@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Register - BW11 DentaLink</title>
+</head>
+
+<body>
+
+    <h1>Create Your DentaLink Account</h1>
+
+    <p>
+        Your account will need to be reviewed and approved
+        by an administrator before you can access the system.
+    </p>
+
+    <form method="POST">
+
+        <!-- PERSONAL INFORMATION -->
+
+        <h2>Personal Information</h2>
+
+        <div>
+            <label for="first_name">First Name</label>
+            <br>
+
+            <input
+                type="text"
+                id="first_name"
+                name="first_name"
+                required
+            >
+        </div>
+
+        <br>
+
+        <div>
+            <label for="last_name">Last Name</label>
+            <br>
+
+            <input
+                type="text"
+                id="last_name"
+                name="last_name"
+                required
+            >
+        </div>
+
+        <br>
+
+        <div>
+            <label for="display_name">Display Name</label>
+            <br>
+
+            <input
+                type="text"
+                id="display_name"
+                name="display_name"
+                required
+            >
+        </div>
+
+        <br>
+
+        <div>
+            <label for="phone">Phone Number</label>
+            <br>
+
+            <input
+                type="tel"
+                id="phone"
+                name="phone"
+                placeholder="09XXXXXXXXX"
+                required
+            >
+        </div>
+
+        <br>
+
+
+        <!-- PROFESSIONAL INFORMATION -->
+
+        <h2>Professional Information</h2>
+
+        <div>
+
+            <label for="role">Requested Role</label>
+            <br>
+
+            <select id="role" name="role" required>
+
+                <option value="">
+                    -- Select your role --
+                </option>
+
+                <option value="dentist">
+                    Dentist
+                </option>
+
+                <option value="technician">
+                    Dental Technician
+                </option>
+
+            </select>
+
+        </div>
+
+        <br>
+
+        <div>
+
+            <label for="professional_id">
+                Professional / License ID
+            </label>
+
+            <br>
+
+            <input
+                type="text"
+                id="professional_id"
+                name="professional_id"
+                placeholder="Enter your professional ID"
+                required
+            >
+
+        </div>
+
+        <br>
+
+
+        <!-- ACCOUNT INFORMATION -->
+
+        <h2>Account Information</h2>
+
+        <div>
+
+            <label for="email">Email Address</label>
+            <br>
+
+            <input
+                type="email"
+                id="email"
+                name="email"
+                required
+            >
+
+        </div>
+
+        <br>
+
+        <div>
+
+            <label for="password">Password</label>
+            <br>
+
+            <input
+                type="password"
+                id="password"
+                name="password"
+                minlength="8"
+                required
+            >
+
+        </div>
+
+        <br>
+
+        <div>
+
+            <label for="confirm_password">
+                Confirm Password
+            </label>
+
+            <br>
+
+            <input
+                type="password"
+                id="confirm_password"
+                name="confirm_password"
+                minlength="8"
+                required
+            >
+
+        </div>
+
+        <br>
+
+        <button type="submit">
+            Submit Registration
+        </button>
+
+    </form>
+
+    <br>
+
+    <p>
+        Already have an account?
+        <a href="{{ url_for('login') }}">
+            Login
+        </a>
+    </p>
+
+    <p>
+        <a href="{{ url_for('home') }}">
+            Back to Home
+        </a>
+    </p>
+
+</body>
+
+</html>

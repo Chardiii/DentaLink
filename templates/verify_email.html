@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Verify Your Email - BW11 DentaLink</title>
+
+</head>
+
+<body>
+
+    <h1>Check Your Email</h1>
+
+    <p>
+        We've sent a verification link to:
+    </p>
+
+    <h3>{{ email }}</h3>
+
+    <p>
+        Please open your email and click
+        <strong>Verify Email</strong>
+        to verify your account.
+    </p>
+
+    <p>
+        After your email has been verified,
+        your account will still need to be
+        approved by a DentaLink administrator.
+    </p>
+
+    <hr>
+
+    <h3>What happens next?</h3>
+
+    <ol>
+
+        <li>
+            Verify your email.
+        </li>
+
+        <li>
+            Wait for administrator approval.
+        </li>
+
+        <li>
+            Once approved, you can access DentaLink.
+        </li>
+
+    </ol>
+
+    <br>
+
+    <a href="{{ url_for('home') }}">
+        Back to Home
+    </a>
+
+</body>
+
+</html>
