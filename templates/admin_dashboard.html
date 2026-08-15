@@ -5,18 +5,13 @@
 
     <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Admin Dashboard - BW11 DentaLink</title>
+    <title>Admin Dashboard - DentaLink</title>
 
 </head>
 
 <body>
-
-    <!-- HEADER -->
 
     <header>
 
@@ -29,19 +24,16 @@
     </header>
 
 
-    <!-- MAIN CONTENT -->
-
     <main>
 
-        <h2>Dashboard</h2>
-
-        <p>
-            Welcome,
-            <strong>{{ profile.display_name }}</strong>
-        </p>
+        <h2>
+            Welcome, {{ profile.display_name }}
+        </h2>
 
 
-        <!-- SUMMARY -->
+        <!-- ========================= -->
+        <!-- OVERVIEW -->
+        <!-- ========================= -->
 
         <section>
 
@@ -49,17 +41,17 @@
 
             <p>
                 Pending Applications:
-                <strong>0</strong>
+                <strong>{{ pending_count }}</strong>
             </p>
 
             <p>
                 Approved Users:
-                <strong>1</strong>
+                <strong>{{ approved_count }}</strong>
             </p>
 
             <p>
                 Total Users:
-                <strong>1</strong>
+                <strong>{{ total_count }}</strong>
             </p>
 
         </section>
@@ -68,15 +60,100 @@
         <hr>
 
 
+        <!-- ========================= -->
         <!-- PENDING APPLICATIONS -->
+        <!-- ========================= -->
 
         <section>
 
             <h2>Pending Applications</h2>
 
-            <p>
-                There are currently no pending applications.
-            </p>
+
+            {% if pending_users %}
+
+                {% for user in pending_users %}
+
+                    <div>
+
+                        <h3>
+                            {{ user.display_name }}
+                        </h3>
+
+                        <p>
+                            <strong>First Name:</strong>
+                            {{ user.first_name }}
+                        </p>
+
+                        <p>
+                            <strong>Last Name:</strong>
+                            {{ user.last_name }}
+                        </p>
+
+                        <p>
+                            <strong>Phone:</strong>
+                            {{ user.phone }}
+                        </p>
+
+                        <p>
+                            <strong>Professional ID:</strong>
+                            {{ user.professional_id }}
+                        </p>
+
+                        <p>
+                            <strong>Role:</strong>
+                            {{ user.role }}
+                        </p>
+
+                        <p>
+                            <strong>Status:</strong>
+                            {{ user.status }}
+                        </p>
+
+
+                        <!-- APPROVE -->
+
+                        <form
+                            method="POST"
+                            action="{{ url_for('approve_user', user_id=user.id) }}"
+                            style="display:inline;"
+                        >
+
+                            <button type="submit">
+                                APPROVE
+                            </button>
+
+                        </form>
+
+
+                        <!-- REJECT -->
+
+                        <form
+                            method="POST"
+                            action="{{ url_for('reject_user', user_id=user.id) }}"
+                            style="display:inline;"
+                        >
+
+                            <button type="submit">
+                                REJECT
+                            </button>
+
+                        </form>
+
+
+                        <hr>
+
+                    </div>
+
+                {% endfor %}
+
+
+            {% else %}
+
+                <p>
+                    No pending applications.
+                </p>
+
+            {% endif %}
 
         </section>
 
@@ -84,42 +161,23 @@
         <hr>
 
 
-        <!-- USER MANAGEMENT -->
+        <!-- ========================= -->
+        <!-- LOGOUT -->
+        <!-- ========================= -->
 
-        <section>
+        <form
+            method="POST"
+            action="{{ url_for('logout') }}"
+        >
 
-            <h2>User Management</h2>
-
-            <p>
-                User management will appear here.
-            </p>
-
-        </section>
-
-
-        <hr>
-
-
-        <!-- QUICK ACTIONS -->
-
-        <section>
-
-            <h2>Quick Actions</h2>
-
-            <button>
-                View Pending Applications
+            <button type="submit">
+                Logout
             </button>
 
-            <button>
-                Manage Users
-            </button>
-
-        </section>
+        </form>
 
     </main>
 
-
-    <!-- FOOTER -->
 
     <footer>
 

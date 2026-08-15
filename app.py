@@ -66,11 +66,11 @@ def admin_dashboard():
 
 
     # =========================
-    # GET USER PROFILE
+    # GET ADMIN PROFILE
     # =========================
 
     response = (
-        supabase
+        supabase_admin
         .table("profiles")
         .select("*")
         .eq("id", user_id)
@@ -81,10 +81,6 @@ def admin_dashboard():
     profile = response.data
 
 
-    # =========================
-    # CHECK PROFILE
-    # =========================
-
     if not profile:
 
         session.clear()
@@ -93,12 +89,12 @@ def admin_dashboard():
 
 
     # =========================
-    # CHECK ROLE
+    # CHECK ADMIN ROLE
     # =========================
 
     if profile["role"] != "admin":
 
-        return "Access denied. Administrator privileges required.", 403
+        return "Access denied.", 403
 
 
     # =========================
@@ -107,17 +103,183 @@ def admin_dashboard():
 
     if profile["status"] != "approved":
 
-        return "Your administrator account is not approved.", 403
+        return "Administrator account is not approved.", 403
 
 
     # =========================
-    # ADMIN DASHBOARD
+    # GET PENDING USERS
     # =========================
+
+    pending_response = (
+        supabase_admin
+        .table("profiles")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    pending_users = pending_response.data or []
+
+
+    # =========================
+    # GET ALL USERS
+    # =========================
+
+    all_response = (
+        supabase_admin
+        .table("profiles")
+        .select("id, status")
+        .execute()
+    )
+
+    all_users = all_response.data or []
+
+
+    pending_count = len([
+        user for user in all_users
+        if user["status"] == "pending"
+    ])
+
+    approved_count = len([
+        user for user in all_users
+        if user["status"] == "approved"
+    ])
+
+    total_count = len(all_users)
+
 
     return render_template(
         "admin_dashboard.html",
-        profile=profile
+
+        profile=profile,
+
+        pending_users=pending_users,
+
+        pending_count=pending_count,
+
+        approved_count=approved_count,
+
+        total_count=total_count
     )
+
+# =========================
+# APPROVE USER
+# =========================
+
+@app.route("/admin/approve/<user_id>", methods=["POST"])
+def approve_user(user_id):
+
+    # Check admin is logged in
+
+    admin_id = session.get("user_id")
+
+    if not admin_id:
+
+        return redirect(url_for("login"))
+
+
+    # Get admin profile
+
+    response = (
+        supabase_admin
+        .table("profiles")
+        .select("*")
+        .eq("id", admin_id)
+        .single()
+        .execute()
+    )
+
+    admin_profile = response.data
+
+
+    if not admin_profile:
+
+        return "Admin profile not found.", 403
+
+
+    # Verify admin
+
+    if admin_profile["role"] != "admin":
+
+        return "Access denied.", 403
+
+
+    if admin_profile["status"] != "approved":
+
+        return "Access denied.", 403
+
+
+    # Approve user
+
+    supabase_admin \
+        .table("profiles") \
+        .update({
+            "status": "approved"
+        }) \
+        .eq("id", user_id) \
+        .execute()
+
+
+    return redirect(url_for("admin_dashboard"))
+# =========================
+# REJECT USER
+# =========================
+@app.route("/admin/reject/<user_id>", methods=["POST"])
+def reject_user(user_id):
+
+    # Check admin is logged in
+
+    admin_id = session.get("user_id")
+
+    if not admin_id:
+
+        return redirect(url_for("login"))
+
+
+    # Get admin profile
+
+    response = (
+        supabase_admin
+        .table("profiles")
+        .select("*")
+        .eq("id", admin_id)
+        .single()
+        .execute()
+    )
+
+    admin_profile = response.data
+
+
+    if not admin_profile:
+
+        return "Admin profile not found.", 403
+
+
+    # Verify admin
+
+    if admin_profile["role"] != "admin":
+
+        return "Access denied.", 403
+
+
+    if admin_profile["status"] != "approved":
+
+        return "Access denied.", 403
+
+
+    # Reject user
+
+    supabase_admin \
+        .table("profiles") \
+        .update({
+            "status": "rejected"
+        }) \
+        .eq("id", user_id) \
+        .execute()
+
+
+    return redirect(url_for("admin_dashboard"))
 # =========================
 # REGISTER
 # =========================
