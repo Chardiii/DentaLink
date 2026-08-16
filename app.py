@@ -22,7 +22,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
-
+APP_URL = os.getenv("APP_URL")
 supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
@@ -423,6 +423,125 @@ def login():
 
     return render_template("login.html")
 
+# =========================
+# FORGOT PASSWORD
+# =========================
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+
+    if request.method == "POST":
+
+        email = request.form["email"].strip().lower()
+
+        try:
+
+            # =========================
+            # FIND USER IN SUPABASE AUTH
+            # =========================
+
+            users_response = supabase_admin.auth.admin.list_users()
+
+            auth_user = None
+
+            for user in users_response:
+
+                if user.email and user.email.lower() == email:
+                    auth_user = user
+                    break
+
+
+            # =========================
+            # DON'T REVEAL WHETHER
+            # THE ACCOUNT EXISTS
+            # =========================
+
+            if not auth_user:
+
+                return render_template(
+                    "reset_email_sent.html"
+                )
+
+
+            # =========================
+            # GET PROFILE
+            # =========================
+
+            profile_response = (
+                supabase_admin
+                .table("profiles")
+                .select("id, role, status")
+                .eq("id", auth_user.id)
+                .execute()
+            )
+
+            profiles = profile_response.data
+
+
+            # =========================
+            # NO PROFILE
+            # =========================
+
+            if not profiles:
+
+                return render_template(
+                    "reset_email_sent.html"
+                )
+
+
+            profile = profiles[0]
+
+
+            # =========================
+            # BLOCK ADMIN PASSWORD RESET
+            # =========================
+
+            if profile["role"] == "admin":
+
+                return render_template(
+                    "reset_email_sent.html"
+                )
+
+
+            # =========================
+            # SEND RESET EMAIL
+            # =========================
+
+            supabase.auth.reset_password_for_email(
+                email,
+                options={
+                    "redirect_to": f"{APP_URL}/reset-password"
+                }
+            )
+
+
+            # =========================
+            # SHOW GENERIC SUCCESS PAGE
+            # =========================
+
+            return render_template(
+                "reset_email_sent.html"
+            )
+
+
+        except Exception as e:
+
+            return f"Password reset error: {str(e)}"
+
+
+    return render_template("forgot_password.html")
+
+# =========================
+# RESET PASSWORD
+# =========================
+@app.route("/reset-password")
+def reset_password():
+
+    return render_template(
+        "reset_password.html",
+        supabase_url=SUPABASE_URL,
+        supabase_publishable_key=SUPABASE_KEY
+    )
 
 # =========================
 # LOGOUT
