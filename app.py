@@ -3,6 +3,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
 
 # Load variables from .env
 load_dotenv()
@@ -549,22 +550,28 @@ def dentist_dashboard():
 @app.route("/dentist/cases/new", methods=["GET", "POST"])
 def create_dental_case():
 
-    # =========================
+    # ==========================================
+    # STORAGE
+    # ==========================================
+
+    CASE_FILES_BUCKET = "dental-case-files"
+
+
+    # ==========================================
     # CHECK LOGIN
-    # =========================
+    # ==========================================
 
     user_id = session.get("user_id")
 
     if not user_id:
-
         return redirect(url_for("login"))
 
 
     try:
 
-        # =========================
+        # ==========================================
         # GET DENTIST PROFILE
-        # =========================
+        # ==========================================
 
         response = (
             supabase_admin
@@ -587,22 +594,22 @@ def create_dental_case():
         profile = profiles[0]
 
 
-        # =========================
+        # ==========================================
         # CHECK ROLE
-        # =========================
+        # ==========================================
 
-        if profile["role"] != "dentist":
+        if profile.get("role") != "dentist":
 
             return "Access denied.", 403
 
 
-        # =========================
+        # ==========================================
         # CHECK APPROVAL
-        # =========================
+        # ==========================================
 
-        if profile["status"] != "approved":
+        if profile.get("status") != "approved":
 
-            if profile["status"] == "pending":
+            if profile.get("status") == "pending":
 
                 return (
                     "Your account is still waiting "
@@ -610,7 +617,7 @@ def create_dental_case():
                     403
                 )
 
-            if profile["status"] == "rejected":
+            if profile.get("status") == "rejected":
 
                 return (
                     "Your account application was rejected.",
@@ -620,124 +627,121 @@ def create_dental_case():
             return "Your account is not approved.", 403
 
 
-        # =========================
-        # CREATE CASE
-        # =========================
+        # ==========================================
+        # POST
+        # ==========================================
 
         if request.method == "POST":
 
-            patient_name = request.form["patient_name"].strip()
+            # ======================================
+            # BASIC CASE INFORMATION
+            # ======================================
+
+            patient_name = (
+                request.form.get(
+                    "patient_name",
+                    ""
+                ).strip()
+            )
+
 
             patient_reference = (
-                request.form.get("patient_reference", "").strip()
+                request.form.get(
+                    "patient_reference",
+                    ""
+                ).strip()
                 or None
             )
 
-            case_type = request.form["case_type"].strip()
 
-            material = (
-                request.form.get("material", "").strip()
-                or None
+            case_type = (
+                request.form.get(
+                    "case_type",
+                    ""
+                ).strip()
             )
 
-            shade = (
-                request.form.get("shade", "").strip()
-                or None
-            )
 
             instructions = (
-                request.form.get("instructions", "").strip()
+                request.form.get(
+                    "instructions",
+                    ""
+                ).strip()
                 or None
             )
 
 
-            # =========================
-            # BASIC VALIDATION
-            # =========================
+            # ======================================
+            # SUBMIT ACTION
+            #
+            # SAVE DRAFT = draft
+            # SEND       = submitted
+            # ======================================
+
+            submit_action = (
+                request.form.get(
+                    "submit_action",
+                    "draft"
+                ).strip()
+            )
+
+
+            if submit_action == "send":
+
+                case_status = "submitted"
+
+            else:
+
+                case_status = "draft"
+
+
+            # ======================================
+            # VALIDATION
+            # ======================================
 
             if not patient_name:
 
-                return "Patient name is required.", 400
+                return (
+                    "Patient name is required.",
+                    400
+                )
 
 
             if not case_type:
 
-                return "Case type is required.", 400
+                return (
+                    "Case type is required.",
+                    400
+                )
 
 
-            # =========================
-            # GENERATE CASE NUMBER
-            # =========================
-
-            existing_cases_response = (
-                supabase_admin
-                .table("dental_cases")
-                .select("id")
-                .execute()
-            )
-
-            existing_cases = (
-                existing_cases_response.data or []
-            )
-
-            case_number = (
-                f"DL-{len(existing_cases) + 1:05d}"
-            )
-
-
-            # =========================
-            # CREATE DENTAL CASE
-            # =========================
-
-            case_response = (
-                supabase_admin
-                .table("dental_cases")
-                .insert({
-                    "case_number": case_number,
-                    "dentist_id": user_id,
-                    "patient_name": patient_name,
-                    "patient_reference": patient_reference,
-                    "case_type": case_type,
-                    "material": material,
-                    "shade": shade,
-                    "instructions": instructions,
-                    "status": "draft"
-                })
-                .execute()
-            )
-
-
-            created_cases = case_response.data or []
-
-
-            if not created_cases:
-
-                return "Failed to create dental case.", 500
-
-
-            case = created_cases[0]
-
-
-            # =========================
-            # GET TEETH FROM FORM
-            # =========================
+            # ======================================
+            # GET SELECTED TEETH
+            # ======================================
 
             tooth_numbers = request.form.getlist(
                 "tooth_number"
             )
 
-            restoration_types = request.form.getlist(
-                "restoration_type"
+
+            materials = request.form.getlist(
+                "material"
             )
+
+
+            shades = request.form.getlist(
+                "shade"
+            )
+
 
             tooth_notes = request.form.getlist(
                 "tooth_notes"
             )
 
 
-            # =========================
-            # CREATE CASE TEETH
-            # =========================
+            # ======================================
+            # BUILD TEETH DATA
+            # ======================================
 
             teeth_to_insert = []
 
@@ -746,101 +750,821 @@ def create_dental_case():
                 tooth_numbers
             ):
 
-                tooth_number = tooth_number.strip()
+                tooth_number = (
+                    tooth_number.strip()
+                )
 
 
                 if not tooth_number:
-
                     continue
 
 
-                restoration_type = ""
+                # ----------------------------------
+                # MATERIAL
+                # ----------------------------------
 
+                material = None
 
-                if index < len(restoration_types):
+                if index < len(materials):
 
-                    restoration_type = (
-                        restoration_types[index].strip()
-                    )
-
-
-                notes = None
-
-
-                if index < len(tooth_notes):
-
-                    notes = (
-                        tooth_notes[index].strip()
+                    material = (
+                        materials[index]
+                        .strip()
                         or None
                     )
 
 
-                if not restoration_type:
+                # ----------------------------------
+                # SHADE
+                # ----------------------------------
 
-                    continue
+                shade = None
+
+                if index < len(shades):
+
+                    shade = (
+                        shades[index]
+                        .strip()
+                        or None
+                    )
+
+
+                # ----------------------------------
+                # NOTES
+                # ----------------------------------
+
+                notes = None
+
+                if index < len(tooth_notes):
+
+                    notes = (
+                        tooth_notes[index]
+                        .strip()
+                        or None
+                    )
+
+
+                # ----------------------------------
+                # RESTORATION TYPE
+                #
+                # Case type is automatically used
+                # as restoration type for each tooth.
+                # ----------------------------------
+
+                restoration_type = case_type
 
 
                 teeth_to_insert.append({
 
-                    "case_id": case["id"],
+                    "tooth_number":
+                        tooth_number,
 
-                    "tooth_number": tooth_number,
+                    "restoration_type":
+                        restoration_type,
 
-                    "restoration_type": restoration_type,
+                    "material":
+                        material,
 
-                    "notes": notes
+                    "shade":
+                        shade,
+
+                    "notes":
+                        notes
 
                 })
 
 
-            # =========================
+            # ======================================
             # REQUIRE AT LEAST ONE TOOTH
-            # =========================
+            # ======================================
 
             if not teeth_to_insert:
 
-                # Remove the case if no teeth
-                # were provided.
+                return (
+                    "Please select at least one tooth.",
+                    400
+                )
+
+
+            # ======================================
+            # VALIDATE STL FILE
+            # ======================================
+
+            stl_file = request.files.get(
+                "stl_file"
+            )
+
+
+            if (
+                stl_file
+                and stl_file.filename
+            ):
+
+                stl_filename = secure_filename(
+                    stl_file.filename
+                )
+
+
+                if not stl_filename:
+
+                    return (
+                        "Invalid STL filename.",
+                        400
+                    )
+
+
+                if not stl_filename.lower().endswith(
+                    ".stl"
+                ):
+
+                    return (
+                        "Only STL files are allowed "
+                        "for the STL upload.",
+                        400
+                    )
+
+
+            # ======================================
+            # GET SMILE FILES
+            # ======================================
+
+            smile_files = request.files.getlist(
+                "patient_smile"
+            )
+
+
+            allowed_image_extensions = {
+
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp"
+
+            }
+
+
+            for smile_file in smile_files:
+
+                if not smile_file:
+                    continue
+
+
+                if not smile_file.filename:
+                    continue
+
+
+                smile_filename = secure_filename(
+                    smile_file.filename
+                )
+
+
+                if not smile_filename:
+
+                    return (
+                        "Invalid patient smile "
+                        "filename.",
+                        400
+                    )
+
+
+                extension = ""
+
+
+                if "." in smile_filename:
+
+                    extension = (
+                        "."
+                        + smile_filename.rsplit(
+                            ".",
+                            1
+                        )[1].lower()
+                    )
+
+
+                if (
+                    extension
+                    not in allowed_image_extensions
+                ):
+
+                    return (
+                        "Only JPG, JPEG, PNG, "
+                        "or WEBP images are allowed.",
+                        400
+                    )
+
+
+            # ======================================
+            # GENERATE CASE NUMBER
+            # ======================================
+
+            existing_cases_response = (
+                supabase_admin
+                .table("dental_cases")
+                .select("id")
+                .execute()
+            )
+
+
+            existing_cases = (
+                existing_cases_response.data
+                or []
+            )
+
+
+            case_number = (
+                f"DL-{len(existing_cases) + 1:05d}"
+            )
+
+
+            # ======================================
+            # CREATE DENTAL CASE
+            # ======================================
+
+            case_response = (
+                supabase_admin
+                .table("dental_cases")
+                .insert({
+
+                    "case_number":
+                        case_number,
+
+                    "dentist_id":
+                        user_id,
+
+                    "patient_name":
+                        patient_name,
+
+                    "patient_reference":
+                        patient_reference,
+
+                    "case_type":
+                        case_type,
+
+                    "instructions":
+                        instructions,
+
+                    "status":
+                        case_status
+
+                })
+                .execute()
+            )
+
+
+            created_cases = (
+                case_response.data
+                or []
+            )
+
+
+            if not created_cases:
+
+                return (
+                    "Failed to create dental case.",
+                    500
+                )
+
+
+            case = created_cases[0]
+
+
+            # ======================================
+            # ADD CASE ID TO TEETH
+            # ======================================
+
+            for tooth in teeth_to_insert:
+
+                tooth["case_id"] = case["id"]
+
+
+            # ======================================
+            # INSERT CASE TEETH
+            # ======================================
+
+            try:
+
+                teeth_response = (
+                    supabase_admin
+                    .table("case_teeth")
+                    .insert(teeth_to_insert)
+                    .execute()
+                )
+
+            except Exception as teeth_error:
 
                 (
                     supabase_admin
                     .table("dental_cases")
                     .delete()
-                    .eq("id", case["id"])
+                    .eq(
+                        "id",
+                        case["id"]
+                    )
                     .execute()
                 )
 
                 return (
-                    "At least one tooth is required.",
-                    400
+                    "Failed to save selected teeth: "
+                    f"{str(teeth_error)}",
+                    500
                 )
 
 
-            # =========================
-            # INSERT TEETH
-            # =========================
+            if not teeth_response.data:
 
-            (
-                supabase_admin
-                .table("case_teeth")
-                .insert(teeth_to_insert)
-                .execute()
-            )
+                (
+                    supabase_admin
+                    .table("dental_cases")
+                    .delete()
+                    .eq(
+                        "id",
+                        case["id"]
+                    )
+                    .execute()
+                )
+
+                return (
+                    "Failed to save selected teeth.",
+                    500
+                )
 
 
-            # =========================
-            # REDIRECT TO DENTIST
-            # DASHBOARD
-            # =========================
+            # ======================================
+            # FILE RECORDS
+            # ======================================
+
+            uploaded_files = []
+
+
+            # ======================================
+            # STL FILE UPLOAD
+            # ======================================
+
+            if (
+                stl_file
+                and stl_file.filename
+            ):
+
+                original_name = (
+                    stl_file.filename
+                )
+
+
+                safe_name = secure_filename(
+                    original_name
+                )
+
+
+                storage_path = (
+                    f"{user_id}/"
+                    f"{case['id']}/"
+                    f"stl/"
+                    f"{safe_name}"
+                )
+
+
+                file_bytes = stl_file.read()
+
+
+                mime_type = (
+                    stl_file.mimetype
+                    or "application/octet-stream"
+                )
+
+
+                file_size = len(file_bytes)
+
+
+                try:
+
+                    (
+                        supabase_admin
+                        .storage
+                        .from_(CASE_FILES_BUCKET)
+                        .upload(
+                            storage_path,
+                            file_bytes,
+                            {
+                                "content-type":
+                                    mime_type,
+
+                                "upsert":
+                                    "false"
+                            }
+                        )
+                    )
+
+                except Exception as upload_error:
+
+                    # ------------------------------
+                    # ROLLBACK CASE TEETH
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("case_teeth")
+                        .delete()
+                        .eq(
+                            "case_id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("dental_cases")
+                        .delete()
+                        .eq(
+                            "id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    return (
+                        "Failed to upload STL file: "
+                        f"{str(upload_error)}",
+                        500
+                    )
+
+
+                # ------------------------------
+                # PREPARE DATABASE RECORD
+                #
+                # IMPORTANT:
+                # case_files has:
+                #
+                # id
+                # case_id
+                # uploaded_by
+                # file_name
+                # file_path
+                # file_type
+                # mime_type
+                # file_size
+                #
+                # There is NO:
+                # storage_bucket
+                # storage_path
+                # ------------------------------
+
+                uploaded_files.append({
+
+                    "case_id":
+                        case["id"],
+
+                    "uploaded_by":
+                        user_id,
+
+                    "file_name":
+                        original_name,
+
+                    "file_path":
+                        storage_path,
+
+                    "file_type":
+                        "stl",
+
+                    "mime_type":
+                        mime_type,
+
+                    "file_size":
+                        file_size
+
+                })
+
+
+            # ======================================
+            # PATIENT SMILE PHOTO UPLOADS
+            # ======================================
+
+            for smile_file in smile_files:
+
+                if not smile_file:
+                    continue
+
+
+                if not smile_file.filename:
+                    continue
+
+
+                original_name = (
+                    smile_file.filename
+                )
+
+
+                safe_name = secure_filename(
+                    original_name
+                )
+
+
+                storage_path = (
+                    f"{user_id}/"
+                    f"{case['id']}/"
+                    f"smile/"
+                    f"{safe_name}"
+                )
+
+
+                file_bytes = smile_file.read()
+
+
+                mime_type = (
+                    smile_file.mimetype
+                    or "image/jpeg"
+                )
+
+
+                file_size = len(file_bytes)
+
+
+                try:
+
+                    (
+                        supabase_admin
+                        .storage
+                        .from_(CASE_FILES_BUCKET)
+                        .upload(
+                            storage_path,
+                            file_bytes,
+                            {
+                                "content-type":
+                                    mime_type,
+
+                                "upsert":
+                                    "false"
+                            }
+                        )
+                    )
+
+                except Exception as upload_error:
+
+                    # ------------------------------
+                    # REMOVE ALREADY UPLOADED FILES
+                    # ------------------------------
+
+                    for uploaded_file in uploaded_files:
+
+                        try:
+
+                            (
+                                supabase_admin
+                                .storage
+                                .from_(
+                                    CASE_FILES_BUCKET
+                                )
+                                .remove([
+                                    uploaded_file[
+                                        "file_path"
+                                    ]
+                                ])
+                            )
+
+                        except Exception:
+
+                            pass
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE TEETH
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("case_teeth")
+                        .delete()
+                        .eq(
+                            "case_id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("dental_cases")
+                        .delete()
+                        .eq(
+                            "id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    return (
+                        "Failed to upload patient "
+                        "smile photo: "
+                        f"{str(upload_error)}",
+                        500
+                    )
+
+
+                # ------------------------------
+                # PREPARE DATABASE RECORD
+                # ------------------------------
+                uploaded_files.append({
+
+                    "case_id":
+                        case["id"],
+
+                    "uploaded_by":
+                        user_id,
+
+                    "file_name":
+                        original_name,
+
+                    "file_path":
+                        storage_path,
+
+                    "file_type":
+                        "smile_image",
+
+                    "mime_type":
+                        mime_type,
+
+                    "file_size":
+                        file_size
+
+                })
+
+
+            # ======================================
+            # SAVE FILE RECORDS
+            # ======================================
+
+            if uploaded_files:
+
+                try:
+
+                    file_response = (
+                        supabase_admin
+                        .table("case_files")
+                        .insert(uploaded_files)
+                        .execute()
+                    )
+
+                except Exception as file_error:
+
+                    # ------------------------------
+                    # REMOVE STORAGE FILES
+                    # ------------------------------
+
+                    for uploaded_file in uploaded_files:
+
+                        try:
+
+                            (
+                                supabase_admin
+                                .storage
+                                .from_(
+                                    CASE_FILES_BUCKET
+                                )
+                                .remove([
+                                    uploaded_file[
+                                        "file_path"
+                                    ]
+                                ])
+                            )
+
+                        except Exception:
+
+                            pass
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE TEETH
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("case_teeth")
+                        .delete()
+                        .eq(
+                            "case_id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("dental_cases")
+                        .delete()
+                        .eq(
+                            "id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    return (
+                        "Failed to save uploaded "
+                        "file records: "
+                        f"{str(file_error)}",
+                        500
+                    )
+
+
+                if not file_response.data:
+
+                    # ------------------------------
+                    # REMOVE STORAGE FILES
+                    # ------------------------------
+
+                    for uploaded_file in uploaded_files:
+
+                        try:
+
+                            (
+                                supabase_admin
+                                .storage
+                                .from_(
+                                    CASE_FILES_BUCKET
+                                )
+                                .remove([
+                                    uploaded_file[
+                                        "file_path"
+                                    ]
+                                ])
+                            )
+
+                        except Exception:
+
+                            pass
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE TEETH
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("case_teeth")
+                        .delete()
+                        .eq(
+                            "case_id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    # ------------------------------
+                    # ROLLBACK CASE
+                    # ------------------------------
+
+                    (
+                        supabase_admin
+                        .table("dental_cases")
+                        .delete()
+                        .eq(
+                            "id",
+                            case["id"]
+                        )
+                        .execute()
+                    )
+
+
+                    return (
+                        "Failed to save uploaded "
+                        "file records.",
+                        500
+                    )
+
+
+            # ======================================
+            # SUCCESS
+            # ======================================
 
             return redirect(
-                url_for("dentist_dashboard")
+                url_for(
+                    "dentist_dashboard"
+                )
             )
 
 
-        # =========================
-        # SHOW CREATE CASE PAGE
-        # =========================
+        # ==========================================
+        # GET
+        # ==========================================
 
         return render_template(
             "create_dental_case.html",
@@ -848,9 +1572,16 @@ def create_dental_case():
         )
 
 
+    # ==========================================
+    # GENERAL ERROR
+    # ==========================================
+
     except Exception as e:
 
-        return f"Create dental case error: {str(e)}", 500
+        return (
+            f"Create dental case error: {str(e)}",
+            500
+        )
 
 # =========================
 # REGISTER
