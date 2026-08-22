@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Dentist Dashboard - DentaLink</title>
+
+</head>
+
+<body>
+
+    <header>
+
+        <h1>BW11 DentaLink</h1>
+
+        <p>Dentist Dashboard</p>
+
+        <hr>
+
+    </header>
+
+
+    <main>
+
+        <h2>
+            Welcome, {{ profile.display_name }}
+        </h2>
+
+
+        <!-- ========================= -->
+        <!-- PROFILE INFORMATION -->
+        <!-- ========================= -->
+
+        <section>
+
+            <h2>My Profile</h2>
+
+            <p>
+                <strong>First Name:</strong>
+                {{ profile.first_name }}
+            </p>
+
+            <p>
+                <strong>Last Name:</strong>
+                {{ profile.last_name }}
+            </p>
+
+            <p>
+                <strong>Professional ID:</strong>
+                {{ profile.professional_id }}
+            </p>
+
+            <p>
+                <strong>Role:</strong>
+                {{ profile.role }}
+            </p>
+
+            <p>
+                <strong>Account Status:</strong>
+                {{ profile.status }}
+            </p>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- ========================= -->
+        <!-- DENTIST FEATURES -->
+        <!-- ========================= -->
+
+        <section>
+
+            <h2>Dentist Workspace</h2>
+
+            <p>
+                Your DentaLink dentist workspace is ready.
+            </p>
+
+            <p>
+                More dental features will be added here.
+            </p>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- ========================= -->
+        <!-- LOGOUT -->
+        <!-- ========================= -->
+
+        <form
+            method="POST"
+            action="{{ url_for('logout') }}"
+        >
+
+            <button type="submit">
+                Logout
+            </button>
+
+        </form>
+
+    </main>
+
+
+    <footer>
+
+        <hr>
+
+        <p>
+            BW11 DentaLink
+        </p>
+
+    </footer>
+
+</body>
+
+</html>
