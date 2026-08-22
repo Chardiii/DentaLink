@@ -5,7 +5,10 @@
 
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Admin Dashboard - DentaLink</title>
 
@@ -50,6 +53,11 @@
             </p>
 
             <p>
+                Rejected Applications:
+                <strong>{{ rejected_count }}</strong>
+            </p>
+
+            <p>
                 Total Users:
                 <strong>{{ total_count }}</strong>
             </p>
@@ -67,7 +75,6 @@
         <section>
 
             <h2>Pending Applications</h2>
-
 
             {% if pending_users %}
 
@@ -110,31 +117,16 @@
                         </p>
 
 
-                        <!-- APPROVE -->
+                        <!-- REVIEW APPLICATION -->
 
                         <form
-                            method="POST"
-                            action="{{ url_for('approve_user', user_id=user.id) }}"
+                            method="GET"
+                            action="{{ url_for('review_user', user_id=user.id) }}"
                             style="display:inline;"
                         >
 
                             <button type="submit">
-                                APPROVE
-                            </button>
-
-                        </form>
-
-
-                        <!-- REJECT -->
-
-                        <form
-                            method="POST"
-                            action="{{ url_for('reject_user', user_id=user.id) }}"
-                            style="display:inline;"
-                        >
-
-                            <button type="submit">
-                                REJECT
+                                REVIEW APPLICATION
                             </button>
 
                         </form>
@@ -146,11 +138,162 @@
 
                 {% endfor %}
 
-
             {% else %}
 
                 <p>
                     No pending applications.
+                </p>
+
+            {% endif %}
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- ========================= -->
+        <!-- APPROVED USERS -->
+        <!-- ========================= -->
+
+        <section>
+
+            <h2>Approved Users</h2>
+
+            {% if approved_users %}
+
+                {% for user in approved_users %}
+
+                    <div>
+
+                        <h3>
+                            {{ user.display_name }}
+                        </h3>
+
+                        <p>
+                            <strong>First Name:</strong>
+                            {{ user.first_name }}
+                        </p>
+
+                        <p>
+                            <strong>Last Name:</strong>
+                            {{ user.last_name }}
+                        </p>
+
+                        <p>
+                            <strong>Phone:</strong>
+                            {{ user.phone }}
+                        </p>
+
+                        <p>
+                            <strong>Professional ID:</strong>
+                            {{ user.professional_id }}
+                        </p>
+
+                        <p>
+                            <strong>Role:</strong>
+                            {{ user.role }}
+                        </p>
+
+                        <p>
+                            <strong>Status:</strong>
+                            {{ user.status }}
+                        </p>
+
+                        <hr>
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <p>
+                    No approved users.
+                </p>
+
+            {% endif %}
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- ========================= -->
+        <!-- REJECTED APPLICATIONS -->
+        <!-- ========================= -->
+
+        <section>
+
+            <h2>Rejected Applications</h2>
+
+            {% if rejected_users %}
+
+                {% for user in rejected_users %}
+
+                    <div>
+
+                        <h3>
+                            {{ user.display_name }}
+                        </h3>
+
+                        <p>
+                            <strong>First Name:</strong>
+                            {{ user.first_name }}
+                        </p>
+
+                        <p>
+                            <strong>Last Name:</strong>
+                            {{ user.last_name }}
+                        </p>
+
+                        <p>
+                            <strong>Phone:</strong>
+                            {{ user.phone }}
+                        </p>
+
+                        <p>
+                            <strong>Professional ID:</strong>
+                            {{ user.professional_id }}
+                        </p>
+
+                        <p>
+                            <strong>Role:</strong>
+                            {{ user.role }}
+                        </p>
+
+                        <p>
+                            <strong>Status:</strong>
+                            {{ user.status }}
+                        </p>
+
+
+                        <!-- REVIEW REJECTED APPLICATION -->
+
+                        <form
+                            method="GET"
+                            action="{{ url_for('review_user', user_id=user.id) }}"
+                            style="display:inline;"
+                        >
+
+                            <button type="submit">
+                                REVIEW APPLICATION
+                            </button>
+
+                        </form>
+
+
+                        <hr>
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <p>
+                    No rejected applications.
                 </p>
 
             {% endif %}

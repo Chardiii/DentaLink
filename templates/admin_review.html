@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Review Application - DentaLink</title>
+
+</head>
+
+<body>
+
+    <header>
+
+        <h1>BW11 DentaLink</h1>
+
+        <p>Administrator Review</p>
+
+        <hr>
+
+    </header>
+
+
+    <main>
+
+        <h2>Review Application</h2>
+
+
+        <!-- ========================= -->
+        <!-- APPLICANT INFORMATION -->
+        <!-- ========================= -->
+
+        <section>
+
+            <h2>Applicant Information</h2>
+
+            <p>
+                <strong>Display Name:</strong>
+                {{ user.display_name }}
+            </p>
+
+            <p>
+                <strong>First Name:</strong>
+                {{ user.first_name }}
+            </p>
+
+            <p>
+                <strong>Last Name:</strong>
+                {{ user.last_name }}
+            </p>
+
+            <p>
+                <strong>Phone:</strong>
+                {{ user.phone }}
+            </p>
+
+            <p>
+                <strong>Professional ID:</strong>
+                {{ user.professional_id }}
+            </p>
+
+            <p>
+                <strong>Role:</strong>
+                {{ user.role }}
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+                {{ user.status }}
+            </p>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- ========================= -->
+        <!-- PENDING ACTIONS -->
+        <!-- ========================= -->
+
+        {% if user.status == "pending" %}
+
+
+            <h2>Application Actions</h2>
+
+
+            <!-- APPROVE -->
+
+            <form
+                method="POST"
+                action="{{ url_for('approve_user', user_id=user.id) }}"
+            >
+
+                <button type="submit">
+                    APPROVE APPLICATION
+                </button>
+
+            </form>
+
+
+            <br>
+
+
+            <!-- REJECT -->
+
+            <form
+                method="POST"
+                action="{{ url_for('reject_user', user_id=user.id) }}"
+            >
+
+                <button type="submit">
+                    REJECT APPLICATION
+                </button>
+
+            </form>
+
+
+        <!-- ========================= -->
+        <!-- REJECTED ACTIONS -->
+        <!-- ========================= -->
+
+        {% elif user.status == "rejected" %}
+
+
+            <h2>Application Actions</h2>
+
+
+            <p>
+                This application was rejected.
+            </p>
+
+
+            <!-- REOPEN -->
+
+            <form
+                method="POST"
+                action="{{ url_for('reopen_user', user_id=user.id) }}"
+            >
+
+                <button type="submit">
+                    REOPEN APPLICATION
+                </button>
+
+            </form>
+
+
+        {% endif %}
+
+
+        <br>
+
+
+        <!-- ========================= -->
+        <!-- BACK -->
+        <!-- ========================= -->
+
+        <a href="{{ url_for('admin_dashboard') }}">
+
+            <button type="button">
+                Back to Admin Dashboard
+            </button>
+
+        </a>
+
+    </main>
+
+
+    <footer>
+
+        <hr>
+
+        <p>
+            BW11 DentaLink
+        </p>
+
+    </footer>
+
+</body>
+
+</html>

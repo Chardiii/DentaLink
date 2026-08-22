@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Create Dental Case - DentaLink</title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        body {
+
+            font-family: Arial, sans-serif;
+
+            margin: 0;
+
+            padding: 20px;
+
+            background: #f5f7fa;
+
+            color: #222;
+
+        }
+
+
+        header {
+
+            background: white;
+
+            padding: 20px;
+
+            border-radius: 10px;
+
+            margin-bottom: 25px;
+
+        }
+
+
+        main {
+
+            max-width: 1100px;
+
+            margin: auto;
+
+        }
+
+
+        section {
+
+            background: white;
+
+            padding: 25px;
+
+            margin-bottom: 25px;
+
+            border-radius: 10px;
+
+        }
+
+
+        hr {
+
+            border: 0;
+
+            border-top: 1px solid #ddd;
+
+            margin: 25px 0;
+
+        }
+
+
+        h1,
+        h2,
+        h3 {
+
+            margin-top: 0;
+
+        }
+
+
+        input,
+        select,
+        textarea {
+
+            width: 100%;
+
+            max-width: 500px;
+
+            padding: 10px;
+
+            border: 1px solid #bbb;
+
+            border-radius: 5px;
+
+            font-size: 14px;
+
+        }
+
+
+        textarea {
+
+            resize: vertical;
+
+        }
+
+
+        button {
+
+            padding: 10px 16px;
+
+            border: 1px solid #999;
+
+            border-radius: 5px;
+
+            background: white;
+
+            cursor: pointer;
+
+            font-weight: bold;
+
+        }
+
+
+        button:hover {
+
+            background: #eeeeee;
+
+        }
+
+
+        /* ================================= */
+        /* CASE TYPE MESSAGE */
+        /* ================================= */
+
+        #case-type-message {
+
+            margin-top: 10px;
+
+            font-weight: bold;
+
+        }
+
+
+        /* ================================= */
+        /* ODONTOGRAM */
+        /* ================================= */
+
+        .odontogram-wrapper {
+
+            width: 100%;
+
+            overflow-x: auto;
+
+            padding: 20px 0;
+
+        }
+
+
+        .odontogram {
+
+            min-width: 850px;
+
+            max-width: 1000px;
+
+            margin: auto;
+
+        }
+
+
+        .arch-label {
+
+            text-align: center;
+
+            font-weight: bold;
+
+            margin: 10px 0;
+
+            font-size: 18px;
+
+        }
+
+
+        .arch {
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            gap: 5px;
+
+        }
+
+
+        .quadrant {
+
+            display: flex;
+
+            gap: 5px;
+
+        }
+
+
+        .midline {
+
+            width: 2px;
+
+            height: 90px;
+
+            background: #999;
+
+            margin: 0 10px;
+
+        }
+
+
+        /* ================================= */
+        /* TOOTH */
+        /* ================================= */
+
+        .tooth {
+
+            width: 50px;
+
+            min-width: 50px;
+
+            height: 75px;
+
+            padding: 4px;
+
+            border: 1px solid #777;
+
+            background: white;
+
+            border-radius: 8px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            transition: 0.15s;
+
+        }
+
+
+        .tooth:hover {
+
+            background: #eeeeee;
+
+            transform: translateY(-2px);
+
+        }
+
+
+        .tooth-number {
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+        }
+
+
+        /* ================================= */
+        /* TOOTH SHAPE */
+        /* ================================= */
+
+        .tooth-shape {
+
+            width: 32px;
+
+            height: 40px;
+
+            border: 2px solid #444;
+
+            background: #fafafa;
+
+            border-radius: 45% 45% 40% 40%;
+
+            position: relative;
+
+        }
+
+
+        .tooth-shape::before {
+
+            content: "";
+
+            position: absolute;
+
+            left: 7px;
+
+            right: 7px;
+
+            top: 9px;
+
+            bottom: 8px;
+
+            border: 1px solid #aaa;
+
+            border-radius: 50%;
+
+        }
+
+
+        /* ================================= */
+        /* SELECTED TOOTH */
+        /* ================================= */
+
+        .tooth.selected {
+
+            background: #cceeff;
+
+            border: 2px solid #0077cc;
+
+        }
+
+
+        .tooth.selected .tooth-shape {
+
+            background: #b8e4ff;
+
+            border-color: #0077cc;
+
+        }
+
+
+        /* ================================= */
+        /* LOWER ARCH */
+        /* ================================= */
+
+        .lower-arch .tooth-shape {
+
+            border-radius: 40% 40% 50% 50%;
+
+        }
+
+
+        /* ================================= */
+        /* SELECTION INFORMATION */
+        /* ================================= */
+
+        .selection-summary {
+
+            margin-top: 25px;
+
+            padding: 15px;
+
+            border: 1px solid #ccc;
+
+            border-radius: 8px;
+
+            background: #fafafa;
+
+        }
+
+
+        #selected-count {
+
+            font-size: 20px;
+
+            font-weight: bold;
+
+        }
+
+
+        #selected-numbers {
+
+            margin-top: 10px;
+
+            font-weight: bold;
+
+        }
+
+
+        /* ================================= */
+        /* PER TOOTH DETAILS */
+        /* ================================= */
+
+        .tooth-detail {
+
+            border: 1px solid #ccc;
+
+            padding: 15px;
+
+            margin-top: 15px;
+
+            border-radius: 8px;
+
+            background: #fafafa;
+
+        }
+
+
+        .tooth-detail h4 {
+
+            margin-top: 0;
+
+        }
+
+
+        .tooth-detail label {
+
+            display: block;
+
+            margin-top: 10px;
+
+            margin-bottom: 5px;
+
+            font-weight: bold;
+
+        }
+
+
+        /* ================================= */
+        /* ACTIONS */
+        /* ================================= */
+
+        .actions {
+
+            display: flex;
+
+            gap: 10px;
+
+            flex-wrap: wrap;
+
+        }
+
+
+        .primary-button {
+
+            background: #0077cc;
+
+            color: white;
+
+            border-color: #0077cc;
+
+        }
+
+
+        .primary-button:hover {
+
+            background: #005fa3;
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <h1>BW11 DentaLink</h1>
+
+    <p>Create Dental Case</p>
+
+</header>
+
+
+<main>
+
+
+    <!-- ================================= -->
+    <!-- PATIENT INFORMATION -->
+    <!-- ================================= -->
+
+    <section>
+
+        <h2>Patient Information</h2>
+
+
+        <label for="patient_name">
+
+            Patient Name
+
+        </label>
+
+        <br><br>
+
+
+        <input
+            type="text"
+            id="patient_name"
+            name="patient_name"
+            placeholder="Enter patient name"
+        >
+
+
+        <br><br>
+
+
+        <label for="patient_reference">
+
+            Patient Reference
+
+        </label>
+
+        <br><br>
+
+
+        <input
+            type="text"
+            id="patient_reference"
+            name="patient_reference"
+            placeholder="Optional reference number"
+        >
+
+    </section>
+
+
+    <!-- ================================= -->
+    <!-- CASE INFORMATION -->
+    <!-- ================================= -->
+
+    <section>
+
+        <h2>Case Information</h2>
+
+
+        <label for="case_type">
+
+            Case Type
+
+        </label>
+
+        <br><br>
+
+
+        <select id="case_type">
+
+            <option value="">
+
+                Select Case Type
+
+            </option>
+
+
+            <option value="full_denture">
+
+                Full Denture
+
+            </option>
+
+
+            <option value="upper_full_denture">
+
+                Upper Full Denture
+
+            </option>
+
+
+            <option value="lower_full_denture">
+
+                Lower Full Denture
+
+            </option>
+
+
+            <option value="partial_denture">
+
+                Partial Denture
+
+            </option>
+
+
+            <option value="crown">
+
+                Crown
+
+            </option>
+
+
+            <option value="bridge">
+
+                Bridge
+
+            </option>
+
+
+            <option value="veneer">
+
+                Veneer
+
+            </option>
+
+
+            <option value="inlay">
+
+                Inlay
+
+            </option>
+
+
+            <option value="onlay">
+
+                Onlay
+
+            </option>
+
+
+            <option value="other">
+
+                Other
+
+            </option>
+
+        </select>
+
+
+        <p id="case-type-message"></p>
+
+    </section>
+
+
+    <!-- ================================= -->
+    <!-- ODONTOGRAM -->
+    <!-- ================================= -->
+
+    <section>
+
+        <h2>Odontogram</h2>
+
+
+        <p>
+
+            Select the tooth or teeth involved in this
+            dental case.
+
+        </p>
+
+
+        <div class="odontogram-wrapper">
+
+
+            <div class="odontogram">
+
+
+                <!-- =============================== -->
+                <!-- UPPER JAW -->
+                <!-- =============================== -->
+
+                <div class="arch-label">
+
+                    UPPER JAW
+
+                </div>
+
+
+                <div class="arch">
+
+
+                    <!-- UPPER LEFT FROM PATIENT'S VIEW -->
+
+                    <div class="quadrant">
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="18"
+                        >
+
+                            <span class="tooth-number">
+                                18
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="17"
+                        >
+
+                            <span class="tooth-number">
+                                17
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="16"
+                        >
+
+                            <span class="tooth-number">
+                                16
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="15"
+                        >
+
+                            <span class="tooth-number">
+                                15
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="14"
+                        >
+
+                            <span class="tooth-number">
+                                14
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="13"
+                        >
+
+                            <span class="tooth-number">
+                                13
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="12"
+                        >
+
+                            <span class="tooth-number">
+                                12
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="11"
+                        >
+
+                            <span class="tooth-number">
+                                11
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                    </div>
+
+
+                    <div class="midline"></div>
+
+
+                    <!-- UPPER RIGHT -->
+
+                    <div class="quadrant">
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="21"
+                        >
+
+                            <span class="tooth-number">
+                                21
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="22"
+                        >
+
+                            <span class="tooth-number">
+                                22
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="23"
+                        >
+
+                            <span class="tooth-number">
+                                23
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="24"
+                        >
+
+                            <span class="tooth-number">
+                                24
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="25"
+                        >
+
+                            <span class="tooth-number">
+                                25
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="26"
+                        >
+
+                            <span class="tooth-number">
+                                26
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="27"
+                        >
+
+                            <span class="tooth-number">
+                                27
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="28"
+                        >
+
+                            <span class="tooth-number">
+                                28
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                    </div>
+
+
+                </div>
+
+
+                <br>
+
+
+                <!-- =============================== -->
+                <!-- LOWER JAW -->
+                <!-- =============================== -->
+
+                <div class="arch-label">
+
+                    LOWER JAW
+
+                </div>
+
+
+                <div class="arch lower-arch">
+
+
+                    <!-- LOWER LEFT -->
+
+                    <div class="quadrant">
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="48"
+                        >
+
+                            <span class="tooth-number">
+                                48
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="47"
+                        >
+
+                            <span class="tooth-number">
+                                47
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="46"
+                        >
+
+                            <span class="tooth-number">
+                                46
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="45"
+                        >
+
+                            <span class="tooth-number">
+                                45
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="44"
+                        >
+
+                            <span class="tooth-number">
+                                44
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="43"
+                        >
+
+                            <span class="tooth-number">
+                                43
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="42"
+                        >
+
+                            <span class="tooth-number">
+                                42
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="41"
+                        >
+
+                            <span class="tooth-number">
+                                41
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                    </div>
+
+
+                    <div class="midline"></div>
+
+
+                    <!-- LOWER RIGHT -->
+
+                    <div class="quadrant">
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="31"
+                        >
+
+                            <span class="tooth-number">
+                                31
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="32"
+                        >
+
+                            <span class="tooth-number">
+                                32
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="33"
+                        >
+
+                            <span class="tooth-number">
+                                33
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="34"
+                        >
+
+                            <span class="tooth-number">
+                                34
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="35"
+                        >
+
+                            <span class="tooth-number">
+                                35
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="36"
+                        >
+
+                            <span class="tooth-number">
+                                36
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="37"
+                        >
+
+                            <span class="tooth-number">
+                                37
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                        <button
+                            type="button"
+                            class="tooth"
+                            data-tooth="38"
+                        >
+
+                            <span class="tooth-number">
+                                38
+                            </span>
+
+                            <span class="tooth-shape"></span>
+
+                        </button>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================= -->
+        <!-- SELECTION SUMMARY -->
+        <!-- ================================= -->
+
+        <div class="selection-summary">
+
+            <strong>
+                Selected Teeth:
+            </strong>
+
+
+            <span id="selected-count">
+                0
+            </span>
+
+
+            <div id="selected-numbers">
+
+                No teeth selected.
+
+            </div>
+
+        </div>
+
+
+    </section>
+
+
+    <!-- ================================= -->
+    <!-- PER-TOOTH DETAILS -->
+    <!-- ================================= -->
+
+    <section>
+
+        <h2>Selected Tooth Details</h2>
+
+
+        <p>
+
+            Add the requested work for each
+            selected tooth.
+
+        </p>
+
+
+        <div id="tooth-details">
+
+            <p>
+
+                Select a tooth from the odontogram
+                to add details.
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- ================================= -->
+<!-- MATERIAL AND SHADE -->
+<!-- ================================= -->
+
+<section>
+
+    <h2>Material and Shade</h2>
+
+
+    <!-- MATERIAL -->
+
+    <label for="material">
+
+        Material
+
+    </label>
+
+    <br><br>
+
+
+    <select id="material">
+
+        <option value="">
+
+            Select Material
+
+        </option>
+
+
+        <option value="zirconia">
+
+            Zirconia
+
+        </option>
+
+
+        <option value="emax">
+
+            E.max / Lithium Disilicate
+
+        </option>
+
+
+        <option value="porcelain">
+
+            Porcelain
+
+        </option>
+
+
+        <option value="pfm">
+
+            PFM (Porcelain Fused to Metal)
+
+        </option>
+
+
+        <option value="acrylic">
+
+            Acrylic
+
+        </option>
+
+
+        <option value="pmma">
+
+            PMMA
+
+        </option>
+
+
+        <option value="metal">
+
+            Metal
+
+        </option>
+
+
+        <option value="flexible_denture">
+
+            Flexible Denture Material
+
+        </option>
+
+
+        <option value="other">
+
+            Other
+
+        </option>
+
+    </select>
+
+
+    <br><br>
+
+
+    <!-- SHADE -->
+
+    <label for="shade">
+
+        Shade
+
+    </label>
+
+    <br><br>
+
+
+    <select id="shade">
+
+        <option value="">
+
+            Select Shade
+
+        </option>
+
+
+        <option value="A1">
+
+            A1
+
+        </option>
+
+
+        <option value="A2">
+
+            A2
+
+        </option>
+
+
+        <option value="A3">
+
+            A3
+
+        </option>
+
+
+        <option value="A3.5">
+
+            A3.5
+
+        </option>
+
+
+        <option value="A4">
+
+            A4
+
+        </option>
+
+
+        <option value="B1">
+
+            B1
+
+        </option>
+
+
+        <option value="B2">
+
+            B2
+
+        </option>
+
+
+        <option value="B3">
+
+            B3
+
+        </option>
+
+
+        <option value="B4">
+
+            B4
+
+        </option>
+
+
+        <option value="C1">
+
+            C1
+
+        </option>
+
+
+        <option value="C2">
+
+            C2
+
+        </option>
+
+
+        <option value="C3">
+
+            C3
+
+        </option>
+
+
+        <option value="C4">
+
+            C4
+
+        </option>
+
+
+        <option value="D2">
+
+            D2
+
+        </option>
+
+
+        <option value="D3">
+
+            D3
+
+        </option>
+
+
+        <option value="D4">
+
+            D4
+
+        </option>
+
+
+        <option value="BL1">
+
+            BL1
+
+        </option>
+
+
+        <option value="BL2">
+
+            BL2
+
+        </option>
+
+
+        <option value="BL3">
+
+            BL3
+
+        </option>
+
+
+        <option value="BL4">
+
+            BL4
+
+        </option>
+
+    </select>
+
+</section>
+
+
+    <!-- ================================= -->
+    <!-- ACTIONS -->
+    <!-- ================================= -->
+
+    <section>
+
+        <div class="actions">
+
+
+            <button
+                type="button"
+                class="primary-button"
+                onclick="saveDraft()"
+            >
+
+                SAVE DRAFT
+
+            </button>
+
+
+            <button
+                type="button"
+                onclick="sendToTechnician()"
+            >
+
+                SEND TO TECHNICIAN
+
+            </button>
+
+
+            <a href="{{ url_for('dentist_dashboard') }}">
+
+                <button type="button">
+
+                    BACK TO DENTIST DASHBOARD
+
+                </button>
+
+            </a>
+
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+<script>
+
+
+    // =====================================
+    // SELECTED TEETH
+    // =====================================
+
+    const selectedTeeth = new Set();
+
+
+    // =====================================
+    // TOOTH BUTTONS
+    // =====================================
+
+    const toothButtons =
+        document.querySelectorAll(".tooth");
+
+
+    // =====================================
+    // CASE TYPE
+    // =====================================
+
+    const caseType =
+        document.getElementById(
+            "case_type"
+        );
+
+
+    const caseTypeMessage =
+        document.getElementById(
+            "case-type-message"
+        );
+
+
+    // =====================================
+    // CASE TYPE CHANGE
+    // =====================================
+
+    caseType.addEventListener(
+        "change",
+        function () {
+
+
+            clearAllTeeth();
+
+
+            const value =
+                this.value;
+
+
+            if (
+                value ===
+                "full_denture"
+            ) {
+
+
+                selectTeeth([
+                    "18",
+                    "17",
+                    "16",
+                    "15",
+                    "14",
+                    "13",
+                    "12",
+                    "11",
+
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28",
+
+                    "48",
+                    "47",
+                    "46",
+                    "45",
+                    "44",
+                    "43",
+                    "42",
+                    "41",
+
+                    "31",
+                    "32",
+                    "33",
+                    "34",
+                    "35",
+                    "36",
+                    "37",
+                    "38"
+                ]);
+
+
+                caseTypeMessage.textContent =
+                    "All 32 teeth have been selected automatically.";
+
+            }
+
+
+            else if (
+                value ===
+                "upper_full_denture"
+            ) {
+
+
+                selectTeeth([
+
+                    "18",
+                    "17",
+                    "16",
+                    "15",
+                    "14",
+                    "13",
+                    "12",
+                    "11",
+
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28"
+
+                ]);
+
+
+                caseTypeMessage.textContent =
+                    "All 16 upper teeth have been selected automatically.";
+
+            }
+
+
+            else if (
+                value ===
+                "lower_full_denture"
+            ) {
+
+
+                selectTeeth([
+
+                    "48",
+                    "47",
+                    "46",
+                    "45",
+                    "44",
+                    "43",
+                    "42",
+                    "41",
+
+                    "31",
+                    "32",
+                    "33",
+                    "34",
+                    "35",
+                    "36",
+                    "37",
+                    "38"
+
+                ]);
+
+
+                caseTypeMessage.textContent =
+                    "All 16 lower teeth have been selected automatically.";
+
+            }
+
+
+            else if (
+                value ===
+                "partial_denture"
+            ) {
+
+
+                caseTypeMessage.textContent =
+                    "Select the teeth involved in the partial denture.";
+
+            }
+
+
+            else if (value) {
+
+
+                caseTypeMessage.textContent =
+                    "Select the tooth or teeth involved in this case.";
+
+            }
+
+
+            else {
+
+
+                caseTypeMessage.textContent =
+                    "";
+
+            }
+
+
+            updateSelection();
+
+        }
+    );
+
+
+    // =====================================
+    // CLICK TOOTH
+    // =====================================
+
+    toothButtons.forEach(
+        function (tooth) {
+
+
+            tooth.addEventListener(
+                "click",
+                function () {
+
+
+                    const toothNumber =
+                        this.dataset.tooth;
+
+
+                    if (
+                        selectedTeeth.has(
+                            toothNumber
+                        )
+                    ) {
+
+
+                        selectedTeeth.delete(
+                            toothNumber
+                        );
+
+
+                        this.classList.remove(
+                            "selected"
+                        );
+
+                    }
+
+
+                    else {
+
+
+                        selectedTeeth.add(
+                            toothNumber
+                        );
+
+
+                        this.classList.add(
+                            "selected"
+                        );
+
+                    }
+
+
+                    updateSelection();
+
+                }
+            );
+
+        }
+    );
+
+
+    // =====================================
+    // CLEAR ALL TEETH
+    // =====================================
+
+    function clearAllTeeth() {
+
+
+        selectedTeeth.clear();
+
+
+        toothButtons.forEach(
+            function (tooth) {
+
+
+                tooth.classList.remove(
+                    "selected"
+                );
+
+            }
+        );
+
+    }
+
+
+    // =====================================
+    // SELECT TEETH
+    // =====================================
+
+    function selectTeeth(
+        teeth
+    ) {
+
+
+        teeth.forEach(
+            function (toothNumber) {
+
+
+                selectedTeeth.add(
+                    toothNumber
+                );
+
+
+                const button =
+                    document.querySelector(
+                        `.tooth[data-tooth="${toothNumber}"]`
+                    );
+
+
+                if (button) {
+
+
+                    button.classList.add(
+                        "selected"
+                    );
+
+                }
+
+            }
+        );
+
+    }
+
+
+    // =====================================
+    // UPDATE SELECTION
+    // =====================================
+
+    function updateSelection() {
+
+
+        const count =
+            document.getElementById(
+                "selected-count"
+            );
+
+
+        const numbers =
+            document.getElementById(
+                "selected-numbers"
+            );
+
+
+        count.textContent =
+            selectedTeeth.size;
+
+
+        if (
+            selectedTeeth.size === 0
+        ) {
+
+
+            numbers.textContent =
+                "No teeth selected.";
+
+
+        }
+
+
+        else {
+
+
+            const sorted =
+                Array.from(
+                    selectedTeeth
+                ).sort(
+                    function (a, b) {
+
+                        return (
+                            Number(a) -
+                            Number(b)
+                        );
+
+                    }
+                );
+
+
+            numbers.textContent =
+                sorted.join(", ");
+
+        }
+
+
+        updateToothDetails();
+
+    }
+
+
+    // =====================================
+    // PER TOOTH DETAILS
+    // =====================================
+
+    function updateToothDetails() {
+
+
+        const container =
+            document.getElementById(
+                "tooth-details"
+            );
+
+
+        container.innerHTML = "";
+
+
+        if (
+            selectedTeeth.size === 0
+        ) {
+
+
+            container.innerHTML = `
+
+                <p>
+
+                    Select a tooth from the
+                    odontogram to add details.
+
+                </p>
+
+            `;
+
+
+            return;
+
+        }
+
+
+        const sorted =
+            Array.from(
+                selectedTeeth
+            ).sort(
+                function (a, b) {
+
+                    return (
+                        Number(a) -
+                        Number(b)
+                    );
+
+                }
+            );
+
+
+        sorted.forEach(
+            function (toothNumber) {
+
+
+                const detail =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                detail.className =
+                    "tooth-detail";
+
+
+                detail.innerHTML = `
+
+                    <h4>
+                        Tooth ${toothNumber}
+                    </h4>
+
+
+                    <label>
+                        Requested Work
+                    </label>
+
+
+                    <select
+                        data-tooth="${toothNumber}"
+                        class="work-type"
+                    >
+
+                        <option value="">
+                            Select work
+                        </option>
+
+                        <option value="Crown">
+                            Crown
+                        </option>
+
+                        <option value="Bridge">
+                            Bridge
+                        </option>
+
+                        <option value="Veneer">
+                            Veneer
+                        </option>
+
+                        <option value="Inlay">
+                            Inlay
+                        </option>
+
+                        <option value="Onlay">
+                            Onlay
+                        </option>
+
+                        <option value="Denture">
+                            Denture
+                        </option>
+
+                        <option value="Other">
+                            Other
+                        </option>
+
+                    </select>
+
+
+                    <label>
+                        Tooth Notes
+                    </label>
+
+
+                    <textarea
+                        rows="3"
+                        data-tooth="${toothNumber}"
+                        class="tooth-notes"
+                        placeholder="Optional notes for this tooth..."
+                    ></textarea>
+
+                `;
+
+
+                container.appendChild(
+                    detail
+                );
+
+            }
+        );
+
+    }
+
+
+    // =====================================
+    // SAVE DRAFT
+    // =====================================
+
+    function saveDraft() {
+
+
+        if (
+            selectedTeeth.size === 0
+        ) {
+
+
+            alert(
+                "Please select at least one tooth."
+            );
+
+
+            return;
+
+        }
+
+
+        alert(
+
+            "The odontogram selection is working. Save Draft will be connected to Supabase next."
+
+        );
+
+    }
+
+
+    // =====================================
+    // SEND TO TECHNICIAN
+    // =====================================
+
+    function sendToTechnician() {
+
+
+        if (
+            selectedTeeth.size === 0
+        ) {
+
+
+            alert(
+                "Please select at least one tooth."
+            );
+
+
+            return;
+
+        }
+
+
+        alert(
+
+            "The case is ready to be connected to the technician workflow."
+
+        );
+
+    }
+
+
+</script>
+
+
+</body>
+
+</html>

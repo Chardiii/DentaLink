@@ -41,12 +41,7 @@ supabase_admin: Client = create_client(
 @app.route("/")
 def home():
 
-    user = session.get("user")
-
-    return render_template(
-        "home.html",
-        user=user
-    )
+    return redirect(url_for("login"))
 
 # =========================
 # ADMIN DASHBOARD
@@ -65,117 +60,129 @@ def admin_dashboard():
         return redirect(url_for("login"))
 
 
-    # =========================
-    # GET ADMIN PROFILE
-    # =========================
+    try:
 
-    response = (
-        supabase_admin
-        .table("profiles")
-        .select("*")
-        .eq("id", user_id)
-        .execute()
-    )
+        # =========================
+        # GET ADMIN PROFILE
+        # =========================
 
-    profiles = response.data or []
+        response = (
+            supabase_admin
+            .table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .execute()
+        )
 
-
-    # =========================
-    # PROFILE NOT FOUND
-    # =========================
-
-    if not profiles:
-
-        session.clear()
-
-        return "Profile not found.", 404
+        profiles = response.data or []
 
 
-    profile = profiles[0]
+        if not profiles:
+
+            session.clear()
+
+            return "Profile not found.", 404
 
 
-    # =========================
-    # CHECK ADMIN ROLE
-    # =========================
-
-    if profile["role"] != "admin":
-
-        return "Access denied.", 403
+        profile = profiles[0]
 
 
-    # =========================
-    # CHECK APPROVAL
-    # =========================
+        # =========================
+        # CHECK ADMIN ROLE
+        # =========================
 
-    if profile["status"] != "approved":
+        if profile["role"] != "admin":
 
-        return "Administrator account is not approved.", 403
-
-
-    # =========================
-    # GET PENDING USERS
-    # =========================
-
-    pending_response = (
-        supabase_admin
-        .table("profiles")
-        .select("*")
-        .eq("status", "pending")
-        .order("created_at", desc=True)
-        .execute()
-    )
-
-    pending_users = pending_response.data or []
+            return "Access denied.", 403
 
 
-    # =========================
-    # GET ALL USERS
-    # =========================
+        # =========================
+        # CHECK ADMIN APPROVAL
+        # =========================
 
-    all_response = (
-        supabase_admin
-        .table("profiles")
-        .select("id, status")
-        .execute()
-    )
+        if profile["status"] != "approved":
 
-    all_users = all_response.data or []
+            return "Administrator account is not approved.", 403
 
 
-    # =========================
-    # CALCULATE COUNTS
-    # =========================
+        # =========================
+        # GET ALL USERS
+        # =========================
 
-    pending_count = len([
-        user for user in all_users
-        if user["status"] == "pending"
-    ])
+        all_response = (
+            supabase_admin
+            .table("profiles")
+            .select("*")
+            .order("created_at", desc=True)
+            .execute()
+        )
 
-    approved_count = len([
-        user for user in all_users
-        if user["status"] == "approved"
-    ])
-
-    total_count = len(all_users)
+        all_users = all_response.data or []
 
 
-    # =========================
-    # RENDER ADMIN DASHBOARD
-    # =========================
+        # =========================
+        # SEPARATE USERS BY STATUS
+        # =========================
 
-    return render_template(
-        "admin_dashboard.html",
+        pending_users = [
+            user for user in all_users
+            if user["status"] == "pending"
+        ]
 
-        profile=profile,
 
-        pending_users=pending_users,
+        approved_users = [
+            user for user in all_users
+            if user["status"] == "approved"
+        ]
 
-        pending_count=pending_count,
 
-        approved_count=approved_count,
+        rejected_users = [
+            user for user in all_users
+            if user["status"] == "rejected"
+        ]
 
-        total_count=total_count
-    )
+
+        # =========================
+        # COUNTS
+        # =========================
+
+        pending_count = len(pending_users)
+
+        approved_count = len(approved_users)
+
+        rejected_count = len(rejected_users)
+
+        total_count = len(all_users)
+
+
+        # =========================
+        # SHOW ADMIN DASHBOARD
+        # =========================
+
+        return render_template(
+            "admin_dashboard.html",
+
+            profile=profile,
+
+            pending_users=pending_users,
+
+            approved_users=approved_users,
+
+            rejected_users=rejected_users,
+
+            pending_count=pending_count,
+
+            approved_count=approved_count,
+
+            rejected_count=rejected_count,
+
+            total_count=total_count
+        )
+
+
+    except Exception as e:
+
+        return f"Admin dashboard error: {str(e)}", 500
 
 @app.route("/admin/users/<user_id>/approve", methods=["POST"])
 def approve_user(user_id):
@@ -458,13 +465,65 @@ def dentist_dashboard():
 
             if profile["status"] == "pending":
 
-                return "Your account is still waiting for administrator approval.", 403
+                return (
+                    "Your account is still waiting "
+                    "for administrator approval.",
+                    403
+                )
 
             if profile["status"] == "rejected":
 
-                return "Your account application was rejected.", 403
+                return (
+                    "Your account application was rejected.",
+                    403
+                )
 
             return "Your account is not approved.", 403
+
+
+        # =========================
+        # GET MY DENTAL CASES
+        # =========================
+        #
+        # IMPORTANT:
+        # Only retrieve cases where
+        # dentist_id matches the
+        # currently logged-in dentist.
+        #
+        # This prevents Dentist B
+        # from seeing Dentist A's cases.
+        # =========================
+
+        cases_response = (
+            supabase_admin
+            .table("dental_cases")
+            .select("*")
+            .eq("dentist_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        dental_cases = cases_response.data or []
+
+
+        # =========================
+        # GET TEETH FOR EACH CASE
+        # =========================
+
+        for case in dental_cases:
+
+            teeth_response = (
+                supabase_admin
+                .table("case_teeth")
+                .select("*")
+                .eq("case_id", case["id"])
+                .order("created_at")
+                .execute()
+            )
+
+            case["teeth"] = (
+                teeth_response.data or []
+            )
 
 
         # =========================
@@ -473,13 +532,326 @@ def dentist_dashboard():
 
         return render_template(
             "dentist_dashboard.html",
+
+            profile=profile,
+
+            dental_cases=dental_cases
+        )
+
+
+    except Exception as e:
+
+        return (
+            f"Dentist dashboard error: {str(e)}",
+            500
+        )
+
+@app.route("/dentist/cases/new", methods=["GET", "POST"])
+def create_dental_case():
+
+    # =========================
+    # CHECK LOGIN
+    # =========================
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+
+        return redirect(url_for("login"))
+
+
+    try:
+
+        # =========================
+        # GET DENTIST PROFILE
+        # =========================
+
+        response = (
+            supabase_admin
+            .table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .execute()
+        )
+
+        profiles = response.data or []
+
+
+        if not profiles:
+
+            session.clear()
+
+            return "Profile not found.", 404
+
+
+        profile = profiles[0]
+
+
+        # =========================
+        # CHECK ROLE
+        # =========================
+
+        if profile["role"] != "dentist":
+
+            return "Access denied.", 403
+
+
+        # =========================
+        # CHECK APPROVAL
+        # =========================
+
+        if profile["status"] != "approved":
+
+            if profile["status"] == "pending":
+
+                return (
+                    "Your account is still waiting "
+                    "for administrator approval.",
+                    403
+                )
+
+            if profile["status"] == "rejected":
+
+                return (
+                    "Your account application was rejected.",
+                    403
+                )
+
+            return "Your account is not approved.", 403
+
+
+        # =========================
+        # CREATE CASE
+        # =========================
+
+        if request.method == "POST":
+
+            patient_name = request.form["patient_name"].strip()
+
+            patient_reference = (
+                request.form.get("patient_reference", "").strip()
+                or None
+            )
+
+            case_type = request.form["case_type"].strip()
+
+            material = (
+                request.form.get("material", "").strip()
+                or None
+            )
+
+            shade = (
+                request.form.get("shade", "").strip()
+                or None
+            )
+
+            instructions = (
+                request.form.get("instructions", "").strip()
+                or None
+            )
+
+
+            # =========================
+            # BASIC VALIDATION
+            # =========================
+
+            if not patient_name:
+
+                return "Patient name is required.", 400
+
+
+            if not case_type:
+
+                return "Case type is required.", 400
+
+
+            # =========================
+            # GENERATE CASE NUMBER
+            # =========================
+
+            existing_cases_response = (
+                supabase_admin
+                .table("dental_cases")
+                .select("id")
+                .execute()
+            )
+
+            existing_cases = (
+                existing_cases_response.data or []
+            )
+
+            case_number = (
+                f"DL-{len(existing_cases) + 1:05d}"
+            )
+
+
+            # =========================
+            # CREATE DENTAL CASE
+            # =========================
+
+            case_response = (
+                supabase_admin
+                .table("dental_cases")
+                .insert({
+                    "case_number": case_number,
+                    "dentist_id": user_id,
+                    "patient_name": patient_name,
+                    "patient_reference": patient_reference,
+                    "case_type": case_type,
+                    "material": material,
+                    "shade": shade,
+                    "instructions": instructions,
+                    "status": "draft"
+                })
+                .execute()
+            )
+
+
+            created_cases = case_response.data or []
+
+
+            if not created_cases:
+
+                return "Failed to create dental case.", 500
+
+
+            case = created_cases[0]
+
+
+            # =========================
+            # GET TEETH FROM FORM
+            # =========================
+
+            tooth_numbers = request.form.getlist(
+                "tooth_number"
+            )
+
+            restoration_types = request.form.getlist(
+                "restoration_type"
+            )
+
+            tooth_notes = request.form.getlist(
+                "tooth_notes"
+            )
+
+
+            # =========================
+            # CREATE CASE TEETH
+            # =========================
+
+            teeth_to_insert = []
+
+
+            for index, tooth_number in enumerate(
+                tooth_numbers
+            ):
+
+                tooth_number = tooth_number.strip()
+
+
+                if not tooth_number:
+
+                    continue
+
+
+                restoration_type = ""
+
+
+                if index < len(restoration_types):
+
+                    restoration_type = (
+                        restoration_types[index].strip()
+                    )
+
+
+                notes = None
+
+
+                if index < len(tooth_notes):
+
+                    notes = (
+                        tooth_notes[index].strip()
+                        or None
+                    )
+
+
+                if not restoration_type:
+
+                    continue
+
+
+                teeth_to_insert.append({
+
+                    "case_id": case["id"],
+
+                    "tooth_number": tooth_number,
+
+                    "restoration_type": restoration_type,
+
+                    "notes": notes
+
+                })
+
+
+            # =========================
+            # REQUIRE AT LEAST ONE TOOTH
+            # =========================
+
+            if not teeth_to_insert:
+
+                # Remove the case if no teeth
+                # were provided.
+
+                (
+                    supabase_admin
+                    .table("dental_cases")
+                    .delete()
+                    .eq("id", case["id"])
+                    .execute()
+                )
+
+                return (
+                    "At least one tooth is required.",
+                    400
+                )
+
+
+            # =========================
+            # INSERT TEETH
+            # =========================
+
+            (
+                supabase_admin
+                .table("case_teeth")
+                .insert(teeth_to_insert)
+                .execute()
+            )
+
+
+            # =========================
+            # REDIRECT TO DENTIST
+            # DASHBOARD
+            # =========================
+
+            return redirect(
+                url_for("dentist_dashboard")
+            )
+
+
+        # =========================
+        # SHOW CREATE CASE PAGE
+        # =========================
+
+        return render_template(
+            "create_dental_case.html",
             profile=profile
         )
 
 
     except Exception as e:
 
-        return f"Dentist dashboard error: {str(e)}", 500
+        return f"Create dental case error: {str(e)}", 500
+
 # =========================
 # REGISTER
 # =========================
@@ -668,7 +1040,7 @@ def login():
 
             if profile["status"] == "pending":
 
-                return "Your account is still waiting for administrator approval.", 403
+                return render_template("account_pending.html")
 
 
             if profile["status"] == "rejected":
@@ -721,6 +1093,116 @@ def login():
 
 
     return render_template("login.html")
+
+# =========================
+# REVIEW USER
+# =========================
+
+@app.route("/admin/users/<user_id>/review")
+def review_user(user_id):
+
+    # =========================
+    # CHECK LOGIN
+    # =========================
+
+    admin_id = session.get("user_id")
+
+    if not admin_id:
+
+        return redirect(url_for("login"))
+
+
+    try:
+
+        # =========================
+        # GET ADMIN PROFILE
+        # =========================
+
+        admin_response = (
+            supabase_admin
+            .table("profiles")
+            .select("id, role, status")
+            .eq("id", admin_id)
+            .execute()
+        )
+
+        admin_profiles = admin_response.data or []
+
+
+        if not admin_profiles:
+
+            session.clear()
+
+            return "Admin profile not found.", 404
+
+
+        admin_profile = admin_profiles[0]
+
+
+        # =========================
+        # CHECK ADMIN ROLE
+        # =========================
+
+        if admin_profile["role"] != "admin":
+
+            return "Access denied.", 403
+
+
+        # =========================
+        # CHECK ADMIN APPROVAL
+        # =========================
+
+        if admin_profile["status"] != "approved":
+
+            return "Administrator account is not approved.", 403
+
+
+        # =========================
+        # GET USER APPLICATION
+        # =========================
+
+        user_response = (
+            supabase_admin
+            .table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .execute()
+        )
+
+        users = user_response.data or []
+
+
+        if not users:
+
+            return "User application not found.", 404
+
+
+        user = users[0]
+
+
+        # =========================
+        # ONLY ALLOW PENDING
+        # OR REJECTED USERS
+        # =========================
+
+        if user["status"] not in ["pending", "rejected"]:
+
+            return "This application cannot be reviewed.", 400
+
+
+        # =========================
+        # SHOW REVIEW PAGE
+        # =========================
+
+        return render_template(
+            "admin_review.html",
+            user=user
+        )
+
+
+    except Exception as e:
+
+        return f"Review application error: {str(e)}", 500
 
 # =========================
 # FORGOT PASSWORD
@@ -846,17 +1328,232 @@ def reset_password():
 # LOGOUT
 # =========================
 
-@app.route("/logout")
+@app.route("/logout", methods=["GET", "POST"])
 def logout():
 
     try:
+
         supabase.auth.sign_out()
+
     except Exception:
+
         pass
+
+
+    # =========================
+    # CLEAR FLASK SESSION
+    # =========================
 
     session.clear()
 
-    return redirect(url_for("home"))
+
+    # =========================
+    # RETURN TO LOGIN
+    # =========================
+
+    return redirect(url_for("login"))
+
+# =========================
+# REOPEN USER
+# =========================
+
+@app.route("/admin/users/<user_id>/reopen", methods=["POST"])
+def reopen_user(user_id):
+
+    # =========================
+    # CHECK LOGIN
+    # =========================
+
+    admin_id = session.get("user_id")
+
+    if not admin_id:
+
+        return redirect(url_for("login"))
+
+
+    try:
+
+        # =========================
+        # GET ADMIN PROFILE
+        # =========================
+
+        admin_response = (
+            supabase_admin
+            .table("profiles")
+            .select("id, role, status")
+            .eq("id", admin_id)
+            .execute()
+        )
+
+        admin_profiles = admin_response.data or []
+
+
+        if not admin_profiles:
+
+            session.clear()
+
+            return "Admin profile not found.", 404
+
+
+        admin_profile = admin_profiles[0]
+
+
+        # =========================
+        # VERIFY ADMIN
+        # =========================
+
+        if admin_profile["role"] != "admin":
+
+            return "Access denied.", 403
+
+
+        if admin_profile["status"] != "approved":
+
+            return "Administrator account is not approved.", 403
+
+
+        # =========================
+        # GET USER
+        # =========================
+
+        user_response = (
+            supabase_admin
+            .table("profiles")
+            .select("id, role, status")
+            .eq("id", user_id)
+            .execute()
+        )
+
+        users = user_response.data or []
+
+
+        if not users:
+
+            return "User not found.", 404
+
+
+        user = users[0]
+
+
+        # =========================
+        # ONLY REOPEN REJECTED USERS
+        # =========================
+
+        if user["status"] != "rejected":
+
+            return "Only rejected applications can be reopened.", 400
+
+
+        # =========================
+        # CHANGE TO PENDING
+        # =========================
+
+        supabase_admin \
+            .table("profiles") \
+            .update({
+                "status": "pending"
+            }) \
+            .eq("id", user_id) \
+            .execute()
+
+
+        # =========================
+        # RETURN TO ADMIN DASHBOARD
+        # =========================
+
+        return redirect(
+            url_for("admin_dashboard")
+        )
+
+
+    except Exception as e:
+
+        return f"Reopen application error: {str(e)}", 500
+
+@app.route("/technician")
+def technician_dashboard():
+
+    # =========================
+    # CHECK LOGIN
+    # =========================
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+
+        return redirect(url_for("login"))
+
+
+    try:
+
+        # =========================
+        # GET TECHNICIAN PROFILE
+        # =========================
+
+        response = (
+            supabase_admin
+            .table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .execute()
+        )
+
+        profiles = response.data or []
+
+
+        # =========================
+        # PROFILE NOT FOUND
+        # =========================
+
+        if not profiles:
+
+            session.clear()
+
+            return "Profile not found.", 404
+
+
+        profile = profiles[0]
+
+
+        # =========================
+        # CHECK ROLE
+        # =========================
+
+        if profile["role"] != "technician":
+
+            return "Access denied.", 403
+
+
+        # =========================
+        # CHECK APPROVAL
+        # =========================
+
+        if profile["status"] != "approved":
+
+            if profile["status"] == "pending":
+
+                return "Your account is still waiting for administrator approval.", 403
+
+            if profile["status"] == "rejected":
+
+                return "Your account application was rejected.", 403
+
+            return "Your account is not approved.", 403
+
+
+        # =========================
+        # TECHNICIAN DASHBOARD
+        # =========================
+
+        return render_template(
+            "technician_dashboard.html",
+            profile=profile
+        )
+
+
+    except Exception as e:
+
+        return f"Technician dashboard error: {str(e)}", 500
 
 
 # =========================

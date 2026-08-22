@@ -74,7 +74,7 @@
 
 
         <!-- ========================= -->
-        <!-- DENTIST FEATURES -->
+        <!-- DENTAL CASE WORKSPACE -->
         <!-- ========================= -->
 
         <section>
@@ -82,12 +82,243 @@
             <h2>Dentist Workspace</h2>
 
             <p>
-                Your DentaLink dentist workspace is ready.
+                Create and manage your dental cases.
             </p>
 
-            <p>
-                More dental features will be added here.
-            </p>
+
+            <a href="{{ url_for('create_dental_case') }}">
+
+                <button type="button">
+                    CREATE NEW DENTAL CASE
+                </button>
+
+            </a>
+
+        </section>
+
+
+        <hr>
+
+
+        <!-- ========================= -->
+        <!-- MY DENTAL CASES -->
+        <!-- ========================= -->
+
+        <section>
+
+            <h2>My Dental Cases</h2>
+
+
+            {% if dental_cases %}
+
+
+                {% for case in dental_cases %}
+
+                    <div>
+
+                        <h3>
+                            {{ case.case_number }}
+                        </h3>
+
+
+                        <!-- ========================= -->
+                        <!-- PATIENT -->
+                        <!-- ========================= -->
+
+                        <p>
+                            <strong>Patient:</strong>
+                            {{ case.patient_name }}
+                        </p>
+
+
+                        {% if case.patient_reference %}
+
+                            <p>
+                                <strong>
+                                    Patient Reference:
+                                </strong>
+
+                                {{ case.patient_reference }}
+                            </p>
+
+                        {% endif %}
+
+
+                        <!-- ========================= -->
+                        <!-- CASE TYPE -->
+                        <!-- ========================= -->
+
+                        <p>
+                            <strong>Case Type:</strong>
+                            {{ case.case_type }}
+                        </p>
+
+
+                        <!-- ========================= -->
+                        <!-- MATERIAL -->
+                        <!-- ========================= -->
+
+                        {% if case.material %}
+
+                            <p>
+                                <strong>Material:</strong>
+                                {{ case.material }}
+                            </p>
+
+                        {% endif %}
+
+
+                        <!-- ========================= -->
+                        <!-- SHADE -->
+                        <!-- ========================= -->
+
+                        {% if case.shade %}
+
+                            <p>
+                                <strong>Shade:</strong>
+                                {{ case.shade }}
+                            </p>
+
+                        {% endif %}
+
+
+                        <!-- ========================= -->
+                        <!-- STATUS -->
+                        <!-- ========================= -->
+
+                        <p>
+
+                            <strong>Status:</strong>
+
+                            {{ case.status }}
+
+                        </p>
+
+
+                        <!-- ========================= -->
+                        <!-- INSTRUCTIONS -->
+                        <!-- ========================= -->
+
+                        {% if case.instructions %}
+
+                            <p>
+
+                                <strong>
+                                    Instructions:
+                                </strong>
+
+                                {{ case.instructions }}
+
+                            </p>
+
+                        {% endif %}
+
+
+                        <!-- ========================= -->
+                        <!-- TEETH -->
+                        <!-- ========================= -->
+
+                        <h4>
+                            Teeth
+                        </h4>
+
+
+                        {% if case.teeth %}
+
+                            <ul>
+
+                                {% for tooth in case.teeth %}
+
+                                    <li>
+
+                                        <strong>
+                                            Tooth:
+                                        </strong>
+
+                                        {{ tooth.tooth_number }}
+
+                                        —
+
+                                        {{ tooth.restoration_type }}
+
+
+                                        {% if tooth.notes %}
+
+                                            <br>
+
+                                            <strong>
+                                                Notes:
+                                            </strong>
+
+                                            {{ tooth.notes }}
+
+                                        {% endif %}
+
+                                    </li>
+
+                                {% endfor %}
+
+                            </ul>
+
+                        {% else %}
+
+                            <p>
+                                No teeth added.
+                            </p>
+
+                        {% endif %}
+
+
+                        <!-- ========================= -->
+                        <!-- DRAFT ACTION -->
+                        <!-- ========================= -->
+
+                        {% if case.status == "draft" %}
+
+                            <p>
+
+                                <strong>
+                                    This case is still a draft.
+                                </strong>
+
+                            </p>
+
+                            <button type="button">
+                                EDIT CASE
+                            </button>
+
+                            <button type="button">
+                                SEND TO TECHNICIAN
+                            </button>
+
+                        {% endif %}
+
+
+                        <hr>
+
+                    </div>
+
+                {% endfor %}
+
+
+            {% else %}
+
+                <p>
+                    You have not created any dental cases yet.
+                </p>
+
+
+                <a
+                    href="{{ url_for('create_dental_case') }}"
+                >
+
+                    <button type="button">
+                        CREATE YOUR FIRST DENTAL CASE
+                    </button>
+
+                </a>
+
+            {% endif %}
 
         </section>
 
