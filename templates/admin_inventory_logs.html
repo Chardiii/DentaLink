@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Audit Logs - DentaLink</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
+        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
+        th { background: #eee; }
+        .badge-deduction { background: #ffe6e6; color: #cc0000; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .badge-restock { background: #e8f5e9; color: #2e7d32; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .badge-manual { background: #eef6fc; color: #0077cc; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <h1 style="margin: 0;">BW11 DentaLink</h1>
+                <p style="margin: 5px 0 0 0;">Inventory Audit & Consumption Logs</p>
+            </div>
+            <div>
+                <a href="{{ url_for('admin_inventory') }}">
+                    <button type="button" style="padding: 8px 14px; font-weight: bold; cursor: pointer;">← Back to Inventory</button>
+                </a>
+            </div>
+        </div>
+        <hr style="margin-top: 15px;">
+    </header>
+
+    <main>
+        <section>
+            <h2>Stock History & Usage Records</h2>
+            <p>Showing the last 100 inventory movements across the laboratory system.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Item Name</th>
+                        <th>Action Type</th>
+                        <th>Change</th>
+                        <th>Stock Shift</th>
+                        <th>User / Trigger</th>
+                        <th>Notes / Context</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <td><small>{{ log.created_at[:19].replace('T', ' ') }}</small></td>
+                            <td><strong>{{ log.inventory.item_name if log.inventory else 'Unknown Item' }}</strong></td>
+                            <td>
+                                {% if log.action_type == 'case_deduction' %}
+                                    <span class="badge-deduction">Case Deduction</span>
+                                {% elif log.action_type == 'restock' %}
+                                    <span class="badge-restock">Restock</span>
+                                {% else %}
+                                    <span class="badge-manual">Manual Edit</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span style="font-weight: bold; color: {% if log.quantity_changed < 0 %}#cc0000{% else %}#2e7d32{% endif %};">
+                                    {{ log.quantity_changed }}
+                                </span>
+                                {{ log.inventory.unit if log.inventory else '' }}
+                            </td>
+                            <td>{{ log.previous_quantity }} → <strong>{{ log.new_quantity }}</strong></td>
+                            <td>{{ log.profiles.display_name or log.profiles.first_name if log.profiles else 'System / Auto' }}</td>
+                            <td>{{ log.notes or 'N/A' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7">No inventory audit logs recorded yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <hr>
+        <p>BW11 DentaLink</p>
+    </footer>
+
+</body>
+</html>

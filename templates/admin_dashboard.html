@@ -7,9 +7,25 @@
 </head>
 <body>
     <header>
-        <h1>BW11 DentaLink</h1>
-        <p>Administrator Dashboard</p>
-        <hr>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <h1 style="margin: 0;">BW11 DentaLink</h1>
+                <p style="margin: 5px 0 0 0;">Administrator Dashboard</p>
+            </div>
+            <div>
+                <a href="{{ url_for('admin_inventory') }}">
+                    <button type="button" style="background: #0077cc; color: white; border: none; padding: 10px 16px; font-weight: bold; cursor: pointer; border-radius: 6px;">
+                        📦 Manage Lab Inventory
+                    </button>
+                </a>
+                <a href="{{ url_for('admin_inventory_logs') }}">
+                    <button type="button" style="background: #333; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        📋 View Audit Logs
+                    </button>
+                </a>
+            </div>
+        </div>
+        <hr style="margin-top: 15px;">
     </header>
 
     <main>
@@ -36,6 +52,21 @@
 
         <hr>
 
+        <!-- LAB PERFORMANCE ANALYTICS -->
+        <section style="background: #eef6fc; border-left: 5px solid #0077cc; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+            <h2 style="margin-top: 0; color: #0077cc;">Lab Performance Analytics</h2>
+            <div style="display: flex; gap: 30px; flex-wrap: wrap; margin-top: 10px;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; color: #555;">Completed Cases (Total):</p>
+                    <span style="font-size: 24px; font-weight: bold; color: #2e7d32;">{{ completed_this_month }}</span>
+                </div>
+                <div>
+                    <p style="margin: 0; font-size: 14px; color: #555;">⚠️ Overdue Cases (Past Due Date):</p>
+                    <span style="font-size: 24px; font-weight: bold; color: #cc0000;">{{ overdue_count }}</span>
+                </div>
+            </div>
+        </section>
+
         <!-- OVERVIEW -->
         <section>
             <h2>Overview</h2>
@@ -50,7 +81,7 @@
         <!-- TECHNICIAN WORKLOAD & CASE ASSIGNMENT -->
         <section style="background: #eef6fc; border-left: 5px solid #0077cc; padding: 20px; margin-bottom: 25px;">
             <h2 style="margin-top: 0;">Technician Workload & Case Assignment</h2>
-            <p>Review incoming case details, inspect attached files, and assign cases based on technician workload.</p>
+            <p>Review incoming case details, deadlines, and inspect attached files before assignment.</p>
 
             <!-- WORKLOAD SUMMARY -->
             <h3>Lab Workload Status</h3>
@@ -71,7 +102,7 @@
 
             <hr>
 
-            <!-- UNASSIGNED CASES WITH FULL REVIEW -->
+            <!-- UNASSIGNED CASES WITH FULL REVIEW & DUE DATE -->
             <h3>Unassigned Incoming Cases (Full Review)</h3>
             {% if unassigned_cases %}
                 {% for case in unassigned_cases %}
@@ -80,6 +111,13 @@
                         <p><strong>Patient Name:</strong> {{ case.patient_name }}</p>
                         <p><strong>Patient Reference:</strong> {{ case.patient_reference or 'N/A' }}</p>
                         <p><strong>Case Type:</strong> {{ case.case_type }}</p>
+                        
+                        <!-- DUE DATE DISPLAY -->
+                        <p>
+                            <strong>Due Date:</strong> 
+                            <span style="color: #d32f2f; font-weight: bold;">{{ case.due_date or 'Not Specified' }}</span>
+                        </p>
+
                         <p><strong>Instructions:</strong> {{ case.instructions or 'None provided.' }}</p>
                         
                         <h4>Teeth Breakdown:</h4>
@@ -144,7 +182,7 @@
         <!-- ACTIVE LAB CASES & STATUS MONITOR -->
         <section style="background: #fafafa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
             <h2 style="margin-top: 0;">Active Lab Cases & Live Status Monitor</h2>
-            <p>Track the progress of cases currently assigned to or being processed by technicians.</p>
+            <p>Track deadlines and progress of cases currently assigned to technicians.</p>
 
             {% if active_cases %}
                 <table style="width: 100%; border-collapse: collapse; background: white; margin-top: 15px;">
@@ -152,7 +190,7 @@
                         <tr style="background: #eee;">
                             <th style="border: 1px solid #ccc; padding: 10px;">Case #</th>
                             <th style="border: 1px solid #ccc; padding: 10px;">Patient</th>
-                            <th style="border: 1px solid #ccc; padding: 10px;">Type</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Due Date</th>
                             <th style="border: 1px solid #ccc; padding: 10px;">Assigned Tech</th>
                             <th style="border: 1px solid #ccc; padding: 10px;">Current Status</th>
                         </tr>
@@ -162,7 +200,7 @@
                             <tr>
                                 <td style="border: 1px solid #ccc; padding: 10px;">{{ c.case_number }}</td>
                                 <td style="border: 1px solid #ccc; padding: 10px;">{{ c.patient_name }}</td>
-                                <td style="border: 1px solid #ccc; padding: 10px;">{{ c.case_type }}</td>
+                                <td style="border: 1px solid #ccc; padding: 10px; color: #d32f2f; font-weight: bold;">{{ c.due_date or 'N/A' }}</td>
                                 <td style="border: 1px solid #ccc; padding: 10px; font-weight: bold; color: #2e7d32;">
                                     {{ c.profiles.display_name if c.profiles and c.profiles.display_name else 'Assigned' }}
                                 </td>

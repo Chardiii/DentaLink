@@ -4,7 +4,6 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
-
 # Load variables from .env
 load_dotenv()
 
@@ -88,6 +87,20 @@ def admin_dashboard():
         approved_users = [u for u in all_users if u["status"] == "approved"]
         rejected_users = [u for u in all_users if u["status"] == "rejected"]
 
+        # ==========================================
+        # LAB PERFORMANCE ANALYTICS METRICS
+        # ==========================================
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d")
+
+        # 1. Total Completed Cases
+        completed_res = supabase_admin.table("dental_cases").select("id", count="exact").eq("status", "completed").execute()
+        completed_this_month = completed_res.count or 0
+
+        # 2. Delayed / Overdue Cases (Due date has passed and status is not completed/cancelled)
+        overdue_res = supabase_admin.table("dental_cases").select("id", count="exact").lt("due_date", now_str).neq("status", "completed").neq("status", "cancelled").execute()
+        overdue_count = overdue_res.count or 0
+
         # 1. Unassigned Cases, Teeth, and Files for Full Review & Assignment
         unassigned_res = supabase_admin.table("dental_cases").select("*").eq("status", "submitted").execute()
         unassigned_cases = unassigned_res.data or []
@@ -148,6 +161,8 @@ def admin_dashboard():
             approved_count=len(approved_users),
             rejected_count=len(rejected_users),
             total_count=len(all_users),
+            completed_this_month=completed_this_month,
+            overdue_count=overdue_count,
             unassigned_cases=unassigned_cases,
             technicians=technicians,
             active_cases=active_cases,
@@ -160,6 +175,79 @@ def admin_dashboard():
 # =========================
 # TECHNICIAN: UPDATE CASE STAGE
 # =========================
+# =========================
+# TECHNICIAN: UPDATE CASE STAGE
+# =========================
+# =========================
+# HELPER: AUTO-DEDUCT INVENTORY
+# =========================
+def auto_deduct_material_for_case(case_id, user_id, status):
+    """Automatically deducts inventory based on the production stage and case materials."""
+    try:
+        case_res = supabase_admin.table("dental_cases").select("case_number, case_type").eq("id", case_id).execute()
+        if not case_res.data:
+            return
+        
+        case_number = case_res.data[0]["case_number"]
+        
+        teeth_res = supabase_admin.table("case_teeth").select("material").eq("id", case_id).execute() # or case_id
+        teeth_res = supabase_admin.table("case_teeth").select("material").eq("case_id", case_id).execute()
+        teeth = teeth_res.data or []
+        
+        if not teeth:
+            return
+
+        # Define which materials/keywords relate to which status stages
+        # e.g., milling stage uses zirconia/resin blocks, packing stage uses acrylic
+        target_keywords = []
+        if status == "milling_or_printing":
+            target_keywords = ["zirconia", "resin", "e.max", "block", "disc"]
+        elif status == "packing_and_curing":
+            target_keywords = ["acrylic", "powder", "liquid", "polymer"]
+        elif status == "finishing_and_quality_check":
+            target_keywords = ["burr", "polishing", "wheel", "paste"]
+        
+        if not target_keywords:
+            return
+
+        for tooth in teeth:
+            mat = (tooth.get("material") or "").lower()
+            if not mat:
+                continue
+
+            # Check if this material matches the stage's target categories
+            if not any(keyword in mat for keyword in target_keywords):
+                continue
+
+            # Search inventory for an item matching this material name
+            inv_res = supabase_admin.table("inventory").select("*").ilike("item_name", f"%{mat}%").execute()
+            matched_items = inv_res.data or []
+
+            if matched_items:
+                item = matched_items[0]
+                item_id = item["id"]
+                current_qty = item["quantity"]
+                
+                if current_qty > 0:
+                    new_qty = current_qty - 1
+                    
+                    # Update stock level
+                    supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
+                    
+                    # Insert record into inventory audit logs
+                    supabase_admin.table("inventory_logs").insert({
+                        "inventory_id": item_id,
+                        "user_id": user_id,
+                        "action_type": "case_deduction",
+                        "quantity_changed": -1,
+                        "previous_quantity": current_qty,
+                        "new_quantity": new_qty,
+                        "notes": f"Auto-deducted at [{status}] stage for Case {case_number} ({mat})"
+                    }).execute()
+    except Exception as e:
+        print(f"Auto-deduct error: {str(e)}")
+
+
 # =========================
 # TECHNICIAN: UPDATE CASE STAGE
 # =========================
@@ -216,6 +304,26 @@ def update_case_status(case_id):
             "status": new_status
         }).eq("id", case_id).execute()
 
+        # ==========================================
+        # LOG STATUS CHANGE TO TIMELINE HISTORY
+        # ==========================================
+        try:
+            supabase_admin.table("case_status_history").insert({
+                "case_id": case_id,
+                "status": readable_status,
+                "changed_by": user_id,
+                "notes": f"Updated by technician {tech_name}"
+            }).execute()
+        except Exception as hist_err:
+            print(f"History log error: {str(hist_err)}")
+
+        # ==========================================
+        # AUTOMATIC STAGE-BASED INVENTORY DEDUCTION TRIGGER
+        # ==========================================
+        stage_related_statuses = ["milling_or_printing", "packing_and_curing", "finishing_and_quality_check"]
+        if new_status in stage_related_statuses:
+            auto_deduct_material_for_case(case_id, user_id, new_status)
+
         # 1. Notify the Dentist
         create_notification(
             user_id=dentist_id,
@@ -241,7 +349,47 @@ def update_case_status(case_id):
         return redirect(url_for("technician_dashboard"))
 
     except Exception as e:
-        return f"Status update error: {str(e)}", 500
+        return f"Status update error: {str(e)}"
+
+# =========================
+# ADMIN: VIEW INVENTORY AUDIT LOGS
+# =========================
+@app.route("/admin/inventory/logs")
+def admin_inventory_logs():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        # Verify admin
+        profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
+        if not profile_res.data or profile_res.data[0]["role"] != "admin" or profile_res.data[0]["status"] != "approved":
+            return "Access denied.", 403
+
+        # Fetch logs with joined inventory item name and user display name
+        logs_res = (
+            supabase_admin
+            .table("inventory_logs")
+            .select("*, inventory(item_name, unit), profiles(display_name, first_name)")
+            .order("created_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+        logs = logs_res.data or []
+
+        # Fetch notifications for layout consistency
+        notif_res = supabase_admin.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+        notifications = notif_res.data or []
+
+        return render_template(
+            "admin_inventory_logs.html",
+            profile=profile_res.data[0],
+            logs=logs,
+            notifications=notifications
+        )
+    except Exception as e:
+        return f"Audit log error: {str(e)}", 500
+
 
 # =========================
 # TECHNICIAN: COMPLETE CASE
@@ -670,1041 +818,191 @@ def dentist_dashboard():
 
 @app.route("/dentist/cases/new", methods=["GET", "POST"])
 def create_dental_case():
-
-    # ==========================================
-    # STORAGE
-    # ==========================================
-
     CASE_FILES_BUCKET = "dental-case-files"
 
-
-    # ==========================================
-    # CHECK LOGIN
-    # ==========================================
-
     user_id = session.get("user_id")
-
     if not user_id:
         return redirect(url_for("login"))
 
-
     try:
-
-        # ==========================================
-        # GET DENTIST PROFILE
-        # ==========================================
-
-        response = (
-            supabase_admin
-            .table("profiles")
-            .select("*")
-            .eq("id", user_id)
-            .execute()
-        )
-
+        response = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
         profiles = response.data or []
-
-
         if not profiles:
-
             session.clear()
-
             return "Profile not found.", 404
-
 
         profile = profiles[0]
 
-
-        # ==========================================
-        # CHECK ROLE
-        # ==========================================
-
         if profile.get("role") != "dentist":
-
             return "Access denied.", 403
 
-
-        # ==========================================
-        # CHECK APPROVAL
-        # ==========================================
-
         if profile.get("status") != "approved":
-
-            if profile.get("status") == "pending":
-
-                return (
-                    "Your account is still waiting "
-                    "for administrator approval.",
-                    403
-                )
-
-            if profile.get("status") == "rejected":
-
-                return (
-                    "Your account application was rejected.",
-                    403
-                )
-
             return "Your account is not approved.", 403
 
-
-        # ==========================================
-        # POST
-        # ==========================================
-
         if request.method == "POST":
+            patient_name = request.form.get("patient_name", "").strip()
+            patient_reference = request.form.get("patient_reference", "").strip() or None
+            case_type = request.form.get("case_type", "").strip()
+            due_date = request.form.get("due_date", "").strip() or None  # <--- CAPTURE DUE DATE HERE
+            instructions = request.form.get("instructions", "").strip() or None
 
-            # ======================================
-            # BASIC CASE INFORMATION
-            # ======================================
-
-            patient_name = (
-                request.form.get(
-                    "patient_name",
-                    ""
-                ).strip()
-            )
-
-
-            patient_reference = (
-                request.form.get(
-                    "patient_reference",
-                    ""
-                ).strip()
-                or None
-            )
-
-
-            case_type = (
-                request.form.get(
-                    "case_type",
-                    ""
-                ).strip()
-            )
-
-
-            instructions = (
-                request.form.get(
-                    "instructions",
-                    ""
-                ).strip()
-                or None
-            )
-
-
-            # ======================================
-            # SUBMIT ACTION
-            #
-            # SAVE DRAFT = draft
-            # SEND       = submitted
-            # ======================================
-
-            submit_action = (
-                request.form.get(
-                    "submit_action",
-                    "draft"
-                ).strip()
-            )
-
-
-            if submit_action == "send":
-
-                case_status = "submitted"
-
-            else:
-
-                case_status = "draft"
-
-
-            # ======================================
-            # VALIDATION
-            # ======================================
+            submit_action = request.form.get("submit_action", "draft").strip()
+            case_status = "submitted" if submit_action == "send" else "draft"
 
             if not patient_name:
-
-                return (
-                    "Patient name is required.",
-                    400
-                )
-
-
+                return "Patient name is required.", 400
             if not case_type:
+                return "Case type is required.", 400
+            if not due_date:
+                return "Due date is required.", 400
 
-                return (
-                    "Case type is required.",
-                    400
-                )
-
-
-            # ======================================
-            # GET SELECTED TEETH
-            # ======================================
-
-            tooth_numbers = request.form.getlist(
-                "tooth_number"
-            )
-
-
-            materials = request.form.getlist(
-                "material"
-            )
-
-
-            shades = request.form.getlist(
-                "shade"
-            )
-
-
-            tooth_notes = request.form.getlist(
-                "tooth_notes"
-            )
-
-
-            # ======================================
-            # BUILD TEETH DATA
-            # ======================================
+            # Get selected teeth data
+            tooth_numbers = request.form.getlist("tooth_number")
+            materials = request.form.getlist("material")
+            shades = request.form.getlist("shade")
+            tooth_notes = request.form.getlist("tooth_notes")
 
             teeth_to_insert = []
-
-
-            for index, tooth_number in enumerate(
-                tooth_numbers
-            ):
-
-                tooth_number = (
-                    tooth_number.strip()
-                )
-
-
+            for index, tooth_number in enumerate(tooth_numbers):
+                tooth_number = tooth_number.strip()
                 if not tooth_number:
                     continue
 
-
-                # ----------------------------------
-                # MATERIAL
-                # ----------------------------------
-
-                material = None
-
-                if index < len(materials):
-
-                    material = (
-                        materials[index]
-                        .strip()
-                        or None
-                    )
-
-
-                # ----------------------------------
-                # SHADE
-                # ----------------------------------
-
-                shade = None
-
-                if index < len(shades):
-
-                    shade = (
-                        shades[index]
-                        .strip()
-                        or None
-                    )
-
-
-                # ----------------------------------
-                # NOTES
-                # ----------------------------------
-
-                notes = None
-
-                if index < len(tooth_notes):
-
-                    notes = (
-                        tooth_notes[index]
-                        .strip()
-                        or None
-                    )
-
-
-                # ----------------------------------
-                # RESTORATION TYPE
-                # ----------------------------------
-
-                restoration_type = case_type
-
+                material = materials[index].strip() if index < len(materials) else None
+                shade = shades[index].strip() if index < len(shades) else None
+                notes = tooth_notes[index].strip() if index < len(tooth_notes) else None
 
                 teeth_to_insert.append({
-
-                    "tooth_number":
-                        tooth_number,
-
-                    "restoration_type":
-                        restoration_type,
-
-                    "material":
-                        material,
-
-                    "shade":
-                        shade,
-
-                    "notes":
-                        notes
-
+                    "tooth_number": tooth_number,
+                    "restoration_type": case_type,
+                    "material": material,
+                    "shade": shade,
+                    "notes": notes
                 })
-
-
-            # ======================================
-            # REQUIRE AT LEAST ONE TOOTH
-            # ======================================
 
             if not teeth_to_insert:
+                return "Please select at least one tooth.", 400
 
-                return (
-                    "Please select at least one tooth.",
-                    400
-                )
+            # Generate Case Number
+            existing_cases_response = supabase_admin.table("dental_cases").select("id").execute()
+            existing_cases = existing_cases_response.data or []
+            case_number = f"DL-{len(existing_cases) + 1:05d}"
 
+            # Insert Case including due_date
+            case_response = supabase_admin.table("dental_cases").insert({
+                "case_number": case_number,
+                "dentist_id": user_id,
+                "patient_name": patient_name,
+                "patient_reference": patient_reference,
+                "case_type": case_type,
+                "due_date": due_date,  # <--- SAVED TO SUPABASE
+                "instructions": instructions,
+                "status": case_status
+            }).execute()
 
-            # ======================================
-            # VALIDATE STL FILE
-            # ======================================
-
-            stl_file = request.files.get(
-                "stl_file"
-            )
-
-
-            if (
-                stl_file
-                and stl_file.filename
-            ):
-
-                stl_filename = secure_filename(
-                    stl_file.filename
-                )
-
-
-                if not stl_filename:
-
-                    return (
-                        "Invalid STL filename.",
-                        400
-                    )
-
-
-                if not stl_filename.lower().endswith(
-                    ".stl"
-                ):
-
-                    return (
-                        "Only STL files are allowed "
-                        "for the STL upload.",
-                        400
-                    )
-
-
-            # ======================================
-            # GET SMILE FILES
-            # ======================================
-
-            smile_files = request.files.getlist(
-                "patient_smile"
-            )
-
-
-            allowed_image_extensions = {
-
-                ".jpg",
-                ".jpeg",
-                ".png",
-                ".webp"
-
-            }
-
-
-            for smile_file in smile_files:
-
-                if not smile_file:
-                    continue
-
-
-                if not smile_file.filename:
-                    continue
-
-
-                smile_filename = secure_filename(
-                    smile_file.filename
-                )
-
-
-                if not smile_filename:
-
-                    return (
-                        "Invalid patient smile "
-                        "filename.",
-                        400
-                    )
-
-
-                extension = ""
-
-
-                if "." in smile_filename:
-
-                    extension = (
-                        "."
-                        + smile_filename.rsplit(
-                            ".",
-                            1
-                        )[1].lower()
-                    )
-
-
-                if (
-                    extension
-                    not in allowed_image_extensions
-                ):
-
-                    return (
-                        "Only JPG, JPEG, PNG, "
-                        "or WEBP images are allowed.",
-                        400
-                    )
-
-
-            # ======================================
-            # GENERATE CASE NUMBER
-            # ======================================
-
-            existing_cases_response = (
-                supabase_admin
-                .table("dental_cases")
-                .select("id")
-                .execute()
-            )
-
-
-            existing_cases = (
-                existing_cases_response.data
-                or []
-            )
-
-
-            case_number = (
-                f"DL-{len(existing_cases) + 1:05d}"
-            )
-
-
-            # ======================================
-            # CREATE DENTAL CASE
-            # ======================================
-
-            case_response = (
-                supabase_admin
-                .table("dental_cases")
-                .insert({
-
-                    "case_number":
-                        case_number,
-
-                    "dentist_id":
-                        user_id,
-
-                    "patient_name":
-                        patient_name,
-
-                    "patient_reference":
-                        patient_reference,
-
-                    "case_type":
-                        case_type,
-
-                    "instructions":
-                        instructions,
-
-                    "status":
-                        case_status
-
-                })
-                .execute()
-            )
-
-
-            created_cases = (
-                case_response.data
-                or []
-            )
-
-
+            created_cases = case_response.data or []
             if not created_cases:
-
-                return (
-                    "Failed to create dental case.",
-                    500
-                )
-
+                return "Failed to create dental case.", 500
 
             case = created_cases[0]
 
-
-            # ======================================
-            # ADD CASE ID TO TEETH
-            # ======================================
-
             for tooth in teeth_to_insert:
-
                 tooth["case_id"] = case["id"]
 
-
-            # ======================================
-            # INSERT CASE TEETH
-            # ======================================
-
             try:
-
-                teeth_response = (
-                    supabase_admin
-                    .table("case_teeth")
-                    .insert(teeth_to_insert)
-                    .execute()
-                )
-
+                teeth_response = supabase_admin.table("case_teeth").insert(teeth_to_insert).execute()
             except Exception as teeth_error:
-
-                (
-                    supabase_admin
-                    .table("dental_cases")
-                    .delete()
-                    .eq(
-                        "id",
-                        case["id"]
-                    )
-                    .execute()
-                )
-
-                return (
-                    "Failed to save selected teeth: "
-                    f"{str(teeth_error)}",
-                    500
-                )
-
+                supabase_admin.table("dental_cases").delete().eq("id", case["id"]).execute()
+                return f"Failed to save selected teeth: {str(teeth_error)}", 500
 
             if not teeth_response.data:
+                supabase_admin.table("dental_cases").delete().eq("id", case["id"]).execute()
+                return "Failed to save selected teeth.", 500
 
-                (
-                    supabase_admin
-                    .table("dental_cases")
-                    .delete()
-                    .eq(
-                        "id",
-                        case["id"]
-                    )
-                    .execute()
-                )
-
-                return (
-                    "Failed to save selected teeth.",
-                    500
-                )
-
-
-            # ======================================
-            # FILE RECORDS
-            # ======================================
-
+            # File Upload Logic (STL & Smile)
+            stl_file = request.files.get("stl_file")
+            smile_files = request.files.getlist("patient_smile")
             uploaded_files = []
 
-
-            # ======================================
-            # STL FILE UPLOAD
-            # ======================================
-
-            if (
-                stl_file
-                and stl_file.filename
-            ):
-
-                original_name = (
-                    stl_file.filename
-                )
-
-
-                safe_name = secure_filename(
-                    original_name
-                )
-
-
-                storage_path = (
-                    f"{user_id}/"
-                    f"{case['id']}/"
-                    f"stl/"
-                    f"{safe_name}"
-                )
-
-
+            if stl_file and stl_file.filename:
+                original_name = stl_file.filename
+                safe_name = secure_filename(original_name)
+                storage_path = f"{user_id}/{case['id']}/stl/{safe_name}"
                 file_bytes = stl_file.read()
-
-
-                mime_type = (
-                    stl_file.mimetype
-                    or "application/octet-stream"
-                )
-
-
-                file_size = len(file_bytes)
-
+                mime_type = stl_file.mimetype or "application/octet-stream"
 
                 try:
-
-                    (
-                        supabase_admin
-                        .storage
-                        .from_(CASE_FILES_BUCKET)
-                        .upload(
-                            storage_path,
-                            file_bytes,
-                            {
-                                "content-type":
-                                    mime_type,
-
-                                "upsert":
-                                    "false"
-                            }
-                        )
+                    supabase_admin.storage.from_(CASE_FILES_BUCKET).upload(
+                        storage_path, file_bytes, {"content-type": mime_type, "upsert": "false"}
                     )
-
                 except Exception as upload_error:
-
-                    # ------------------------------
-                    # ROLLBACK CASE TEETH
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("case_teeth")
-                        .delete()
-                        .eq(
-                            "case_id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("dental_cases")
-                        .delete()
-                        .eq(
-                            "id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    return (
-                        "Failed to upload STL file: "
-                        f"{str(upload_error)}",
-                        500
-                    )
-
+                    supabase_admin.table("case_teeth").delete().eq("case_id", case["id"]).execute()
+                    supabase_admin.table("dental_cases").delete().eq("id", case["id"]).execute()
+                    return f"Failed to upload STL file: {str(upload_error)}", 500
 
                 uploaded_files.append({
-
-                    "case_id":
-                        case["id"],
-
-                    "uploaded_by":
-                        user_id,
-
-                    "file_name":
-                        original_name,
-
-                    "file_path":
-                        storage_path,
-
-                    "file_type":
-                        "stl",
-
-                    "mime_type":
-                        mime_type,
-
-                    "file_size":
-                        file_size
-
+                    "case_id": case["id"], "uploaded_by": user_id,
+                    "file_name": original_name, "file_path": storage_path,
+                    "file_type": "stl", "mime_type": mime_type, "file_size": len(file_bytes)
                 })
-
-
-            # ======================================
-            # PATIENT SMILE PHOTO UPLOADS
-            # ======================================
 
             for smile_file in smile_files:
-
-                if not smile_file:
+                if not smile_file or not smile_file.filename:
                     continue
-
-
-                if not smile_file.filename:
-                    continue
-
-
-                original_name = (
-                    smile_file.filename
-                )
-
-
-                safe_name = secure_filename(
-                    original_name
-                )
-
-
-                storage_path = (
-                    f"{user_id}/"
-                    f"{case['id']}/"
-                    f"smile/"
-                    f"{safe_name}"
-                )
-
-
+                original_name = smile_file.filename
+                safe_name = secure_filename(original_name)
+                storage_path = f"{user_id}/{case['id']}/smile/{safe_name}"
                 file_bytes = smile_file.read()
-
-
-                mime_type = (
-                    smile_file.mimetype
-                    or "image/jpeg"
-                )
-
-
-                file_size = len(file_bytes)
-
+                mime_type = smile_file.mimetype or "image/jpeg"
 
                 try:
-
-                    (
-                        supabase_admin
-                        .storage
-                        .from_(CASE_FILES_BUCKET)
-                        .upload(
-                            storage_path,
-                            file_bytes,
-                            {
-                                "content-type":
-                                    mime_type,
-
-                                "upsert":
-                                    "false"
-                            }
-                        )
+                    supabase_admin.storage.from_(CASE_FILES_BUCKET).upload(
+                        storage_path, file_bytes, {"content-type": mime_type, "upsert": "false"}
                     )
-
                 except Exception as upload_error:
-
-                    # ------------------------------
-                    # REMOVE ALREADY UPLOADED FILES
-                    # ------------------------------
-
-                    for uploaded_file in uploaded_files:
-
-                        try:
-
-                            (
-                                supabase_admin
-                                .storage
-                                .from_(
-                                    CASE_FILES_BUCKET
-                                )
-                                .remove([
-                                    uploaded_file[
-                                        "file_path"
-                                    ]
-                                ])
-                            )
-
-                        except Exception:
-
-                            pass
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE TEETH
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("case_teeth")
-                        .delete()
-                        .eq(
-                            "case_id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("dental_cases")
-                        .delete()
-                        .eq(
-                            "id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    return (
-                        "Failed to upload patient "
-                        "smile photo: "
-                        f"{str(upload_error)}",
-                        500
-                    )
-
+                    for uf in uploaded_files:
+                        try: supabase_admin.storage.from_(CASE_FILES_BUCKET).remove([uf["file_path"]])
+                        except: pass
+                    supabase_admin.table("case_teeth").delete().eq("case_id", case["id"]).execute()
+                    supabase_admin.table("dental_cases").delete().eq("id", case["id"]).execute()
+                    return f"Failed to upload patient smile photo: {str(upload_error)}", 500
 
                 uploaded_files.append({
-
-                    "case_id":
-                        case["id"],
-
-                    "uploaded_by":
-                        user_id,
-
-                    "file_name":
-                        original_name,
-
-                    "file_path":
-                        storage_path,
-
-                    "file_type":
-                        "smile_image",
-
-                    "mime_type":
-                        mime_type,
-
-                    "file_size":
-                        file_size
-
+                    "case_id": case["id"], "uploaded_by": user_id,
+                    "file_name": original_name, "file_path": storage_path,
+                    "file_type": "smile_image", "mime_type": mime_type, "file_size": len(file_bytes)
                 })
 
-
-            # ======================================
-            # SAVE FILE RECORDS
-            # ======================================
-
             if uploaded_files:
-
                 try:
-
-                    file_response = (
-                        supabase_admin
-                        .table("case_files")
-                        .insert(uploaded_files)
-                        .execute()
-                    )
-
-                except Exception as file_error:
-
-                    # ------------------------------
-                    # REMOVE STORAGE FILES
-                    # ------------------------------
-
-                    for uploaded_file in uploaded_files:
-
-                        try:
-
-                            (
-                                supabase_admin
-                                .storage
-                                .from_(
-                                    CASE_FILES_BUCKET
-                                )
-                                .remove([
-                                    uploaded_file[
-                                        "file_path"
-                                    ]
-                                ])
-                            )
-
-                        except Exception:
-
-                            pass
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE TEETH
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("case_teeth")
-                        .delete()
-                        .eq(
-                            "case_id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("dental_cases")
-                        .delete()
-                        .eq(
-                            "id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    return (
-                        "Failed to save uploaded "
-                        "file records: "
-                        f"{str(file_error)}",
-                        500
-                    )
-
-
-                if not file_response.data:
-
-                    # ------------------------------
-                    # REMOVE STORAGE FILES
-                    # ------------------------------
-
-                    for uploaded_file in uploaded_files:
-
-                        try:
-
-                            (
-                                supabase_admin
-                                .storage
-                                .from_(
-                                    CASE_FILES_BUCKET
-                                )
-                                .remove([
-                                    uploaded_file[
-                                        "file_path"
-                                    ]
-                                ])
-                            )
-
-                        except Exception:
-
-                            pass
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE TEETH
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("case_teeth")
-                        .delete()
-                        .eq(
-                            "case_id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    # ------------------------------
-                    # ROLLBACK CASE
-                    # ------------------------------
-
-                    (
-                        supabase_admin
-                        .table("dental_cases")
-                        .delete()
-                        .eq(
-                            "id",
-                            case["id"]
-                        )
-                        .execute()
-                    )
-
-
-                    return (
-                        "Failed to save uploaded "
-                        "file records.",
-                        500
-                    )
-
+                    supabase_admin.table("case_files").insert(uploaded_files).execute()
+                except Exception:
+                    pass
 
             # ======================================
-            # NOTIFY TECHNICIANS (IF SUBMITTED)
+            # NOTIFY ADMINS INSTEAD OF TECHNICIANS
             # ======================================
-
             if case_status == "submitted":
                 try:
-                    techs_res = (
-                        supabase_admin
-                        .table("profiles")
-                        .select("id")
-                        .eq("role", "technician")
-                        .eq("status", "approved")
-                        .execute()
-                    )
-                    technicians = techs_res.data or []
-                    
+                    admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
+                    admins = admins_res.data or []
                     dentist_name = profile.get("display_name") or f"Dr. {profile.get('first_name', '')}"
-
-                    for tech in technicians:
+                    
+                    for admin in admins:
                         create_notification(
-                            user_id=tech["id"],
-                            message=f"New Case Submitted: {case_number} ({case_type}) by {dentist_name}",
-                            link=f"/technician/cases/{case['id']}"
+                            user_id=admin["id"],
+                            message=f"New Case Submitted: {case_number} ({case_type}) due on {due_date} by {dentist_name}",
+                            link="/admin"
                         )
-                except Exception as notif_err:
-                    print(f"Notification error: {str(notif_err)}")
+                except Exception:
+                    pass
 
+            return redirect(url_for("dentist_dashboard"))
 
-            # ======================================
-            # SUCCESS
-            # ======================================
-
-            return redirect(
-                url_for(
-                    "dentist_dashboard"
-                )
-            )
-
-
-        # ==========================================
-        # GET
-        # ==========================================
-
-        return render_template(
-            "create_dental_case.html",
-            profile=profile
-        )
-
-
-    # ==========================================
-    # GENERAL ERROR
-    # ==========================================
+        return render_template("create_dental_case.html", profile=profile)
 
     except Exception as e:
-
-        return (
-            f"Create dental case error: {str(e)}",
-            500
-        )
+        return f"Create dental case error: {str(e)}", 500
 
 # =========================
 # REGISTER
@@ -2327,11 +1625,43 @@ def reopen_user(user_id):
 # =========================
 # TECHNICIAN DASHBOARD
 # =========================
-
+def log_case_status_change(case_id, status, user_id, notes=None):
+    try:
+        supabase_admin.table("case_status_history").insert({
+            "case_id": case_id,
+            "status": status,
+            "changed_by": user_id,
+            "notes": notes
+        }).execute()
+    except Exception as e:
+        print(f"Status history log error: {str(e)}")
 # =========================
 # TECHNICIAN DASHBOARD
 # =========================
+@app.route("/technician/cases/<case_id>/request-material", methods=["POST"])
+def request_material(case_id):
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+    
+    item_name = request.form.get("item_name", "").strip()
+    if item_name:
+        supabase_admin.table("material_requests").insert({
+            "case_id": case_id,
+            "technician_id": user_id,
+            "item_name": item_name
+        }).execute()
 
+        # Alert all admins
+        admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
+        for admin in (admins_res.data or []):
+            create_notification(
+                user_id=admin["id"],
+                message=f"📦 Restock Request: Technician requested '{item_name}' for Case #{case_id[:8]}",
+                link="/admin/inventory"
+            )
+            
+    return redirect(f"/technician/cases/{case_id}")
 # =========================
 # TECHNICIAN DASHBOARD
 # =========================
@@ -2398,7 +1728,6 @@ def view_case_details(case_id):
     user_id = session.get("user_id")
 
     if not user_id:
-
         return redirect(url_for("login"))
 
 
@@ -2419,7 +1748,6 @@ def view_case_details(case_id):
         profiles = profile_response.data or []
 
         if not profiles or profiles[0]["role"] != "technician":
-
             return "Access denied.", 403
 
 
@@ -2482,7 +1810,6 @@ def view_case_details(case_id):
 
         for file_record in files:
 
-            # Create a secure temporary URL valid for 1 hour (3600 seconds)
             signed_url = (
                 supabase_admin
                 .storage
@@ -2490,18 +1817,38 @@ def view_case_details(case_id):
                 .create_signed_url(file_record["file_path"], 3600)
             )
             
-            # Extract the actual URL string from the response
             if isinstance(signed_url, dict):
                 file_record["download_url"] = signed_url.get("signedURL")
             else:
                 file_record["download_url"] = signed_url
 
 
+        # ==========================================
+        # GET STATUS TIMELINE HISTORY
+        # ==========================================
+
+        history_response = (
+            supabase_admin
+            .table("case_status_history")
+            .select("*, profiles(display_name)")
+            .eq("case_id", case_id)
+            .order("created_at")
+            .execute()
+        )
+
+        case_history = history_response.data or []
+
+
+        # =========================
+        # RENDER TEMPLATE
+        # =========================
+
         return render_template(
             "technician_case_details.html",
             case=case,
             teeth=teeth,
-            files=files
+            files=files,
+            case_history=case_history
         )
 
 
@@ -2721,6 +2068,9 @@ def submit_for_admin_review(case_id):
 # =========================
 # ADMIN: ASSIGN CASE TO TECH
 # =========================
+# =========================
+# ADMIN: ASSIGN CASE TO TECHNICIAN
+# =========================
 @app.route("/admin/cases/<case_id>/assign", methods=["POST"])
 def admin_assign_case(case_id):
     admin_id = session.get("user_id")
@@ -2728,42 +2078,183 @@ def admin_assign_case(case_id):
         return redirect(url_for("login"))
 
     try:
-        # Verify Admin
         admin_res = supabase_admin.table("profiles").select("role").eq("id", admin_id).execute()
         if not admin_res.data or admin_res.data[0]["role"] != "admin":
             return "Access denied.", 403
 
         technician_id = request.form.get("technician_id")
         if not technician_id:
-            return "Please select a technician.", 400
+            return "Technician selection is required.", 400
 
-        # Fetch case and technician details for notification
+        # Fetch Case info for notification
         case_res = supabase_admin.table("dental_cases").select("case_number").eq("id", case_id).execute()
-        tech_res = supabase_admin.table("profiles").select("display_name").eq("id", technician_id).execute()
-        
-        if not case_res.data or not tech_res.data:
-            return "Case or technician not found.", 404
-
+        if not case_res.data:
+            return "Case not found.", 404
         case_number = case_res.data[0]["case_number"]
-        tech_name = tech_res.data[0]["display_name"]
 
-        # Assign case and update status
+        # Update case status to assigned and set technician_id
         supabase_admin.table("dental_cases").update({
             "technician_id": technician_id,
             "status": "assigned"
         }).eq("id", case_id).execute()
 
-        # Notify the assigned technician
+        # NOTIFY ONLY THE SPECIFIC ASSIGNED TECHNICIAN
         create_notification(
             user_id=technician_id,
-            message=f"New Assignment: You have been assigned Case {case_number}.",
+            message=f"New Case Assigned: You have been assigned Case {case_number}.",
             link=f"/technician/cases/{case_id}"
         )
 
         return redirect(url_for("admin_dashboard"))
 
     except Exception as e:
-        return f"Assignment error: {str(e)}", 500
+        return f"Assign case error: {str(e)}", 500
+
+# =========================
+# INVENTORY MANAGEMENT ROUTES
+# =========================
+# =========================
+# ADMIN: VIEW INVENTORY
+# =========================
+@app.route("/admin/inventory")
+def admin_inventory():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        # Verify admin
+        profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
+        if not profile_res.data or profile_res.data[0]["role"] != "admin" or profile_res.data[0]["status"] != "approved":
+            return "Access denied.", 403
+
+        # Fetch inventory items
+        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
+        inventory_items = inv_res.data or []
+
+        # Fetch notifications for layout consistency
+        notif_res = supabase_admin.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+        notifications = notif_res.data or []
+
+        return render_template(
+            "admin_inventory.html",
+            profile=profile_res.data[0],
+            inventory=inventory_items,
+            notifications=notifications
+        )
+    except Exception as e:
+        return f"Inventory error: {str(e)}", 500
+
+
+# =========================
+# ADMIN: ADD INVENTORY ITEM
+# =========================
+@app.route("/admin/inventory/add", methods=["POST"])
+def add_inventory_item():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        item_name = request.form.get("item_name", "").strip()
+        category = request.form.get("category", "").strip()
+        quantity = int(request.form.get("quantity", 0))
+        unit = request.form.get("unit", "").strip()
+        min_threshold = int(request.form.get("minimum_threshold", 5))
+        supplier_name = request.form.get("supplier_name", "").strip() or None
+        unit_cost = float(request.form.get("unit_cost", 0.00))
+
+        if not item_name or not category or not unit:
+            return "All fields are required.", 400
+
+        # Insert Item
+        inv_res = supabase_admin.table("inventory").insert({
+            "item_name": item_name,
+            "category": category,
+            "quantity": quantity,
+            "unit": unit,
+            "minimum_threshold": min_threshold,
+            "supplier_name": supplier_name,
+            "unit_cost": unit_cost
+        }).execute()
+
+        if inv_res.data:
+            item_id = inv_res.data[0]["id"]
+            # Log initial restock
+            supabase_admin.table("inventory_logs").insert({
+                "inventory_id": item_id,
+                "user_id": user_id,
+                "action_type": "restock",
+                "quantity_changed": quantity,
+                "previous_quantity": 0,
+                "new_quantity": quantity,
+                "notes": "Initial stock entry"
+            }).execute()
+
+        return redirect(url_for("admin_inventory"))
+    except Exception as e:
+        return f"Add item error: {str(e)}", 500
+
+# =========================
+# ADMIN: UPDATE STOCK QUANTITY
+# =========================
+@app.route("/admin/inventory/update/<item_id>", methods=["POST"])
+def update_inventory_stock(item_id):
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        action = request.form.get("action")  # 'add' or 'subtract'
+        amount = int(request.form.get("amount", 0))
+        notes = request.form.get("notes", "Manual adjustment").strip()
+
+        item_res = supabase_admin.table("inventory").select("*").eq("id", item_id).execute()
+        if not item_res.data:
+            return "Item not found.", 404
+
+        item = item_res.data[0]
+        current_qty = item["quantity"]
+
+        if action == "add":
+            new_qty = current_qty + amount
+            change_val = amount
+            action_type = "restock"
+        else:
+            new_qty = max(0, current_qty - amount)
+            change_val = -amount
+            action_type = "manual_deduction"
+
+        # Update Inventory
+        supabase_admin.table("inventory").update({
+            "quantity": new_qty
+        }).eq("id", item_id).execute()
+
+        # Insert Audit Log
+        supabase_admin.table("inventory_logs").insert({
+            "inventory_id": item_id,
+            "user_id": user_id,
+            "action_type": action_type,
+            "quantity_changed": change_val,
+            "previous_quantity": current_qty,
+            "new_quantity": new_qty,
+            "notes": notes
+        }).execute()
+
+        # Low stock check...
+        if new_qty <= item["minimum_threshold"]:
+            admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
+            for admin in (admins_res.data or []):
+                create_notification(
+                    user_id=admin["id"],
+                    message=f"⚠️ Low Stock Alert: {item['item_name']} is down to {new_qty} {item['unit']}!",
+                    link="/admin/inventory"
+                )
+
+        return redirect(url_for("admin_inventory"))
+    except Exception as e:
+        return f"Update stock error: {str(e)}", 500
+    
 # =========================
 # START FLASK
 # =========================

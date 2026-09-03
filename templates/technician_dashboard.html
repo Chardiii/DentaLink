@@ -65,8 +65,8 @@
                         <th>Case Number</th>
                         <th>Patient</th>
                         <th>Type</th>
+                        <th>Due Date</th>
                         <th>Current Status</th>
-                        <th>Date Submitted</th>
                         <th>Update Status / Action</th>
                     </tr>
                 </thead>
@@ -76,8 +76,8 @@
                             <td>{{ c.case_number }}</td>
                             <td>{{ c.patient_name }}</td>
                             <td>{{ c.case_type }}</td>
+                            <td style="color: #d32f2f; font-weight: bold;">{{ c.due_date or 'N/A' }}</td>
                             <td><strong>{{ c.status | upper }}</strong></td>
-                            <td>{{ c.created_at[:10] }}</td>
                             <td>
                                 <!-- Quick Status Update Form -->
                                 <form method="POST" action="/technician/cases/{{ c.id }}/update-status" style="margin-bottom: 8px;">

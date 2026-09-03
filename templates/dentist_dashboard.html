@@ -100,6 +100,14 @@
                         {% endif %}
                         <p><strong>Case Type:</strong> {{ case.case_type }}</p>
                         
+                        <!-- DUE DATE DISPLAY -->
+                        <p>
+                            <strong>Due Date:</strong> 
+                            <span style="color: #d32f2f; font-weight: bold;">
+                                {{ case.due_date or 'Not Set' }}
+                            </span>
+                        </p>
+
                         <!-- ASSIGNED TECHNICIAN INFO -->
                         <p>
                             <strong>Assigned Technician:</strong> 

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Inventory - DentaLink</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
+        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
+        th { background: #eee; }
+        button { padding: 6px 12px; border: 1px solid #999; border-radius: 6px; background: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #eee; }
+        input, select { padding: 6px; border-radius: 4px; border: 1px solid #aaa; }
+        .low-stock { background: #ffe6e6; color: #cc0000; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
+        .normal-stock { background: #e8f5e9; color: #2e7d32; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <h1 style="margin: 0;">BW11 DentaLink</h1>
+                <p style="margin: 5px 0 0 0;">Laboratory Inventory Management</p>
+            </div>
+            <div>
+                <a href="{{ url_for('admin_inventory_logs') }}">
+                    <button type="button" style="background: #333; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
+                        📋 View Audit Logs
+                    </button>
+                </a>
+                <a href="{{ url_for('admin_dashboard') }}">
+                    <button type="button" style="padding: 8px 14px; font-weight: bold; cursor: pointer;">← Back to Admin Dashboard</button>
+                </a>
+            </div>
+        </div>
+        <hr style="margin-top: 15px;">
+    </header>
+
+    <main>
+        <!-- ADD NEW ITEM SECTION -->
+        <section style="background: #eef6fc; border-left: 5px solid #0077cc;">
+            <h2 style="margin-top: 0; color: #0077cc;">Add New Inventory Item</h2>
+            <form method="POST" action="{{ url_for('add_inventory_item') }}" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                <div>
+                    <label>Item Name:</label><br>
+                    <input type="text" name="item_name" placeholder="e.g., Zirconia Disc A2" required>
+                </div>
+                <div>
+                    <label>Category:</label><br>
+                    <select name="category" required>
+                        <option value="">Select Category</option>
+                        <option value="Zirconia">Zirconia</option>
+                        <option value="Acrylic & Denture">Acrylic & Denture</option>
+                        <option value="3D Printing Resin">3D Printing Resin</option>
+                        <option value="Ceramic & E.max">Ceramic & E.max</option>
+                        <option value="Consumables">Consumables / Burrs</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Quantity:</label><br>
+                    <input type="number" name="quantity" value="10" min="0" required style="width: 90px;">
+                </div>
+                <div>
+                    <label>Unit:</label><br>
+                    <input type="text" name="unit" placeholder="e.g., discs, bottles" required style="width: 120px;">
+                </div>
+                <div>
+                    <label>Low Alert Threshold:</label><br>
+                    <input type="number" name="minimum_threshold" value="3" min="1" required style="width: 90px;">
+                </div>
+                <div>
+                    <label>Supplier Name:</label><br>
+                    <input type="text" name="supplier_name" placeholder="e.g., DentalDepot Inc." style="width: 140px;">
+                </div>
+                <div>
+                    <label>Unit Cost (₱):</label><br>
+                    <input type="number" step="0.01" name="unit_cost" value="0.00" min="0" required style="width: 90px;">
+                </div>
+                <div>
+                    <button type="submit" style="background: #0077cc; color: white; border: none; padding: 8px 14px;">Add Item</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- INVENTORY TABLE -->
+        <section>
+            <h2>Current Lab Stock Levels</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Supplier</th>
+                        <th>Unit Cost</th>
+                        <th>Quantity</th>
+                        <th>Status</th>
+                        <th>Quick Stock Adjust</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventory %}
+                        <tr>
+                            <td><strong>{{ item.item_name }}</strong></td>
+                            <td>{{ item.category }}</td>
+                            <td>{{ item.supplier_name or 'N/A' }}</td>
+                            <td>₱{{ "%.2f"|format(item.unit_cost or 0.00) }}</td>
+                            <td>{{ item.quantity }} {{ item.unit }}</td>
+                            <td>
+                                {% if item.quantity <= item.minimum_threshold %}
+                                    <span class="low-stock">⚠️ Low Stock</span>
+                                {% else %}
+                                    <span class="normal-stock">In Stock</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="POST" action="/admin/inventory/update/{{ item.id }}" style="display: flex; gap: 5px; align-items: center;">
+                                    <select name="action">
+                                        <option value="add">Restock (+)</option>
+                                        <option value="subtract">Use (-)</option>
+                                    </select>
+                                    <input type="number" name="amount" value="1" min="1" style="width: 60px;" required>
+                                    <button type="submit" style="background: #168a45; color: white; border: none;">Update</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7">No inventory items recorded yet. Use the form above to add supplies.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <hr>
+        <p>BW11 DentaLink</p>
+    </footer>
+
+</body>
+</html>

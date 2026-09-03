@@ -15,6 +15,8 @@
         button:hover { background: #eee; }
         textarea { width: 100%; max-width: 600px; padding: 10px; border: 1px solid #aaa; border-radius: 6px; }
         select { padding: 8px; border-radius: 4px; border: 1px solid #aaa; margin-right: 10px; }
+        .timeline-list { list-style-type: none; padding-left: 0; margin-top: 10px; }
+        .timeline-item { margin-bottom: 12px; padding-left: 15px; border-left: 3px solid #0077cc; }
     </style>
 </head>
 
@@ -40,6 +42,26 @@
             <p><strong>Current Status:</strong> <span style="color: #0077cc; font-size: 1.1em;">{{ case.status | upper }}</span></p>
         </section>
 
+        <!-- CASE PROGRESS TIMELINE -->
+        <section style="background: #fafafa;">
+            <h3 style="margin-top: 0; color: #333;">Case Progress Timeline</h3>
+            <p style="font-size: 13px; color: #666;">Chronological history of status updates and lab milestones.</p>
+            
+            <ul class="timeline-list">
+                {% for h in case_history %}
+                    <li class="timeline-item">
+                        <strong>{{ h.status }}</strong> 
+                        <br><small style="color: #666;">{{ h.created_at[:19].replace('T', ' ') }}</small>
+                        {% if h.profiles and h.profiles.display_name %}
+                            <br><small style="color: #2e7d32;">Updated by: {{ h.profiles.display_name }}</small>
+                        {% endif %}
+                    </li>
+                {% else %}
+                    <li>No timeline milestones recorded yet.</li>
+                {% endfor %}
+            </ul>
+        </section>
+
         <!-- LAB STATUS UPDATE CONTROL -->
         <section style="background: #eef6fc; border-left: 5px solid #0077cc;">
             <h3 style="margin-top: 0; color: #0077cc;">Update Lab Process Stage</h3>
@@ -63,6 +85,19 @@
         <section>
             <h3>Instructions from Dentist</h3>
             <p>{{ case.instructions or 'No additional instructions provided.' }}</p>
+        </section>
+
+        <!-- TECHNICIAN MATERIAL RESTOCK REQUEST -->
+        <section style="background: #fff8e1; border-left: 5px solid #ffb300;">
+            <h3 style="margin-top: 0; color: #ff8f00;">Request Material Restock</h3>
+            <p>If you notice stock running low while working on this case, flag it here to alert the administrator immediately.</p>
+            
+            <form method="POST" action="/technician/cases/{{ case.id }}/request-material" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" name="item_name" placeholder="e.g., Zirconia Disc A2 or Resin" required style="padding: 8px; width: 280px; border: 1px solid #aaa; border-radius: 4px;">
+                <button type="submit" style="background: #ffb300; color: #222; border: none; padding: 8px 14px; font-weight: bold; cursor: pointer;">
+                    📦 Flag Supply Shortage
+                </button>
+            </form>
         </section>
 
         <!-- SELECTED TEETH -->
