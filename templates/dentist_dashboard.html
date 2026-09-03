@@ -2,356 +2,194 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dentist Dashboard - DentaLink</title>
-
 </head>
 
 <body>
 
     <header>
-
         <h1>BW11 DentaLink</h1>
-
         <p>Dentist Dashboard</p>
-
         <hr>
-
     </header>
 
-
     <main>
+        <h2>Welcome, {{ profile.display_name }}</h2>
 
-        <h2>
-            Welcome, {{ profile.display_name }}
-        </h2>
-
-
-        <!-- ========================= -->
         <!-- PROFILE INFORMATION -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>My Profile</h2>
-
-            <p>
-                <strong>First Name:</strong>
-                {{ profile.first_name }}
-            </p>
-
-            <p>
-                <strong>Last Name:</strong>
-                {{ profile.last_name }}
-            </p>
-
-            <p>
-                <strong>Professional ID:</strong>
-                {{ profile.professional_id }}
-            </p>
-
-            <p>
-                <strong>Role:</strong>
-                {{ profile.role }}
-            </p>
-
-            <p>
-                <strong>Account Status:</strong>
-                {{ profile.status }}
-            </p>
-
+            <p><strong>First Name:</strong> {{ profile.first_name }}</p>
+            <p><strong>Last Name:</strong> {{ profile.last_name }}</p>
+            <p><strong>Professional ID:</strong> {{ profile.professional_id }}</p>
+            <p><strong>Role:</strong> {{ profile.role }}</p>
+            <p><strong>Account Status:</strong> {{ profile.status }}</p>
         </section>
-
 
         <hr>
 
+        <!-- NOTIFICATIONS -->
+        <section style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; margin-bottom: 25px;">
+            <h2 style="margin-top: 0;">Recent Notifications</h2>
+            <ul>
+                {% for notif in notifications %}
+                    <li style="margin-bottom: 10px;">
+                        {{ notif.message }}
+                        {% if notif.link %}
+                            — <a href="{{ notif.link }}" style="color: #0077cc;"><strong>Take Action</strong></a>
+                        {% endif %}
+                        <br>
+                        <small style="color: #666;">{{ notif.created_at[:10] }}</small>
+                    </li>
+                {% else %}
+                    <li>No new notifications.</li>
+                {% endfor %}
+            </ul>
+        </section>
 
-        <!-- ========================= -->
+        <hr>
+
         <!-- DENTAL CASE WORKSPACE -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>Dentist Workspace</h2>
-
-            <p>
-                Create and manage your dental cases.
-            </p>
-
-
+            <p>Create and manage your dental cases.</p>
             <a href="{{ url_for('create_dental_case') }}">
-
-                <button type="button">
+                <button type="button" style="padding: 10px 16px; font-weight: bold; cursor: pointer;">
                     CREATE NEW DENTAL CASE
                 </button>
-
             </a>
-
         </section>
-
 
         <hr>
 
-
-        <!-- ========================= -->
         <!-- MY DENTAL CASES -->
-        <!-- ========================= -->
-
         <section>
-
-            <h2>My Dental Cases</h2>
-
+            <h2>My Dental Cases & Live Status Tracking</h2>
 
             {% if dental_cases %}
-
-
                 {% for case in dental_cases %}
+                    <div style="margin-bottom: 40px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa;">
 
-                    <div>
-
-                        <h3>
-                            {{ case.case_number }}
+                        <h3 style="margin-top: 0; color: #0077cc;">
+                            Case: {{ case.case_number }}
                         </h3>
 
-
-                        <!-- ========================= -->
-                        <!-- PATIENT -->
-                        <!-- ========================= -->
-
-                        <p>
-                            <strong>Patient:</strong>
-                            {{ case.patient_name }}
-                        </p>
-
-
-                        {% if case.patient_reference %}
-
-                            <p>
-                                <strong>
-                                    Patient Reference:
+                        <!-- REVISION REQUIRED WARNING -->
+                        {% if case.status == "needs_revision" %}
+                            <div style="background: #ffe6e6; padding: 15px; border-radius: 8px; border-left: 5px solid #cc0000; margin-bottom: 15px;">
+                                <strong style="color: #cc0000; font-size: 18px;">
+                                    ⚠️ ACTION REQUIRED: Case Sent Back
                                 </strong>
-
-                                {{ case.patient_reference }}
-                            </p>
-
+                                <p>
+                                    <strong>Technician's Notes:</strong><br>
+                                    {{ case.revision_notes }}
+                                </p>
+                                <a href="{{ url_for('edit_dental_case', case_id=case.id) }}">
+                                    <button type="button" style="background: #cc0000; color: white; border: none; padding: 10px 16px; font-weight: bold; cursor: pointer;">
+                                        FIX & RESUBMIT CASE
+                                    </button>
+                                </a>
+                            </div>
                         {% endif %}
 
-
-                        <!-- ========================= -->
-                        <!-- CASE TYPE -->
-                        <!-- ========================= -->
-
+                        <p><strong>Patient:</strong> {{ case.patient_name }}</p>
+                        {% if case.patient_reference %}
+                            <p><strong>Patient Reference:</strong> {{ case.patient_reference }}</p>
+                        {% endif %}
+                        <p><strong>Case Type:</strong> {{ case.case_type }}</p>
+                        
+                        <!-- ASSIGNED TECHNICIAN INFO -->
                         <p>
-                            <strong>Case Type:</strong>
-                            {{ case.case_type }}
+                            <strong>Assigned Technician:</strong> 
+                            {% if case.profiles and case.profiles.display_name %}
+                                <span style="color: #2e7d32; font-weight: bold;">{{ case.profiles.display_name }}</span>
+                            {% else %}
+                                <span style="color: #666; font-style: italic;">Waiting for Admin Assignment</span>
+                            {% endif %}
                         </p>
 
-
-                        <!-- ========================= -->
-                        <!-- MATERIAL -->
-                        <!-- ========================= -->
-
-                        {% if case.material %}
-
-                            <p>
-                                <strong>Material:</strong>
-                                {{ case.material }}
-                            </p>
-
-                        {% endif %}
-
-
-                        <!-- ========================= -->
-                        <!-- SHADE -->
-                        <!-- ========================= -->
-
-                        {% if case.shade %}
-
-                            <p>
-                                <strong>Shade:</strong>
-                                {{ case.shade }}
-                            </p>
-
-                        {% endif %}
-
-
-                        <!-- ========================= -->
-                        <!-- STATUS -->
-                        <!-- ========================= -->
-
+                        <!-- LIVE STATUS TRACKING -->
                         <p>
-
-                            <strong>Status:</strong>
-
-                            {{ case.status }}
-
+                            <strong>Current Lab Status:</strong> 
+                            <span style="background: #eef6fc; color: #0077cc; padding: 4px 10px; border-radius: 4px; font-weight: bold;">
+                                {% if case.status == 'submitted' %}Submitted (Waiting for Admin Assignment)
+                                {% elif case.status == 'assigned' %}Assigned to Technician
+                                {% elif case.status == 'in_progress' %}In Progress
+                                {% elif case.status == 'cad_designing' %}CAD Designing (exocad)
+                                {% elif case.status == 'wax_up_or_try_in' %}Wax-up / Tooth Setup
+                                {% elif case.status == 'milling_or_printing' %}Milling / 3D Printing
+                                {% elif case.status == 'packing_and_curing' %}Acrylic Packing & Curing
+                                {% elif case.status == 'finishing_and_quality_check' %}Finishing & Quality Check
+                                {% elif case.status == 'completed' %}Completed & Ready
+                                {% elif case.status == 'needs_revision' %}Needs Revision
+                                {% else %}{{ case.status | upper }}{% endif %}
+                            </span>
                         </p>
-
-
-                        <!-- ========================= -->
-                        <!-- INSTRUCTIONS -->
-                        <!-- ========================= -->
 
                         {% if case.instructions %}
-
-                            <p>
-
-                                <strong>
-                                    Instructions:
-                                </strong>
-
-                                {{ case.instructions }}
-
-                            </p>
-
+                            <p><strong>Instructions:</strong> {{ case.instructions }}</p>
                         {% endif %}
 
-
-                        <!-- ========================= -->
-                        <!-- TEETH -->
-                        <!-- ========================= -->
-
-                        <h4>
-                            Teeth
-                        </h4>
-
-
+                        <h4>Teeth Breakdown</h4>
                         {% if case.teeth %}
-
                             <ul>
-
                                 {% for tooth in case.teeth %}
-
-                                    <li>
-
-                                        <strong>
-                                            Tooth:
-                                        </strong>
-
-                                        {{ tooth.tooth_number }}
-
-                                        —
-
-                                        {{ tooth.restoration_type }}
-
-
+                                    <li style="margin-bottom: 8px;">
+                                        <strong>Tooth #{{ tooth.tooth_number }}</strong> — {{ tooth.restoration_type }} 
+                                        (Material: {{ tooth.material or 'N/A' }}, Shade: {{ tooth.shade or 'N/A' }})
                                         {% if tooth.notes %}
-
-                                            <br>
-
-                                            <strong>
-                                                Notes:
-                                            </strong>
-
-                                            {{ tooth.notes }}
-
+                                            <br><strong>Notes:</strong> {{ tooth.notes }}
                                         {% endif %}
-
                                     </li>
-
                                 {% endfor %}
-
                             </ul>
-
                         {% else %}
-
-                            <p>
-                                No teeth added.
-                            </p>
-
+                            <p>No teeth added.</p>
                         {% endif %}
 
-
-                        <!-- ========================= -->
                         <!-- DRAFT ACTION -->
-                        <!-- ========================= -->
-
                         {% if case.status == "draft" %}
-
-                            <p>
-
-                                <strong>
-                                    This case is still a draft.
-                                </strong>
-
-                            </p>
-
-                            <button type="button">
-                                EDIT CASE
-                            </button>
-
-                            <button type="button">
-                                SEND TO TECHNICIAN
-                            </button>
-
+                            <p><strong>This case is still a draft.</strong></p>
+                            <a href="{{ url_for('edit_dental_case', case_id=case.id) }}">
+                                <button type="button" style="padding: 10px 16px; font-weight: bold; cursor: pointer;">
+                                    EDIT CASE
+                                </button>
+                            </a>
+                            <a href="{{ url_for('edit_dental_case', case_id=case.id) }}">
+                                <button type="button" style="background: #168a45; color: white; border: none; padding: 10px 16px; font-weight: bold; cursor: pointer;">
+                                    REVIEW & SEND TO ADMIN
+                                </button>
+                            </a>
                         {% endif %}
-
-
-                        <hr>
 
                     </div>
-
                 {% endfor %}
-
-
             {% else %}
-
-                <p>
-                    You have not created any dental cases yet.
-                </p>
-
-
-                <a
-                    href="{{ url_for('create_dental_case') }}"
-                >
-
-                    <button type="button">
+                <p>You have not created any dental cases yet.</p>
+                <a href="{{ url_for('create_dental_case') }}">
+                    <button type="button" style="padding: 10px 16px; font-weight: bold; cursor: pointer;">
                         CREATE YOUR FIRST DENTAL CASE
                     </button>
-
                 </a>
-
             {% endif %}
-
         </section>
-
 
         <hr>
 
-
-        <!-- ========================= -->
         <!-- LOGOUT -->
-        <!-- ========================= -->
-
-        <form
-            method="POST"
-            action="{{ url_for('logout') }}"
-        >
-
-            <button type="submit">
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit" style="padding: 10px 16px; font-weight: bold; cursor: pointer;">
                 Logout
             </button>
-
         </form>
 
     </main>
 
-
     <footer>
-
         <hr>
-
-        <p>
-            BW11 DentaLink
-        </p>
-
+        <p>BW11 DentaLink</p>
     </footer>
 
 </body>

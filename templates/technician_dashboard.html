@@ -2,127 +2,120 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technician Dashboard - DentaLink</title>
-
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
+        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
+        th { background: #eee; }
+        button { padding: 6px 12px; border: 1px solid #999; border-radius: 6px; background: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #eee; }
+        select { padding: 6px; border-radius: 4px; border: 1px solid #aaa; margin-bottom: 5px; }
+    </style>
 </head>
 
 <body>
 
     <header>
-
         <h1>BW11 DentaLink</h1>
-
         <p>Dental Technician Dashboard</p>
-
         <hr>
-
     </header>
 
-
     <main>
+        <h2>Welcome, {{ profile.display_name }}</h2>
 
-        <h2>
-            Welcome, {{ profile.display_name }}
-        </h2>
-
-
-        <!-- ========================= -->
         <!-- PROFILE INFORMATION -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>My Profile</h2>
-
-            <p>
-                <strong>First Name:</strong>
-                {{ profile.first_name }}
-            </p>
-
-            <p>
-                <strong>Last Name:</strong>
-                {{ profile.last_name }}
-            </p>
-
-            <p>
-                <strong>Professional ID:</strong>
-                {{ profile.professional_id }}
-            </p>
-
-            <p>
-                <strong>Role:</strong>
-                {{ profile.role }}
-            </p>
-
-            <p>
-                <strong>Account Status:</strong>
-                {{ profile.status }}
-            </p>
-
+            <p><strong>First Name:</strong> {{ profile.first_name }}</p>
+            <p><strong>Last Name:</strong> {{ profile.last_name }}</p>
+            <p><strong>Professional ID:</strong> {{ profile.professional_id }}</p>
+            <p><strong>Role:</strong> {{ profile.role }}</p>
+            <p><strong>Account Status:</strong> {{ profile.status }}</p>
         </section>
 
+        <!-- NOTIFICATIONS -->
+        <section style="background: #fff3cd; border-left: 5px solid #ffc107;">
+            <h2 style="margin-top: 0;">Recent Notifications</h2>
+            <ul>
+                {% for notif in notifications %}
+                    <li style="margin-bottom: 10px;">
+                        {{ notif.message }}
+                        {% if notif.link %}
+                            — <a href="{{ notif.link }}" style="color: #0077cc;"><strong>Take Action</strong></a>
+                        {% endif %}
+                        <br><small style="color: #666;">{{ notif.created_at[:10] }}</small>
+                    </li>
+                {% else %}
+                    <li>No new notifications.</li>
+                {% endfor %}
+            </ul>
+        </section>
 
-        <hr>
-
-
-        <!-- ========================= -->
-        <!-- TECHNICIAN WORKSPACE -->
-        <!-- ========================= -->
-
+        <!-- ACTIVE DENTAL CASES -->
         <section>
-
-            <h2>Technician Workspace</h2>
-
-            <p>
-                Your DentaLink technician workspace is ready.
-            </p>
-
-            <p>
-                Dental laboratory features will be added here.
-            </p>
-
+            <h2>Active Dental Cases & Lab Status Control</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Case Number</th>
+                        <th>Patient</th>
+                        <th>Type</th>
+                        <th>Current Status</th>
+                        <th>Date Submitted</th>
+                        <th>Update Status / Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cases %}
+                        <tr>
+                            <td>{{ c.case_number }}</td>
+                            <td>{{ c.patient_name }}</td>
+                            <td>{{ c.case_type }}</td>
+                            <td><strong>{{ c.status | upper }}</strong></td>
+                            <td>{{ c.created_at[:10] }}</td>
+                            <td>
+                                <!-- Quick Status Update Form -->
+                                <form method="POST" action="/technician/cases/{{ c.id }}/update-status" style="margin-bottom: 8px;">
+                                    <select name="status">
+                                        <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                        <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing (exocad)</option>
+                                        <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Tooth Setup</option>
+                                        <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / 3D Printing</option>
+                                        <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Acrylic Packing & Curing</option>
+                                        <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                                        <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
+                                    </select>
+                                    <br>
+                                    <button type="submit" style="background: #0077cc; color: white; border: none; font-size: 12px;">Update Status</button>
+                                </form>
+                                
+                                <a href="/technician/cases/{{ c.id }}" style="font-size: 14px;">View Case Details</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6">No active cases assigned to you yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </section>
 
-
-        <hr>
-
-
-        <!-- ========================= -->
         <!-- LOGOUT -->
-        <!-- ========================= -->
-
-        <form
-            method="POST"
-            action="{{ url_for('logout') }}"
-        >
-
-            <button type="submit">
-                Logout
-            </button>
-
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit">Logout</button>
         </form>
-
     </main>
 
-
     <footer>
-
         <hr>
-
-        <p>
-            BW11 DentaLink
-        </p>
-
+        <p>BW11 DentaLink</p>
     </footer>
 
 </body>
-
 </html>

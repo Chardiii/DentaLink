@@ -1,337 +1,282 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - DentaLink</title>
-
 </head>
-
 <body>
-
     <header>
-
         <h1>BW11 DentaLink</h1>
-
         <p>Administrator Dashboard</p>
-
         <hr>
-
     </header>
 
-
     <main>
+        <h2>Welcome, {{ profile.display_name }}</h2>
 
-        <h2>
-            Welcome, {{ profile.display_name }}
-        </h2>
+        <!-- NOTIFICATIONS -->
+        <section style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; margin-bottom: 25px;">
+            <h2 style="margin-top: 0;">Recent Notifications</h2>
+            <ul>
+                {% for notif in notifications %}
+                    <li style="margin-bottom: 10px;">
+                        {{ notif.message }}
+                        {% if notif.link %}
+                            — <a href="{{ notif.link }}" style="color: #0077cc;"><strong>Take Action</strong></a>
+                        {% endif %}
+                        <br>
+                        <small style="color: #666;">{{ notif.created_at[:10] }}</small>
+                    </li>
+                {% else %}
+                    <li>No new notifications.</li>
+                {% endfor %}
+            </ul>
+        </section>
 
+        <hr>
 
-        <!-- ========================= -->
         <!-- OVERVIEW -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>Overview</h2>
-
-            <p>
-                Pending Applications:
-                <strong>{{ pending_count }}</strong>
-            </p>
-
-            <p>
-                Approved Users:
-                <strong>{{ approved_count }}</strong>
-            </p>
-
-            <p>
-                Rejected Applications:
-                <strong>{{ rejected_count }}</strong>
-            </p>
-
-            <p>
-                Total Users:
-                <strong>{{ total_count }}</strong>
-            </p>
-
+            <p>Pending Applications: <strong>{{ pending_count }}</strong></p>
+            <p>Approved Users: <strong>{{ approved_count }}</strong></p>
+            <p>Rejected Applications: <strong>{{ rejected_count }}</strong></p>
+            <p>Total Users: <strong>{{ total_count }}</strong></p>
         </section>
-
 
         <hr>
 
+        <!-- TECHNICIAN WORKLOAD & CASE ASSIGNMENT -->
+        <section style="background: #eef6fc; border-left: 5px solid #0077cc; padding: 20px; margin-bottom: 25px;">
+            <h2 style="margin-top: 0;">Technician Workload & Case Assignment</h2>
+            <p>Review incoming case details, inspect attached files, and assign cases based on technician workload.</p>
 
-        <!-- ========================= -->
+            <!-- WORKLOAD SUMMARY -->
+            <h3>Lab Workload Status</h3>
+            {% if technicians %}
+                <ul>
+                    {% for tech in technicians %}
+                        <li style="margin-bottom: 5px;">
+                            <strong>{{ tech.display_name or tech.first_name }}</strong>: 
+                            <span style="background: #ddd; padding: 2px 8px; border-radius: 4px; font-weight: bold;">
+                                {{ tech.active_workload }} active case(s)
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No approved technicians available.</p>
+            {% endif %}
+
+            <hr>
+
+            <!-- UNASSIGNED CASES WITH FULL REVIEW -->
+            <h3>Unassigned Incoming Cases (Full Review)</h3>
+            {% if unassigned_cases %}
+                {% for case in unassigned_cases %}
+                    <div style="background: white; padding: 20px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #ccc;">
+                        <h3 style="margin-top: 0; color: #0077cc;">Case Number: {{ case.case_number }}</h3>
+                        <p><strong>Patient Name:</strong> {{ case.patient_name }}</p>
+                        <p><strong>Patient Reference:</strong> {{ case.patient_reference or 'N/A' }}</p>
+                        <p><strong>Case Type:</strong> {{ case.case_type }}</p>
+                        <p><strong>Instructions:</strong> {{ case.instructions or 'None provided.' }}</p>
+                        
+                        <h4>Teeth Breakdown:</h4>
+                        {% if case.teeth %}
+                            <ul>
+                                {% for tooth in case.teeth %}
+                                    <li>
+                                        Tooth #{{ tooth.tooth_number }} — {{ tooth.restoration_type }} 
+                                        (Material: {{ tooth.material or 'N/A' }}, Shade: {{ tooth.shade or 'N/A' }})
+                                        {% if tooth.notes %}<br><em>Notes: {{ tooth.notes }}</em>{% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No specific teeth recorded.</p>
+                        {% endif %}
+
+                        <h4>Attached Files (STL & Smile Photos):</h4>
+                        {% if case.files %}
+                            <ul>
+                                {% for file in case.files %}
+                                    <li style="margin-bottom: 8px;">
+                                        <strong>{{ file.file_name }}</strong> ({{ file.file_type | upper }}) — 
+                                        {% if file.download_url and file.download_url != "#" %}
+                                            <a href="{{ file.download_url }}" target="_blank" download>
+                                                <button type="button" style="padding: 4px 8px; cursor: pointer;">Download/View</button>
+                                            </a>
+                                        {% else %}
+                                            <span>File link unavailable</span>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No files attached to this case.</p>
+                        {% endif %}
+
+                        <hr style="border: 0; border-top: 1px dashed #ccc;">
+
+                        <form method="POST" action="{{ url_for('admin_assign_case', case_id=case.id) }}">
+                            <label><strong>Assign to Technician:</strong></label><br>
+                            <select name="technician_id" required style="margin: 10px 0; padding: 8px; width: 100%; max-width: 300px;">
+                                <option value="">Select Technician</option>
+                                {% for tech in technicians %}
+                                    <option value="{{ tech.id }}">{{ tech.display_name or tech.first_name }} ({{ tech.active_workload }} active)</option>
+                                {% endfor %}
+                            </select>
+                            <br>
+                            <button type="submit" style="background: #0077cc; color: white; border: none; padding: 10px 16px; font-weight: bold; cursor: pointer;">
+                                ASSIGN CASE
+                            </button>
+                        </form>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>No unassigned cases waiting for review.</p>
+            {% endif %}
+        </section>
+
+        <hr>
+
+        <!-- ACTIVE LAB CASES & STATUS MONITOR -->
+        <section style="background: #fafafa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h2 style="margin-top: 0;">Active Lab Cases & Live Status Monitor</h2>
+            <p>Track the progress of cases currently assigned to or being processed by technicians.</p>
+
+            {% if active_cases %}
+                <table style="width: 100%; border-collapse: collapse; background: white; margin-top: 15px;">
+                    <thead>
+                        <tr style="background: #eee;">
+                            <th style="border: 1px solid #ccc; padding: 10px;">Case #</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Patient</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Type</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Assigned Tech</th>
+                            <th style="border: 1px solid #ccc; padding: 10px;">Current Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in active_cases %}
+                            <tr>
+                                <td style="border: 1px solid #ccc; padding: 10px;">{{ c.case_number }}</td>
+                                <td style="border: 1px solid #ccc; padding: 10px;">{{ c.patient_name }}</td>
+                                <td style="border: 1px solid #ccc; padding: 10px;">{{ c.case_type }}</td>
+                                <td style="border: 1px solid #ccc; padding: 10px; font-weight: bold; color: #2e7d32;">
+                                    {{ c.profiles.display_name if c.profiles and c.profiles.display_name else 'Assigned' }}
+                                </td>
+                                <td style="border: 1px solid #ccc; padding: 10px;">
+                                    <span style="background: #eef6fc; color: #0077cc; padding: 4px 8px; border-radius: 4px; font-weight: bold;">
+                                        {% if c.status == 'assigned' %}Assigned
+                                        {% elif c.status == 'in_progress' %}In Progress
+                                        {% elif c.status == 'cad_designing' %}CAD Designing (exocad)
+                                        {% elif c.status == 'wax_up_or_try_in' %}Wax-up / Tooth Setup
+                                        {% elif c.status == 'milling_or_printing' %}Milling / 3D Printing
+                                        {% elif c.status == 'packing_and_curing' %}Acrylic Packing & Curing
+                                        {% elif c.status == 'finishing_and_quality_check' %}Finishing & QC
+                                        {% elif c.status == 'completed' %}Completed
+                                        {% elif c.status == 'needs_revision' %}Needs Revision
+                                        {% else %}{{ c.status | upper }}{% endif %}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No active cases in progress right now.</p>
+            {% endif %}
+        </section>
+
+        <hr>
+
         <!-- PENDING APPLICATIONS -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>Pending Applications</h2>
-
             {% if pending_users %}
-
                 {% for user in pending_users %}
-
                     <div>
+                        <h3>{{ user.display_name }}</h3>
+                        <p><strong>First Name:</strong> {{ user.first_name }}</p>
+                        <p><strong>Last Name:</strong> {{ user.last_name }}</p>
+                        <p><strong>Phone:</strong> {{ user.phone }}</p>
+                        <p><strong>Professional ID:</strong> {{ user.professional_id }}</p>
+                        <p><strong>Role:</strong> {{ user.role }}</p>
+                        <p><strong>Status:</strong> {{ user.status }}</p>
 
-                        <h3>
-                            {{ user.display_name }}
-                        </h3>
-
-                        <p>
-                            <strong>First Name:</strong>
-                            {{ user.first_name }}
-                        </p>
-
-                        <p>
-                            <strong>Last Name:</strong>
-                            {{ user.last_name }}
-                        </p>
-
-                        <p>
-                            <strong>Phone:</strong>
-                            {{ user.phone }}
-                        </p>
-
-                        <p>
-                            <strong>Professional ID:</strong>
-                            {{ user.professional_id }}
-                        </p>
-
-                        <p>
-                            <strong>Role:</strong>
-                            {{ user.role }}
-                        </p>
-
-                        <p>
-                            <strong>Status:</strong>
-                            {{ user.status }}
-                        </p>
-
-
-                        <!-- REVIEW APPLICATION -->
-
-                        <form
-                            method="GET"
-                            action="{{ url_for('review_user', user_id=user.id) }}"
-                            style="display:inline;"
-                        >
-
-                            <button type="submit">
-                                REVIEW APPLICATION
-                            </button>
-
+                        <form method="GET" action="{{ url_for('review_user', user_id=user.id) }}" style="display:inline;">
+                            <button type="submit">REVIEW APPLICATION</button>
                         </form>
-
-
                         <hr>
-
                     </div>
-
                 {% endfor %}
-
             {% else %}
-
-                <p>
-                    No pending applications.
-                </p>
-
+                <p>No pending applications.</p>
             {% endif %}
-
         </section>
-
 
         <hr>
 
-
-        <!-- ========================= -->
         <!-- APPROVED USERS -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>Approved Users</h2>
-
             {% if approved_users %}
-
                 {% for user in approved_users %}
-
                     <div>
-
-                        <h3>
-                            {{ user.display_name }}
-                        </h3>
-
-                        <p>
-                            <strong>First Name:</strong>
-                            {{ user.first_name }}
-                        </p>
-
-                        <p>
-                            <strong>Last Name:</strong>
-                            {{ user.last_name }}
-                        </p>
-
-                        <p>
-                            <strong>Phone:</strong>
-                            {{ user.phone }}
-                        </p>
-
-                        <p>
-                            <strong>Professional ID:</strong>
-                            {{ user.professional_id }}
-                        </p>
-
-                        <p>
-                            <strong>Role:</strong>
-                            {{ user.role }}
-                        </p>
-
-                        <p>
-                            <strong>Status:</strong>
-                            {{ user.status }}
-                        </p>
-
+                        <h3>{{ user.display_name }}</h3>
+                        <p><strong>First Name:</strong> {{ user.first_name }}</p>
+                        <p><strong>Last Name:</strong> {{ user.last_name }}</p>
+                        <p><strong>Phone:</strong> {{ user.phone }}</p>
+                        <p><strong>Professional ID:</strong> {{ user.professional_id }}</p>
+                        <p><strong>Role:</strong> {{ user.role }}</p>
+                        <p><strong>Status:</strong> {{ user.status }}</p>
                         <hr>
-
                     </div>
-
                 {% endfor %}
-
             {% else %}
-
-                <p>
-                    No approved users.
-                </p>
-
+                <p>No approved users.</p>
             {% endif %}
-
         </section>
-
 
         <hr>
 
-
-        <!-- ========================= -->
         <!-- REJECTED APPLICATIONS -->
-        <!-- ========================= -->
-
         <section>
-
             <h2>Rejected Applications</h2>
-
             {% if rejected_users %}
-
                 {% for user in rejected_users %}
-
                     <div>
+                        <h3>{{ user.display_name }}</h3>
+                        <p><strong>First Name:</strong> {{ user.first_name }}</p>
+                        <p><strong>Last Name:</strong> {{ user.last_name }}</p>
+                        <p><strong>Phone:</strong> {{ user.phone }}</p>
+                        <p><strong>Professional ID:</strong> {{ user.professional_id }}</p>
+                        <p><strong>Role:</strong> {{ user.role }}</p>
+                        <p><strong>Status:</strong> {{ user.status }}</p>
 
-                        <h3>
-                            {{ user.display_name }}
-                        </h3>
-
-                        <p>
-                            <strong>First Name:</strong>
-                            {{ user.first_name }}
-                        </p>
-
-                        <p>
-                            <strong>Last Name:</strong>
-                            {{ user.last_name }}
-                        </p>
-
-                        <p>
-                            <strong>Phone:</strong>
-                            {{ user.phone }}
-                        </p>
-
-                        <p>
-                            <strong>Professional ID:</strong>
-                            {{ user.professional_id }}
-                        </p>
-
-                        <p>
-                            <strong>Role:</strong>
-                            {{ user.role }}
-                        </p>
-
-                        <p>
-                            <strong>Status:</strong>
-                            {{ user.status }}
-                        </p>
-
-
-                        <!-- REVIEW REJECTED APPLICATION -->
-
-                        <form
-                            method="GET"
-                            action="{{ url_for('review_user', user_id=user.id) }}"
-                            style="display:inline;"
-                        >
-
-                            <button type="submit">
-                                REVIEW APPLICATION
-                            </button>
-
+                        <form method="GET" action="{{ url_for('review_user', user_id=user.id) }}" style="display:inline;">
+                            <button type="submit">REVIEW APPLICATION</button>
                         </form>
-
-
                         <hr>
-
                     </div>
-
                 {% endfor %}
-
             {% else %}
-
-                <p>
-                    No rejected applications.
-                </p>
-
+                <p>No rejected applications.</p>
             {% endif %}
-
         </section>
-
 
         <hr>
 
-
-        <!-- ========================= -->
         <!-- LOGOUT -->
-        <!-- ========================= -->
-
-        <form
-            method="POST"
-            action="{{ url_for('logout') }}"
-        >
-
-            <button type="submit">
-                Logout
-            </button>
-
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit">Logout</button>
         </form>
-
     </main>
 
-
     <footer>
-
         <hr>
-
-        <p>
-            BW11 DentaLink
-        </p>
-
+        <p>BW11 DentaLink</p>
     </footer>
-
 </body>
-
 </html>

@@ -10,7 +10,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Create Dental Case - DentaLink</title>
+    <title>Edit Dental Case - DentaLink</title>
 
     <style>
 
@@ -302,7 +302,7 @@
 
     <h1>BW11 DentaLink</h1>
 
-    <p>Dentist — Create Dental Case</p>
+    <p>Dentist — Edit Draft Case: {{ case.case_number }}</p>
 
 </header>
 
@@ -316,7 +316,7 @@
 
     <form
         method="POST"
-        action="{{ url_for('create_dental_case') }}"
+        action="{{ url_for('edit_dental_case', case_id=case.id) }}"
         id="dental-case-form"
         enctype="multipart/form-data"
     >
@@ -341,6 +341,7 @@
                 type="text"
                 id="patient_name"
                 name="patient_name"
+                value="{{ case.patient_name }}"
                 placeholder="Enter patient name"
                 required
             >
@@ -359,6 +360,7 @@
                 type="text"
                 id="patient_reference"
                 name="patient_reference"
+                value="{{ case.patient_reference or '' }}"
                 placeholder="Optional reference number"
             >
 
@@ -391,43 +393,43 @@
                     Select Case Type
                 </option>
 
-                <option value="full_denture">
+                <option value="full_denture" {% if case.case_type == 'full_denture' %}selected{% endif %}>
                     Full Denture
                 </option>
 
-                <option value="upper_full_denture">
+                <option value="upper_full_denture" {% if case.case_type == 'upper_full_denture' %}selected{% endif %}>
                     Upper Full Denture
                 </option>
 
-                <option value="lower_full_denture">
+                <option value="lower_full_denture" {% if case.case_type == 'lower_full_denture' %}selected{% endif %}>
                     Lower Full Denture
                 </option>
 
-                <option value="partial_denture">
+                <option value="partial_denture" {% if case.case_type == 'partial_denture' %}selected{% endif %}>
                     Partial Denture
                 </option>
 
-                <option value="crown">
+                <option value="crown" {% if case.case_type == 'crown' %}selected{% endif %}>
                     Crown
                 </option>
 
-                <option value="bridge">
+                <option value="bridge" {% if case.case_type == 'bridge' %}selected{% endif %}>
                     Bridge
                 </option>
 
-                <option value="veneer">
+                <option value="veneer" {% if case.case_type == 'veneer' %}selected{% endif %}>
                     Veneer
                 </option>
 
-                <option value="inlay">
+                <option value="inlay" {% if case.case_type == 'inlay' %}selected{% endif %}>
                     Inlay
                 </option>
 
-                <option value="onlay">
+                <option value="onlay" {% if case.case_type == 'onlay' %}selected{% endif %}>
                     Onlay
                 </option>
 
-                <option value="other">
+                <option value="other" {% if case.case_type == 'other' %}selected{% endif %}>
                     Other
                 </option>
 
@@ -761,68 +763,9 @@
                 name="instructions"
                 rows="6"
                 placeholder="Enter general instructions for the dental technician..."
-            ></textarea>
+            >{{ case.instructions or '' }}</textarea>
 
         </section>
-
-
-        <!-- ================================= -->
-        <!-- FILE UPLOADS -->
-        <!-- ================================= -->
-
-        <section>
-
-            <h2>
-                Case Files
-            </h2>
-
-
-            <!-- STL -->
-
-            <label for="stl_file">
-                STL File
-            </label>
-
-            <br><br>
-
-            <input
-                type="file"
-                id="stl_file"
-                name="stl_file"
-                accept=".stl"
-            >
-
-            <p class="upload-help">
-                Upload the patient's STL dental scan.
-            </p>
-
-
-            <br><br>
-
-
-            <!-- PATIENT SMILE -->
-
-            <label for="patient_smile">
-                Patient Smile Photo
-            </label>
-
-            <br><br>
-
-            <input
-                type="file"
-                id="patient_smile"
-                name="patient_smile"
-                accept=".jpg,.jpeg,.png,.webp"
-                multiple
-            >
-
-            <p class="upload-help">
-                You may upload one or more JPG, JPEG, PNG,
-                or WEBP patient smile photos.
-            </p>
-
-        </section>
-
 
         <!-- ================================= -->
         <!-- ACTIONS -->
@@ -838,7 +781,7 @@
                     name="submit_action"
                     value="draft"
                 >
-                    SAVE DRAFT
+                    UPDATE DRAFT
                 </button>
 
 
@@ -859,7 +802,7 @@
                 >
 
                     <button type="button">
-                        BACK TO DENTIST DASHBOARD
+                        CANCEL
                     </button>
 
                 </a>
@@ -873,6 +816,12 @@
 
 
 </main>
+
+
+<!-- Hidden JSON data block for Jinja injection, keeps syntax highlighters happy -->
+<script id="draft-teeth-data" type="application/json">
+    {{ teeth | tojson | safe }}
+</script>
 
 
 <script>
@@ -1234,16 +1183,6 @@
                     <!-- RESTORATION TYPE -->
                     <!-- ================= -->
 
-                    <!--
-                        The database requires restoration_type.
-
-                        We no longer ask the dentist to select
-                        requested work for each tooth.
-
-                        The case_type is automatically used as
-                        restoration_type for every selected tooth.
-                    -->
-
                     <input
                         type="hidden"
                         name="restoration_type"
@@ -1411,7 +1350,7 @@
 
 
         return confirm(
-            "Are you sure you want to send this dental case to the Admin?"
+            "Are you sure you want to send this dental case to the ADMIN?"
         );
 
     }
@@ -1563,6 +1502,39 @@
 
             }
         );
+
+    // =====================================
+    // PRE-LOAD SAVED DRAFT DATA
+    // =====================================
+    window.addEventListener('DOMContentLoaded', () => {
+        // Read the data from the hidden script tag above
+        const teethDataElement = document.getElementById("draft-teeth-data");
+        const savedTeeth = JSON.parse(teethDataElement.textContent || "[]");
+        
+        if (savedTeeth && savedTeeth.length > 0) {
+            // 1. Select the teeth visually
+            savedTeeth.forEach(tooth => {
+                selectedTeeth.add(tooth.tooth_number);
+                const btn = document.querySelector(`.tooth[data-tooth="${tooth.tooth_number}"]`);
+                if (btn) btn.classList.add("selected");
+            });
+
+            // 2. Generate the form inputs
+            updateSelection();
+
+            // 3. Fill the generated dropdowns with the saved data
+            setTimeout(() => {
+                savedTeeth.forEach(tooth => {
+                    const detailBlock = document.querySelector(`input[name="tooth_number"][value="${tooth.tooth_number}"]`).closest('.tooth-detail');
+                    if (detailBlock) {
+                        if (tooth.material) detailBlock.querySelector('select[name="material"]').value = tooth.material;
+                        if (tooth.shade) detailBlock.querySelector('select[name="shade"]').value = tooth.shade;
+                        if (tooth.notes) detailBlock.querySelector('textarea[name="tooth_notes"]').value = tooth.notes;
+                    }
+                });
+            }, 50); // small delay to ensure DOM is updated
+        }
+    });
 
 </script>
 

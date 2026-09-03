@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Details: {{ case.case_number }} - DentaLink</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
+        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background: #eee; }
+        button { padding: 10px 16px; border: 1px solid #999; border-radius: 6px; background: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #eee; }
+        textarea { width: 100%; max-width: 600px; padding: 10px; border: 1px solid #aaa; border-radius: 6px; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #aaa; margin-right: 10px; }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>BW11 DentaLink</h1>
+        <p>Dental Case: {{ case.case_number }}</p>
+        <hr>
+    </header>
+
+    <main>
+        <a href="{{ url_for('technician_dashboard') }}">← Back to Dashboard</a>
+
+        <h2>Case Details: {{ case.case_number }}</h2>
+
+        <!-- GENERAL INFORMATION -->
+        <section>
+            <h3>General Information</h3>
+            <p><strong>Patient Name:</strong> {{ case.patient_name }}</p>
+            <p><strong>Reference/ID:</strong> {{ case.patient_reference or 'N/A' }}</p>
+            <p><strong>Case Type:</strong> {{ case.case_type }}</p>
+            <p><strong>Current Status:</strong> <span style="color: #0077cc; font-size: 1.1em;">{{ case.status | upper }}</span></p>
+        </section>
+
+        <!-- LAB STATUS UPDATE CONTROL -->
+        <section style="background: #eef6fc; border-left: 5px solid #0077cc;">
+            <h3 style="margin-top: 0; color: #0077cc;">Update Lab Process Stage</h3>
+            <p>Update the current stage of this case to keep the dentist and patient informed of its progress.</p>
+            
+            <form method="POST" action="/technician/cases/{{ case.id }}/update-status">
+                <select name="status">
+                    <option value="in_progress" {% if case.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                    <option value="cad_designing" {% if case.status == 'cad_designing' %}selected{% endif %}>CAD Designing (exocad)</option>
+                    <option value="wax_up_or_try_in" {% if case.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Tooth Setup</option>
+                    <option value="milling_or_printing" {% if case.status == 'milling_or_printing' %}selected{% endif %}>Milling / 3D Printing</option>
+                    <option value="packing_and_curing" {% if case.status == 'packing_and_curing' %}selected{% endif %}>Acrylic Packing & Curing</option>
+                    <option value="finishing_and_quality_check" {% if case.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                    <option value="completed" {% if case.status == 'completed' %}selected{% endif %}>Completed</option>
+                </select>
+                <button type="submit" style="background: #0077cc; color: white; border: none;">Save Status Update</button>
+            </form>
+        </section>
+
+        <!-- INSTRUCTIONS -->
+        <section>
+            <h3>Instructions from Dentist</h3>
+            <p>{{ case.instructions or 'No additional instructions provided.' }}</p>
+        </section>
+
+        <!-- SELECTED TEETH -->
+        <section>
+            <h3>Selected Teeth</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tooth #</th>
+                        <th>Material</th>
+                        <th>Shade</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tooth in teeth %}
+                        <tr>
+                            <td>{{ tooth.tooth_number }}</td>
+                            <td>{{ tooth.material or 'N/A' }}</td>
+                            <td>{{ tooth.shade or 'N/A' }}</td>
+                            <td>{{ tooth.notes or 'N/A' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4">No teeth selected.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <!-- UPLOADED FILES -->
+        <section>
+            <h3>Uploaded Files (STL & Photos)</h3>
+            <ul>
+                {% for file in files %}
+                    <li style="margin-bottom: 10px;">
+                        <strong>{{ file.file_name }}</strong> ({{ file.file_type | upper }}) - 
+                        <a href="{{ file.download_url }}" target="_blank" download>
+                            <button type="button" style="padding: 5px 10px; margin-left: 10px;">Download File</button>
+                        </a>
+                    </li>
+                {% else %}
+                    <li>No files attached to this case.</li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        <!-- RETURN TO DENTIST FORM -->
+        <section style="border: 2px solid #cc0000; background: #fff0f0;">
+            <h3 style="color: #cc0000; margin-top: 0;">Send Back for Revision</h3>
+            <p>If there is an issue with the scan or instructions, send it back to the dentist.</p>
+            
+            <form method="POST" action="/technician/cases/{{ case.id }}/return">
+                <label>Reason for return (Required):</label><br><br>
+                <textarea name="revision_notes" rows="4" required placeholder="Explain what needs to be fixed..."></textarea><br><br>
+                <button type="submit" style="background: #cc0000; color: white; border: none; font-size: 16px;">
+                    RETURN CASE TO DENTIST
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <hr>
+        <p>BW11 DentaLink</p>
+    </footer>
+
+</body>
+</html>
