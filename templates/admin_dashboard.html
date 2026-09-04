@@ -3,318 +3,638 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - DentaLink</title>
+    <title>Admin Dashboard - DentaLink LIS</title>
+    <style>
+        /* Dark Theme Variables */
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-card-hover: #1A2132;
+            --bg-input: #0B101E;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #131825;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .app-header {
+            background-color: var(--bg-main);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo-box { background-color: var(--accent-cyan); border-radius: 8px; padding: 5px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 12px; color: var(--text-muted); }
+
+        .header-center-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .nav-pill { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px; border: 1px solid transparent; transition: all 0.2s; background: transparent; cursor: pointer; font-family: inherit; }
+        .nav-pill:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.02); border-color: var(--border-color); }
+        .nav-pill.active { background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border-color: rgba(66, 221, 242, 0.3); }
+        
+        .pill-badge { background-color: var(--accent-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: bold; margin-left: 4px; }
+        .pill-badge.yellow { background-color: var(--accent-yellow); color: var(--bg-main); }
+
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 10px; border-radius: 12px; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; }
+
+        /* Modern Notifications Popover */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 6px; border-radius: 6px; cursor: pointer; transition: 0.2s; position: relative; display: flex; align-items: center; justify-content: center;}
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--text-main); background: rgba(255,255,255,0.05);}
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid var(--bg-main);}
+        
+        .notif-dropdown { position: absolute; top: 45px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 200; overflow: hidden;}
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header);}
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: normal; transition: color 0.2s;}
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 15px; border-bottom: 1px solid var(--border-color); position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; transition: background 0.2s; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4;}
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 6px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; transition: color 0.2s;}
+        .notif-close:hover { color: var(--accent-red); }
+
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; background-color: rgba(66, 221, 242, 0.1); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; }
+        .user-info p { margin: 0; font-size: 13px; font-weight: 600; }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); }
+        .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
+        /* Main Dashboard Container */
+        .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+
+        /* Welcome Banner */
+        .welcome-banner { background-color: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--accent-green); padding: 15px 20px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; margin-bottom: 25px; }
+
+        /* Metrics Grid */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .metric-card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+        .metric-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .metric-title { color: var(--text-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px 0; }
+        .metric-value { font-size: 32px; font-weight: 700; color: var(--text-main); margin: 0; line-height: 1; }
+        .metric-icon { background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); padding: 8px; border-radius: 8px; display: flex; }
+        .metric-icon.warning { background-color: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); }
+        .metric-icon.danger { background-color: rgba(239, 68, 68, 0.1); color: var(--accent-red); }
+        .metric-icon.success { background-color: rgba(16, 185, 129, 0.1); color: var(--accent-green); }
+        .metric-bottom { margin-top: 15px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+        .metric-bottom.success { color: var(--accent-green); }
+        .metric-bottom.warning { color: var(--accent-yellow); }
+        .metric-bottom.danger { color: var(--accent-red); }
+
+        /* General Panel Container */
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .panel-title { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+        .panel-subtitle { margin: 5px 0 0 0; font-size: 13px; color: var(--text-muted); }
+
+        /* =========================================
+           KANBAN PIPELINE DESIGN FOR ADMIN WORKFLOW
+           ========================================= */
+        .kanban-board {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 15px;
+            align-items: flex-start;
+        }
+        .kanban-board::-webkit-scrollbar { height: 8px; }
+        .kanban-board::-webkit-scrollbar-track { background: var(--bg-card); border-radius: 10px; }
+        .kanban-board::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .kanban-column {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            min-width: 300px;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .kanban-header {
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--panel-header);
+        }
+
+        .kanban-title { font-size: 12px; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.5px; }
+        .kanban-count { background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+
+        .kanban-body {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 180px;
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .kanban-body::-webkit-scrollbar { width: 5px; }
+        .kanban-body::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .empty-column { border: 1px dashed var(--border-color); border-radius: 8px; padding: 25px 10px; text-align: center; color: var(--text-muted); font-size: 12px; }
+
+        /* Kanban Card */
+        .k-card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; transition: all 0.2s; }
+        .k-card:hover { border-color: var(--accent-cyan); }
+        .k-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .k-badge-cyan { background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 1px solid rgba(66, 221, 242, 0.2); }
+        .k-card-title { color: var(--text-main); font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+        .k-card-subtitle { color: var(--text-muted); font-size: 11px; margin-bottom: 8px; }
+
+        /* Buttons & Inputs */
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline-cyan { background-color: transparent; border: 1px solid var(--accent-cyan); color: var(--accent-cyan); }
+        .btn-outline-cyan:hover { background-color: rgba(66, 221, 242, 0.1); }
+
+        /* Tables & Directories */
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dark-table th { text-align: left; padding: 12px 15px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
+        .dark-table td { padding: 12px 15px; border-bottom: 1px solid rgba(38, 47, 68, 0.5); vertical-align: middle; }
+        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
+        .dark-table tr:last-child td { border-bottom: none; }
+
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border: 1px solid rgba(66, 221, 242, 0.2); }
+        .select-dark { background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 6px 10px; border-radius: 6px; font-size: 12px; outline: none; }
+
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .item-card { background-color: var(--bg-main); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; }
+        .item-card h4 { margin: 0 0 10px 0; color: var(--accent-cyan); font-size: 15px;}
+        .item-card p { margin: 5px 0; font-size: 12px; color: var(--text-muted); }
+        .item-card strong { color: var(--text-main); }
+
+        /* Popup Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.8); backdrop-filter: blur(8px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 900px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { background-color: var(--panel-header); padding: 20px 25px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 25px; overflow-y: auto; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; }
+        .close-btn:hover { color: var(--accent-red); }
+
+        @media (max-width: 768px) {
+            .dark-table { display: block; overflow-x: auto; }
+            .header-center-nav { display: none; }
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <div>
-                <h1 style="margin: 0;">BW11 DentaLink</h1>
-                <p style="margin: 5px 0 0 0;">Administrator Dashboard</p>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
             </div>
-            <div>
-                <a href="{{ url_for('admin_inventory') }}">
-                    <button type="button" style="background: #0077cc; color: white; border: none; padding: 10px 16px; font-weight: bold; cursor: pointer; border-radius: 6px;">
-                        📦 Manage Lab Inventory
-                    </button>
-                </a>
-                <a href="{{ url_for('admin_inventory_logs') }}">
-                    <button type="button" style="background: #333; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                        📋 View Audit Logs
-                    </button>
-                </a>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Mrkzter Dental Laboratory</p>
             </div>
         </div>
-        <hr style="margin-top: 15px;">
-    </header>
 
-    <main>
-        <h2>Welcome, {{ profile.display_name }}</h2>
+        <nav class="header-center-nav">
+            <a href="#" class="nav-pill active">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Admin Portal
+            </a>
+            
+            <!-- Incoming Cases Pill Button with Badge -->
+            <button type="button" class="nav-pill" onclick="openIncomingModal()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                Incoming Cases <span class="pill-badge">{{ unassigned_cases|length }}</span>
+            </button>
 
-        <!-- NOTIFICATIONS -->
-        <section style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; margin-bottom: 25px;">
-            <h2 style="margin-top: 0;">Recent Notifications</h2>
-            <ul>
-                {% for notif in notifications %}
-                    <li style="margin-bottom: 10px;">
-                        {{ notif.message }}
-                        {% if notif.link %}
-                            — <a href="{{ notif.link }}" style="color: #0077cc;"><strong>Take Action</strong></a>
-                        {% endif %}
-                        <br>
-                        <small style="color: #666;">{{ notif.created_at[:10] }}</small>
-                    </li>
-                {% else %}
-                    <li>No new notifications.</li>
-                {% endfor %}
-            </ul>
-        </section>
+            <!-- Restock Requests Pill Button with Badge -->
+            <button type="button" class="nav-pill" onclick="openRestockModal()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                Restock Requests <span class="pill-badge yellow">{{ restock_requests|length if restock_requests else 0 }}</span>
+            </button>
 
-        <hr>
+            <!-- Manage Inventory Pill Button -->
+            <a href="{{ url_for('admin_inventory') }}" class="nav-pill">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                Manage Inventory
+            </a>
 
-        <!-- LAB PERFORMANCE ANALYTICS -->
-        <section style="background: #eef6fc; border-left: 5px solid #0077cc; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
-            <h2 style="margin-top: 0; color: #0077cc;">Lab Performance Analytics</h2>
-            <div style="display: flex; gap: 30px; flex-wrap: wrap; margin-top: 10px;">
-                <div>
-                    <p style="margin: 0; font-size: 14px; color: #555;">Completed Cases (Total):</p>
-                    <span style="font-size: 24px; font-weight: bold; color: #2e7d32;">{{ completed_this_month }}</span>
-                </div>
-                <div>
-                    <p style="margin: 0; font-size: 14px; color: #555;">⚠️ Overdue Cases (Past Due Date):</p>
-                    <span style="font-size: 24px; font-weight: bold; color: #cc0000;">{{ overdue_count }}</span>
+            <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Audit Logs
+            </a>
+        </nav>
+
+        <div class="header-right">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Online
+            </div>
+
+            <!-- Modern Notification Bell Dropdown -->
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear All</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Take Action →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
-        </section>
 
-        <!-- OVERVIEW -->
-        <section>
-            <h2>Overview</h2>
-            <p>Pending Applications: <strong>{{ pending_count }}</strong></p>
-            <p>Approved Users: <strong>{{ approved_count }}</strong></p>
-            <p>Rejected Applications: <strong>{{ rejected_count }}</strong></p>
-            <p>Total Users: <strong>{{ total_count }}</strong></p>
-        </section>
+            <div class="user-profile">
+                <div class="avatar">AD</div>
+                <div class="user-info">
+                    <p>{{ profile.display_name }}</p>
+                    <span>Admin</span>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                <button type="submit" class="btn-icon" title="Logout">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </form>
+        </div>
+    </header>
 
-        <hr>
+    <main class="dashboard-container">
+        
+        <!-- Welcome Banner -->
+        <div class="welcome-banner">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Welcome back, {{ profile.display_name }}!
+        </div>
 
-        <!-- TECHNICIAN WORKLOAD & CASE ASSIGNMENT -->
-        <section style="background: #eef6fc; border-left: 5px solid #0077cc; padding: 20px; margin-bottom: 25px;">
-            <h2 style="margin-top: 0;">Technician Workload & Case Assignment</h2>
-            <p>Review incoming case details, deadlines, and inspect attached files before assignment.</p>
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Completed Cases</p>
+                        <p class="metric-value">{{ completed_this_month }}</p>
+                    </div>
+                    <div class="metric-icon success"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>
+                </div>
+                <div class="metric-bottom success">All lab metrics optimal</div>
+            </div>
 
-            <!-- WORKLOAD SUMMARY -->
-            <h3>Lab Workload Status</h3>
-            {% if technicians %}
-                <ul>
-                    {% for tech in technicians %}
-                        <li style="margin-bottom: 5px;">
-                            <strong>{{ tech.display_name or tech.first_name }}</strong>: 
-                            <span style="background: #ddd; padding: 2px 8px; border-radius: 4px; font-weight: bold;">
-                                {{ tech.active_workload }} active case(s)
-                            </span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>No approved technicians available.</p>
-            {% endif %}
+            <div class="metric-card">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Overdue Cases</p>
+                        <p class="metric-value">{{ overdue_count }}</p>
+                    </div>
+                    <div class="metric-icon danger"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                </div>
+                <div class="metric-bottom {% if overdue_count > 0 %}danger{% else %}success{% endif %}">{% if overdue_count > 0 %}Attention required{% else %}No delays reported{% endif %}</div>
+            </div>
 
-            <hr>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Pending Users</p>
+                        <p class="metric-value">{{ pending_count }}</p>
+                    </div>
+                    <div class="metric-icon warning"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0z"></path></svg></div>
+                </div>
+                <div class="metric-bottom warning">Awaiting authorization</div>
+            </div>
 
-            <!-- UNASSIGNED CASES WITH FULL REVIEW & DUE DATE -->
-            <h3>Unassigned Incoming Cases (Full Review)</h3>
-            {% if unassigned_cases %}
-                {% for case in unassigned_cases %}
-                    <div style="background: white; padding: 20px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #ccc;">
-                        <h3 style="margin-top: 0; color: #0077cc;">Case Number: {{ case.case_number }}</h3>
-                        <p><strong>Patient Name:</strong> {{ case.patient_name }}</p>
-                        <p><strong>Patient Reference:</strong> {{ case.patient_reference or 'N/A' }}</p>
-                        <p><strong>Case Type:</strong> {{ case.case_type }}</p>
-                        
-                        <!-- DUE DATE DISPLAY -->
-                        <p>
-                            <strong>Due Date:</strong> 
-                            <span style="color: #d32f2f; font-weight: bold;">{{ case.due_date or 'Not Specified' }}</span>
-                        </p>
+            <div class="metric-card">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Total Active Users</p>
+                        <p class="metric-value">{{ approved_count }}</p>
+                    </div>
+                    <div class="metric-icon"><svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></div>
+                </div>
+                <div class="metric-bottom success">Registered network accounts</div>
+            </div>
+        </div>
 
-                        <p><strong>Instructions:</strong> {{ case.instructions or 'None provided.' }}</p>
-                        
-                        <h4>Teeth Breakdown:</h4>
-                        {% if case.teeth %}
-                            <ul>
-                                {% for tooth in case.teeth %}
-                                    <li>
-                                        Tooth #{{ tooth.tooth_number }} — {{ tooth.restoration_type }} 
-                                        (Material: {{ tooth.material or 'N/A' }}, Shade: {{ tooth.shade or 'N/A' }})
-                                        {% if tooth.notes %}<br><em>Notes: {{ tooth.notes }}</em>{% endif %}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p>No specific teeth recorded.</p>
-                        {% endif %}
+        <!-- JINJA DATA SORTING FOR ADMIN KANBAN PIPELINE -->
+        {% set assigned_cases = active_cases | selectattr('status', 'in', ['assigned', 'pending', 'new']) | list %}
+        {% set setup_cases = active_cases | selectattr('status', 'in', ['in_progress', 'cad_designing', 'wax_up_or_try_in']) | list %}
+        {% set milling_cases = active_cases | selectattr('status', 'equalto', 'milling_or_printing') | list %}
+        {% set packing_cases = active_cases | selectattr('status', 'equalto', 'packing_and_curing') | list %}
+        {% set qc_cases = active_cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
 
-                        <h4>Attached Files (STL & Smile Photos):</h4>
-                        {% if case.files %}
-                            <ul>
-                                {% for file in case.files %}
-                                    <li style="margin-bottom: 8px;">
-                                        <strong>{{ file.file_name }}</strong> ({{ file.file_type | upper }}) — 
-                                        {% if file.download_url and file.download_url != "#" %}
-                                            <a href="{{ file.download_url }}" target="_blank" download>
-                                                <button type="button" style="padding: 4px 8px; cursor: pointer;">Download/View</button>
-                                            </a>
-                                        {% else %}
-                                            <span>File link unavailable</span>
-                                        {% endif %}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p>No files attached to this case.</p>
-                        {% endif %}
+        <!-- ACTIVE PRODUCTION WORKFLOW (KANBAN PIPELINE WITH REASSIGN CAPABILITY) -->
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">
+                        <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        Active Production Pipeline
+                        <span class="version-badge" style="color: var(--accent-green); border-color: var(--accent-green); background: rgba(16,185,129,0.1);">{{ active_cases|length }} In Progress</span>
+                    </h2>
+                    <p class="panel-subtitle">Real-time supervision of active lab stages. Reassign technicians on the fly without altering case progress status.</p>
+                </div>
+            </div>
 
-                        <hr style="border: 0; border-top: 1px dashed #ccc;">
-
-                        <form method="POST" action="{{ url_for('admin_assign_case', case_id=case.id) }}">
-                            <label><strong>Assign to Technician:</strong></label><br>
-                            <select name="technician_id" required style="margin: 10px 0; padding: 8px; width: 100%; max-width: 300px;">
-                                <option value="">Select Technician</option>
-                                {% for tech in technicians %}
-                                    <option value="{{ tech.id }}">{{ tech.display_name or tech.first_name }} ({{ tech.active_workload }} active)</option>
-                                {% endfor %}
-                            </select>
-                            <br>
-                            <button type="submit" style="background: #0077cc; color: white; border: none; padding: 10px 16px; font-weight: bold; cursor: pointer;">
-                                ASSIGN CASE
-                            </button>
-                        </form>
+            <div class="kanban-board">
+                {% for col_title, col_cases in [('0. Assigned', assigned_cases), ('1. Setup & CAD', setup_cases), ('2. Milling / Printing', milling_cases), ('3. Packing & Curing', packing_cases), ('4. Finishing & QC', qc_cases)] %}
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <span class="kanban-title">{{ col_title }}</span>
+                            <span class="kanban-count">{{ col_cases|length }}</span>
+                        </div>
+                        <div class="kanban-body">
+                            {% for c in col_cases %}
+                                <div class="k-card">
+                                    <div class="k-card-header">
+                                        <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                        <span class="k-badge-cyan" style="color: var(--accent-yellow); background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3);">Due: {{ c.due_date or 'N/A' }}</span>
+                                    </div>
+                                    <div class="k-card-title">{{ c.patient_name }}</div>
+                                    <div class="k-card-subtitle">Type: {{ c.case_type }}</div>
+                                    
+                                    <!-- Reassign Tech Form (Preserves stage status, updates technician only) -->
+                                    <form method="POST" action="{{ url_for('admin_reassign_case', case_id=c.id) }}" style="display: flex; gap: 6px; margin-top: 6px; border-top: 1px solid var(--border-color); padding-top: 8px; align-items: center;">
+                                        <select name="technician_id" class="select-dark" style="font-size: 11px; padding: 4px; flex: 1;" required>
+                                            <option value="" disabled>Reassign Tech...</option>
+                                            {% for tech in technicians %}
+                                                <option value="{{ tech.id }}" {% if c.technician_id == tech.id %}selected{% endif %}>{{ tech.first_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-outline-cyan" style="padding: 4px 8px; font-size: 11px;">Update</button>
+                                    </form>
+                                </div>
+                            {% else %}
+                                <div class="empty-column">No cases here</div>
+                            {% endfor %}
+                        </div>
                     </div>
                 {% endfor %}
-            {% else %}
-                <p>No unassigned cases waiting for review.</p>
-            {% endif %}
-        </section>
+            </div>
+        </div>
 
-        <hr>
+        <!-- USER DIRECTORY -->
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">
+                        <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        Network Directory
+                    </h2>
+                    <p class="panel-subtitle">Manage system access for partner clinics and dental technicians.</p>
+                </div>
+            </div>
 
-        <!-- ACTIVE LAB CASES & STATUS MONITOR -->
-        <section style="background: #fafafa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-            <h2 style="margin-top: 0;">Active Lab Cases & Live Status Monitor</h2>
-            <p>Track deadlines and progress of cases currently assigned to technicians.</p>
-
-            {% if active_cases %}
-                <table style="width: 100%; border-collapse: collapse; background: white; margin-top: 15px;">
-                    <thead>
-                        <tr style="background: #eee;">
-                            <th style="border: 1px solid #ccc; padding: 10px;">Case #</th>
-                            <th style="border: 1px solid #ccc; padding: 10px;">Patient</th>
-                            <th style="border: 1px solid #ccc; padding: 10px;">Due Date</th>
-                            <th style="border: 1px solid #ccc; padding: 10px;">Assigned Tech</th>
-                            <th style="border: 1px solid #ccc; padding: 10px;">Current Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for c in active_cases %}
-                            <tr>
-                                <td style="border: 1px solid #ccc; padding: 10px;">{{ c.case_number }}</td>
-                                <td style="border: 1px solid #ccc; padding: 10px;">{{ c.patient_name }}</td>
-                                <td style="border: 1px solid #ccc; padding: 10px; color: #d32f2f; font-weight: bold;">{{ c.due_date or 'N/A' }}</td>
-                                <td style="border: 1px solid #ccc; padding: 10px; font-weight: bold; color: #2e7d32;">
-                                    {{ c.profiles.display_name if c.profiles and c.profiles.display_name else 'Assigned' }}
-                                </td>
-                                <td style="border: 1px solid #ccc; padding: 10px;">
-                                    <span style="background: #eef6fc; color: #0077cc; padding: 4px 8px; border-radius: 4px; font-weight: bold;">
-                                        {% if c.status == 'assigned' %}Assigned
-                                        {% elif c.status == 'in_progress' %}In Progress
-                                        {% elif c.status == 'cad_designing' %}CAD Designing (exocad)
-                                        {% elif c.status == 'wax_up_or_try_in' %}Wax-up / Tooth Setup
-                                        {% elif c.status == 'milling_or_printing' %}Milling / 3D Printing
-                                        {% elif c.status == 'packing_and_curing' %}Acrylic Packing & Curing
-                                        {% elif c.status == 'finishing_and_quality_check' %}Finishing & QC
-                                        {% elif c.status == 'completed' %}Completed
-                                        {% elif c.status == 'needs_revision' %}Needs Revision
-                                        {% else %}{{ c.status | upper }}{% endif %}
-                                    </span>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p>No active cases in progress right now.</p>
-            {% endif %}
-        </section>
-
-        <hr>
-
-        <!-- PENDING APPLICATIONS -->
-        <section>
-            <h2>Pending Applications</h2>
             {% if pending_users %}
-                {% for user in pending_users %}
-                    <div>
-                        <h3>{{ user.display_name }}</h3>
-                        <p><strong>First Name:</strong> {{ user.first_name }}</p>
-                        <p><strong>Last Name:</strong> {{ user.last_name }}</p>
-                        <p><strong>Phone:</strong> {{ user.phone }}</p>
-                        <p><strong>Professional ID:</strong> {{ user.professional_id }}</p>
-                        <p><strong>Role:</strong> {{ user.role }}</p>
-                        <p><strong>Status:</strong> {{ user.status }}</p>
-
-                        <form method="GET" action="{{ url_for('review_user', user_id=user.id) }}" style="display:inline;">
-                            <button type="submit">REVIEW APPLICATION</button>
-                        </form>
-                        <hr>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p>No pending applications.</p>
+                <h3 style="font-size: 14px; color: var(--accent-yellow); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Pending Approvals</h3>
+                <div class="card-grid" style="margin-bottom: 30px;">
+                    {% for user in pending_users %}
+                        <div class="item-card" style="border-left: 3px solid var(--accent-yellow);">
+                            <h4>{{ user.display_name }}</h4>
+                            <p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+                            <p><strong>Role:</strong> <span style="text-transform: capitalize;">{{ user.role }}</span></p>
+                            <p><strong>License/ID:</strong> {{ user.professional_id }}</p>
+                            <form method="GET" action="{{ url_for('review_user', user_id=user.id) }}" style="margin-top: 15px;">
+                                <button type="submit" class="btn btn-outline-cyan" style="width: 100%; justify-content: center;">Review Access</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
             {% endif %}
-        </section>
 
-        <hr>
-
-        <!-- APPROVED USERS -->
-        <section>
-            <h2>Approved Users</h2>
+            <h3 style="font-size: 14px; color: var(--text-main); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Approved Network</h3>
             {% if approved_users %}
-                {% for user in approved_users %}
-                    <div>
-                        <h3>{{ user.display_name }}</h3>
-                        <p><strong>First Name:</strong> {{ user.first_name }}</p>
-                        <p><strong>Last Name:</strong> {{ user.last_name }}</p>
-                        <p><strong>Phone:</strong> {{ user.phone }}</p>
-                        <p><strong>Professional ID:</strong> {{ user.professional_id }}</p>
-                        <p><strong>Role:</strong> {{ user.role }}</p>
-                        <p><strong>Status:</strong> {{ user.status }}</p>
-                        <hr>
-                    </div>
-                {% endfor %}
+                <div class="card-grid">
+                    {% for user in approved_users %}
+                        <div class="item-card">
+                            <h4>{{ user.display_name }}</h4>
+                            <p><strong>Role:</strong> <span style="text-transform: capitalize;">{{ user.role }}</span></p>
+                            <p><strong>Contact:</strong> {{ user.phone }}</p>
+                            <p><strong>License/ID:</strong> {{ user.professional_id }}</p>
+                            {% if user.role == 'technician' %}
+                                <div style="margin-top: 10px; display: inline-block; padding: 2px 8px; background: rgba(66,221,242,0.1); color: var(--accent-cyan); border-radius: 4px; font-size: 11px;">
+                                    Active Workload: 
+                                    {% for tech in technicians %}{% if tech.id == user.id %}{{ tech.active_workload }}{% endif %}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
             {% else %}
-                <p>No approved users.</p>
+                <p style="color: var(--text-muted); font-size: 13px;">No approved users currently in the network.</p>
             {% endif %}
-        </section>
+        </div>
 
-        <hr>
-
-        <!-- REJECTED APPLICATIONS -->
-        <section>
-            <h2>Rejected Applications</h2>
-            {% if rejected_users %}
-                {% for user in rejected_users %}
-                    <div>
-                        <h3>{{ user.display_name }}</h3>
-                        <p><strong>First Name:</strong> {{ user.first_name }}</p>
-                        <p><strong>Last Name:</strong> {{ user.last_name }}</p>
-                        <p><strong>Phone:</strong> {{ user.phone }}</p>
-                        <p><strong>Professional ID:</strong> {{ user.professional_id }}</p>
-                        <p><strong>Role:</strong> {{ user.role }}</p>
-                        <p><strong>Status:</strong> {{ user.status }}</p>
-
-                        <form method="GET" action="{{ url_for('review_user', user_id=user.id) }}" style="display:inline;">
-                            <button type="submit">REVIEW APPLICATION</button>
-                        </form>
-                        <hr>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p>No rejected applications.</p>
-            {% endif %}
-        </section>
-
-        <hr>
-
-        <!-- LOGOUT -->
-        <form method="POST" action="{{ url_for('logout') }}">
-            <button type="submit">Logout</button>
-        </form>
     </main>
 
-    <footer>
-        <hr>
-        <p>BW11 DentaLink</p>
-    </footer>
+    <!-- INCOMING CASES POPUP MODAL -->
+    <div class="modal-overlay" id="incomingModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 style="font-size: 16px; margin:0; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Incoming Unassigned Cases Board ({{ unassigned_cases|length }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeIncomingModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if unassigned_cases %}
+                    <table class="dark-table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Patient</th>
+                                <th>Type</th>
+                                <th>Due Date</th>
+                                <th>Assign Tech</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for case in unassigned_cases %}
+                                <tr>
+                                    <td><span style="color: var(--accent-cyan); font-weight: 700;">{{ case.case_number }}</span></td>
+                                    <td><strong>{{ case.patient_name }}</strong></td>
+                                    <td><span class="tag">{{ case.case_type }}</span></td>
+                                    <td><span style="color: var(--accent-red); font-weight: 600;">{{ case.due_date or 'Not Set' }}</span></td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('admin_assign_case', case_id=case.id) }}" style="display: flex; gap: 8px; margin: 0;">
+                                            <select name="technician_id" class="select-dark" required>
+                                                <option value="">Select Tech...</option>
+                                                {% for tech in technicians %}
+                                                    <option value="{{ tech.id }}">{{ tech.first_name }} ({{ tech.active_workload }})</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit" class="btn btn-cyan" style="padding: 6px 12px;">Dispatch</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">No unassigned cases waiting for review.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RESTOCK REQUESTS POPUP MODAL -->
+    <div class="modal-overlay" id="restockModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 style="font-size: 16px; margin:0; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-yellow)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    Technician Material Restock Requests ({{ restock_requests|length if restock_requests else 0 }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeRestockModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if restock_requests %}
+                    <table class="dark-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Technician</th>
+                                <th>Requested Material / Item</th>
+                                <th>Case #</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in restock_requests %}
+                                <tr>
+                                    <td><small>{{ req.created_at[:19].replace('T', ' ') }}</small></td>
+                                    <td><strong>{{ req.profiles.display_name if req.profiles else 'Technician' }}</strong></td>
+                                    <td><span style="color: var(--accent-yellow); font-weight: 700;">{{ req.item_name }}</span></td>
+                                    <td><span class="tag">#{{ req.dental_cases.case_number if req.dental_cases else 'N/A' }}</span></td>
+                                    <td>
+                                        <a href="{{ url_for('admin_inventory') }}" class="btn btn-cyan" style="padding: 4px 10px; font-size: 11px;">Restock Inventory &rarr;</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">No material shortage requests pending.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openIncomingModal() { document.getElementById('incomingModal').style.display = 'flex'; }
+        function closeIncomingModal() { document.getElementById('incomingModal').style.display = 'none'; }
+
+        function openRestockModal() { document.getElementById('restockModal').style.display = 'flex'; }
+        function closeRestockModal() { document.getElementById('restockModal').style.display = 'none'; }
+
+        function toggleNotif(e) {
+            e.stopPropagation();
+            const bell = document.getElementById('bell-icon');
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('show');
+            bell.classList.toggle('active');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if(count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper') && !event.target.closest('#incomingModal') && !event.target.closest('#restockModal')) {
+                const dd = document.getElementById('notifDropdown');
+                const bell = document.getElementById('bell-icon');
+                if (dd && dd.classList.contains('show')) {
+                    dd.classList.remove('show');
+                    bell.classList.remove('active');
+                }
+            }
+            if (event.target === document.getElementById('incomingModal')) {
+                closeIncomingModal();
+            }
+            if (event.target === document.getElementById('restockModal')) {
+                closeRestockModal();
+            }
+        }
+    </script>
 </body>
 </html>

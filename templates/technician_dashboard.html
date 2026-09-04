@@ -1,121 +1,876 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Technician Dashboard - DentaLink</title>
+    <title>Technician Dashboard - DentaLink LIS</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
-        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
-        th { background: #eee; }
-        button { padding: 6px 12px; border: 1px solid #999; border-radius: 6px; background: white; cursor: pointer; font-weight: bold; }
-        button:hover { background: #eee; }
-        select { padding: 6px; border-radius: 4px; border: 1px solid #aaa; margin-bottom: 5px; }
+        /* Dark Theme Variables */
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-card-hover: #1A2132;
+            --bg-input: #0B101E;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #131825;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .app-header {
+            background-color: var(--bg-main);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo-box { background-color: var(--accent-cyan); border-radius: 8px; padding: 5px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 12px; color: var(--text-muted); }
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 10px; border-radius: 12px; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; }
+        
+        /* Modern Notifications Popover */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 6px; border-radius: 6px; cursor: pointer; transition: 0.2s; position: relative; display: flex; align-items: center; justify-content: center;}
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--text-main); background: rgba(255,255,255,0.05);}
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid var(--bg-main);}
+        
+        .notif-dropdown { position: absolute; top: 45px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 200; overflow: hidden;}
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header);}
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: normal; transition: color 0.2s;}
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-list-dd::-webkit-scrollbar { width: 6px; }
+        .notif-list-dd::-webkit-scrollbar-track { background: transparent; }
+        .notif-list-dd::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+        .notif-item-dd { padding: 12px 15px; border-bottom: 1px solid var(--border-color); position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; transition: background 0.2s; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4;}
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 6px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; transition: color 0.2s;}
+        .notif-close:hover { color: var(--accent-red); }
+
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; background-color: rgba(66, 221, 242, 0.1); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; text-transform: uppercase; }
+        .user-info p { margin: 0; font-size: 13px; font-weight: 600; }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); text-transform: capitalize; }
+        .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
+        /* Main Container */
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+        .welcome-banner { background-color: rgba(66, 221, 242, 0.05); border: 1px solid rgba(66, 221, 242, 0.2); color: var(--accent-cyan); padding: 15px 20px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; margin-bottom: 25px; }
+
+        /* Profile Panel */
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 30px; }
+        .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+        .panel-title { margin: 0; font-size: 16px; color: var(--text-main); font-weight: 600; }
+        .profile-flex { display: flex; flex-wrap: wrap; gap: 20px 40px; font-size: 13px; }
+        .profile-flex > div { display: flex; flex-direction: column; gap: 4px; }
+        .profile-flex strong { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .profile-flex span { font-weight: 600; color: var(--text-main); }
+
+        /* Workspace Header */
+        .workspace-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .workspace-title { margin: 0; font-size: 20px; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+
+        /* Buttons & Filter Toggles */
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
+        .btn-outline { background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { border-color: var(--text-muted); background-color: rgba(255,255,255,0.02); }
+        .btn-toggle-completed.active-filter { background-color: rgba(16, 185, 129, 0.1); border-color: var(--accent-green); color: var(--accent-green); }
+
+        /* =========================================
+            KANBAN PIPELINE DESIGN
+            ========================================= */
+        .kanban-board {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 20px;
+            align-items: flex-start;
+        }
+
+        .kanban-board::-webkit-scrollbar { height: 8px; }
+        .kanban-board::-webkit-scrollbar-track { background: var(--bg-card); border-radius: 10px; }
+        .kanban-board::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .kanban-column {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            min-width: 320px;
+            max-width: 320px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .kanban-header {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--panel-header);
+        }
+
+        .kanban-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kanban-count {
+            background: rgba(66, 221, 242, 0.1);
+            color: var(--accent-cyan);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .kanban-body {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-height: 150px;
+        }
+
+        .empty-column {
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 30px 15px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* Kanban Card */
+        .k-card {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.2s;
+        }
+        
+        .k-card:hover {
+            border-color: var(--accent-cyan);
+        }
+
+        .k-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .k-badge-cyan { background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 1px solid rgba(66, 221, 242, 0.2); }
+        .k-badge-yellow { background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .k-badge-green { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; border: 1px solid rgba(16, 185, 129, 0.2); }
+
+        .k-card-title {
+            color: var(--text-main);
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .k-card-subtitle {
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+
+        .k-card-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 10px;
+        }
+
+        .select-dark {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px top 50%;
+            background-size: 10px auto;
+        }
+        .select-dark:focus { border-color: var(--border-focus); }
+        .select-dark option { background-color: var(--bg-card); }
+
+        .btn-submit-stage { background-color: var(--accent-cyan); color: var(--bg-main); width: 100%; padding: 8px; border-radius: 6px; font-weight: 600; font-size: 12px; border: none; cursor: pointer; transition: background 0.2s; }
+        .btn-submit-stage:hover { background-color: var(--accent-cyan-hover); }
+
+        .view-link { font-size: 11px; color: var(--accent-cyan); text-decoration: none; text-align: center; display: block; margin-top: 5px; }
+        .view-link:hover { text-decoration: underline; }
+
+        /* =========================================
+            COMPLETED GRID VIEW (Hidden by default)
+            ========================================= */
+        .completed-grid {
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* =========================================
+            MODAL STYLES (JIT Material Logging)
+            ========================================= */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 650px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: slideUp 0.3s ease-out forwards; display: flex; flex-direction: column; max-height: 85vh; overflow: hidden;}
+        .modal-header { background-color: var(--panel-header); padding: 20px 25px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;}
+        .modal-title { margin: 0; font-size: 16px; color: var(--text-main); font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .modal-body { padding: 25px; overflow-y: auto; }
+        .modal-footer { background-color: var(--panel-header); padding: 20px 25px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 15px; }
+
+        .material-row { display: grid; grid-template-columns: 1fr 120px 30px; gap: 15px; align-items: end; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);}
+        .info-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        .percent-wrapper { position: relative; display: flex; align-items: center; }
+        .percent-symbol { position: absolute; right: 15px; color: var(--text-muted); font-size: 13px; font-weight: bold;}
+        .input-dark { width: 100%; padding: 10px 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; font-size: 13px; outline: none; }
     </style>
 </head>
-
 <body>
 
-    <header>
-        <h1>BW11 DentaLink</h1>
-        <p>Dental Technician Dashboard</p>
-        <hr>
+    <!-- TOP NAVBAR -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
+            </div>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Mrkzter Dental Laboratory</p>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Online
+            </div>
+            
+            <!-- Modern Notification Bell Dropdown -->
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear All</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Take Action →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="user-profile">
+                <div class="avatar">{{ profile.first_name[0] }}{{ profile.last_name[0] }}</div>
+                <div class="user-info">
+                    <p>{{ profile.display_name }}</p>
+                    <span>Technician Portal</span>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                <button type="submit" class="btn-icon" title="Logout">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </form>
+        </div>
     </header>
 
-    <main>
-        <h2>Welcome, {{ profile.display_name }}</h2>
+    <main class="container">
+        
+        <div class="welcome-banner">
+            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Welcome back to the Lab, {{ profile.first_name }}!
+        </div>
 
-        <!-- PROFILE INFORMATION -->
-        <section>
-            <h2>My Profile</h2>
-            <p><strong>First Name:</strong> {{ profile.first_name }}</p>
-            <p><strong>Last Name:</strong> {{ profile.last_name }}</p>
-            <p><strong>Professional ID:</strong> {{ profile.professional_id }}</p>
-            <p><strong>Role:</strong> {{ profile.role }}</p>
-            <p><strong>Account Status:</strong> {{ profile.status }}</p>
+        <!-- PROFILE OVERVIEW -->
+        <section class="panel" style="margin-bottom: 30px;">
+            <div class="panel-header" style="margin-bottom: 15px; padding-bottom: 15px;">
+                <h2 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    My Profile Overview
+                </h2>
+            </div>
+            <div class="profile-flex">
+                <div><strong>Full Name</strong> <span>{{ profile.display_name }}</span></div>
+                <div><strong>Professional ID</strong> <span>{{ profile.professional_id }}</span></div>
+                <div><strong>Role</strong> <span style="text-transform: capitalize;">{{ profile.role }}</span></div>
+                <div><strong>System Status</strong> <span style="color: var(--accent-green); text-transform: uppercase;">{{ profile.status }}</span></div>
+            </div>
         </section>
 
-        <!-- NOTIFICATIONS -->
-        <section style="background: #fff3cd; border-left: 5px solid #ffc107;">
-            <h2 style="margin-top: 0;">Recent Notifications</h2>
-            <ul>
-                {% for notif in notifications %}
-                    <li style="margin-bottom: 10px;">
-                        {{ notif.message }}
-                        {% if notif.link %}
-                            — <a href="{{ notif.link }}" style="color: #0077cc;"><strong>Take Action</strong></a>
-                        {% endif %}
-                        <br><small style="color: #666;">{{ notif.created_at[:10] }}</small>
-                    </li>
-                {% else %}
-                    <li>No new notifications.</li>
-                {% endfor %}
-            </ul>
-        </section>
+        <!-- JINJA DATA SORTING FOR KANBAN & COMPLETED VIEW -->
+        {% set assigned_cases = cases | selectattr('status', 'in', ['assigned', 'pending', 'new']) | list %}
+        {% set in_progress_cases = cases | selectattr('status', 'in', ['in_progress', 'cad_designing', 'wax_up_or_try_in']) | list %}
+        {% set milling_cases = cases | selectattr('status', 'equalto', 'milling_or_printing') | list %}
+        {% set packing_cases = cases | selectattr('status', 'equalto', 'packing_and_curing') | list %}
+        {% set qc_cases = cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
+        {% set completed_cases = cases | selectattr('status', 'equalto', 'completed') | list %}
 
-        <!-- ACTIVE DENTAL CASES -->
-        <section>
-            <h2>Active Dental Cases & Lab Status Control</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Case Number</th>
-                        <th>Patient</th>
-                        <th>Type</th>
-                        <th>Due Date</th>
-                        <th>Current Status</th>
-                        <th>Update Status / Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in cases %}
-                        <tr>
-                            <td>{{ c.case_number }}</td>
-                            <td>{{ c.patient_name }}</td>
-                            <td>{{ c.case_type }}</td>
-                            <td style="color: #d32f2f; font-weight: bold;">{{ c.due_date or 'N/A' }}</td>
-                            <td><strong>{{ c.status | upper }}</strong></td>
-                            <td>
-                                <!-- Quick Status Update Form -->
-                                <form method="POST" action="/technician/cases/{{ c.id }}/update-status" style="margin-bottom: 8px;">
-                                    <select name="status">
-                                        <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                                        <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing (exocad)</option>
-                                        <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Tooth Setup</option>
-                                        <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / 3D Printing</option>
-                                        <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Acrylic Packing & Curing</option>
-                                        <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
-                                        <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
-                                    </select>
-                                    <br>
-                                    <button type="submit" style="background: #0077cc; color: white; border: none; font-size: 12px;">Update Status</button>
-                                </form>
-                                
-                                <a href="/technician/cases/{{ c.id }}" style="font-size: 14px;">View Case Details</a>
-                            </td>
-                        </tr>
+        <!-- WORKSPACE HEADER WITH COMPLETED TOGGLE BUTTON -->
+        <div class="workspace-header">
+            <h2 class="workspace-title" id="workspace-title-text">
+                <svg width="24" height="24" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                Active Lab Production Pipeline
+            </h2>
+            
+            <div class="workspace-actions">
+                <button class="btn btn-outline btn-toggle-completed" id="completed-toggle-btn" onclick="toggleCompleted()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Completed Cases
+                    <span class="tag" style="margin-left: 4px; background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">{{ completed_cases|length }}</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- KANBAN BOARD (Visible by default) -->
+        <div class="kanban-board" id="kanban-pipeline">
+            
+            <!-- COLUMN 0: Assigned / New -->
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">0. Assigned / New</span>
+                    <span class="kanban-count">{{ assigned_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in assigned_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-badge-yellow" style="color: var(--accent-red);">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-subtitle">Type: {{ c.case_type }}</div>
+                            <form class="k-card-form status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status" 
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <select name="status" class="select-dark status-dropdown">
+                                    <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
+                                    <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
+                                    <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / Printing</option>
+                                    <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Packing & Curing</option>
+                                    <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                                    <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                                <button type="submit" class="btn-submit-stage">Start Case</button>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link">View Full Case Details →</a>
+                        </div>
                     {% else %}
-                        <tr>
-                            <td colspan="6">No active cases assigned to you yet.</td>
-                        </tr>
+                        <div class="empty-column">No newly assigned cases</div>
                     {% endfor %}
-                </tbody>
-            </table>
-        </section>
+                </div>
+            </div>
 
-        <!-- LOGOUT -->
-        <form method="POST" action="{{ url_for('logout') }}">
-            <button type="submit">Logout</button>
-        </form>
+            <!-- COLUMN 1: Setup & CAD -->
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">1. Setup & CAD</span>
+                    <span class="kanban-count">{{ in_progress_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in in_progress_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-badge-yellow" style="color: var(--accent-red);">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-subtitle">Type: {{ c.case_type }}</div>
+                            <form class="k-card-form status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status" 
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <select name="status" class="select-dark status-dropdown">
+                                    <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
+                                    <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
+                                    <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / Printing</option>
+                                    <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Packing & Curing</option>
+                                    <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                                    <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                                <button type="submit" class="btn-submit-stage">Save Stage</button>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link">View Full Case Details →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No active setup cases</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- COLUMN 2: Milling / 3D Printing -->
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">2. Milling / Printing</span>
+                    <span class="kanban-count">{{ milling_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in milling_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-badge-yellow" style="color: var(--accent-red);">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-subtitle">Type: {{ c.case_type }}</div>
+                            <form class="k-card-form status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status" 
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <select name="status" class="select-dark status-dropdown">
+                                    <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
+                                    <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
+                                    <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / Printing</option>
+                                    <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Packing & Curing</option>
+                                    <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                                    <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                                <button type="submit" class="btn-submit-stage">Save Stage</button>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link">View Full Case Details →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No cases in milling</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- COLUMN 3: Acrylic Packing & Curing -->
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">3. Packing & Curing</span>
+                    <span class="kanban-count">{{ packing_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in packing_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-badge-yellow" style="color: var(--accent-red);">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-subtitle">Type: {{ c.case_type }}</div>
+                            <form class="k-card-form status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status" 
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <select name="status" class="select-dark status-dropdown">
+                                    <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
+                                    <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
+                                    <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / Printing</option>
+                                    <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Packing & Curing</option>
+                                    <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                                    <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                                <button type="submit" class="btn-submit-stage">Save Stage</button>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link">View Full Case Details →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No cases in packing</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- COLUMN 4: Finishing & QC -->
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">4. Finishing & QC</span>
+                    <span class="kanban-count">{{ qc_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in qc_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-badge-yellow" style="color: var(--accent-red);">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-subtitle">Type: {{ c.case_type }}</div>
+                            <form class="k-card-form status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status" 
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <select name="status" class="select-dark status-dropdown">
+                                    <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
+                                    <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
+                                    <option value="milling_or_printing" {% if c.status == 'milling_or_printing' %}selected{% endif %}>Milling / Printing</option>
+                                    <option value="packing_and_curing" {% if c.status == 'packing_and_curing' %}selected{% endif %}>Packing & Curing</option>
+                                    <option value="finishing_and_quality_check" {% if c.status == 'finishing_and_quality_check' %}selected{% endif %}>Finishing & QC</option>
+                                    <option value="completed" {% if c.status == 'completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                                <button type="submit" class="btn-submit-stage">Save Stage</button>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link">View Full Case Details →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No cases in QC</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COMPLETED GRID VIEW (Hidden by default, triggered by toggle button) -->
+        <div class="completed-grid" id="completed-grid">
+            {% for c in completed_cases %}
+                <div class="k-card" style="border-color: rgba(16, 185, 129, 0.4);">
+                    <div class="k-card-header">
+                        <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                        <span class="k-badge-green">Completed</span>
+                    </div>
+                    <div class="k-card-title">{{ c.patient_name }}</div>
+                    <div class="k-card-subtitle">Type: {{ c.case_type }} | Completed Due: {{ c.due_date or 'N/A' }}</div>
+                    <a href="/technician/cases/{{ c.id }}" class="btn btn-outline" style="margin-top: 10px; color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">View Details &rarr;</a>
+                </div>
+            {% else %}
+                <div class="panel" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px;">
+                    No completed cases found.
+                </div>
+            {% endfor %}
+        </div>
+
     </main>
 
-    <footer>
-        <hr>
-        <p>BW11 DentaLink</p>
-    </footer>
+    <!-- =========================================================================
+         MODAL: JIT MATERIAL LOGGING
+         ========================================================================= -->
+    <div class="modal-overlay" id="materialModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    Log Material Consumption
+                </h2>
+            </div>
+            
+            <div class="modal-body">
+                <p id="modalInstructions" style="color: var(--text-muted); font-size: 13px; margin-top: 0; margin-bottom: 20px;"></p>
+                <div id="materialRowsContainer"></div>
 
+                <button type="button" id="addMaterialBtn" class="btn btn-outline" onclick="addMaterialRow()" style="margin-top: 10px; width: 100%; border-style: dashed; display: none;">
+                    + Add Material from Inventory
+                </button>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeMaterialModal()">Cancel Update</button>
+                <button type="button" class="btn btn-outline" onclick="skipLogging()">Skip Logging</button>
+                <button type="button" class="btn btn-cyan" onclick="submitStatusWithMaterials()">Log Materials & Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Template for Dynamic Consumables Rows -->
+    <div id="dynamic-row-template" style="display: none;">
+        <div class="material-row">
+            <div>
+                <label class="info-label">Material Consumed</label>
+                <select class="select-dark material-select" name="modal_material[]">
+                    <option value="" disabled selected>Select from inventory...</option>
+                    <optgroup label="Acrylics & Resins">
+                        <option value="Vertex Acrylic Powder (Pink)">Vertex Acrylic Powder (Pink)</option>
+                        <option value="Vertex Monomer Liquid">Vertex Monomer Liquid</option>
+                        <option value="3D Printing Resin">3D Printing Resin</option>
+                    </optgroup>
+                    <optgroup label="Finishing & QC">
+                        <option value="VITA Ceramic Glaze Paste">VITA Ceramic Glaze Paste</option>
+                        <option value="VITA Akzent Stain Kit">VITA Akzent Stain Kit</option>
+                        <option value="Polishing Paste">Polishing Paste</option>
+                        <option value="Articulating Paper">Articulating Paper</option>
+                    </optgroup>
+                    <optgroup label="Processing Materials">
+                        <option value="Dental Stone">Dental Stone/Plaster</option>
+                        <option value="Separating Medium">Separating Medium</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div>
+                <label class="info-label">Amount (%)</label>
+                <div class="percent-wrapper">
+                    <input type="number" name="modal_percentage[]" class="input-dark" placeholder="e.g. 25" min="1" max="100">
+                    <span class="percent-symbol">%</span>
+                </div>
+            </div>
+            <div style="padding-top: 18px;">
+                <button type="button" class="btn-icon" onclick="this.closest('.material-row').remove()" title="Remove">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleNotif(e) {
+            e.stopPropagation();
+            const bell = document.getElementById('bell-icon');
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('show');
+            bell.classList.toggle('active');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if(count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper')) {
+                const dd = document.getElementById('notifDropdown');
+                const bell = document.getElementById('bell-icon');
+                if (dd && dd.classList.contains('show')) {
+                    dd.classList.remove('show');
+                    bell.classList.remove('active');
+                }
+            }
+        }
+
+        let showingCompleted = false;
+        function toggleCompleted() {
+            showingCompleted = !showingCompleted;
+            const btn = document.getElementById('completed-toggle-btn');
+            const title = document.getElementById('workspace-title-text');
+            const pipeline = document.getElementById('kanban-pipeline');
+            const completedGrid = document.getElementById('completed-grid');
+            
+            if (showingCompleted) {
+                btn.classList.add('active-filter');
+                title.innerHTML = `<svg width="24" height="24" fill="none" stroke="var(--accent-green)" viewBox="0 0 24 24" style="margin-right: 10px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Completed Lab Cases`;
+                pipeline.style.display = 'none';
+                completedGrid.style.display = 'grid';
+            } else {
+                btn.classList.remove('active-filter');
+                title.innerHTML = `<svg width="24" height="24" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24" style="margin-right: 10px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> Active Lab Production Pipeline`;
+                completedGrid.style.display = 'none';
+                pipeline.style.display = 'flex';
+            }
+        }
+
+        const materialModal = document.getElementById('materialModal');
+        const lockedContainer = document.getElementById('materialRowsContainer');
+        const modalInstructions = document.getElementById('modalInstructions');
+        const addMaterialBtn = document.getElementById('addMaterialBtn');
+        const rowTemplate = document.getElementById('dynamic-row-template').innerHTML;
+        
+        let currentSubmittingForm = null;
+        const loggableStages = ["milling_or_printing", "packing_and_curing", "finishing_and_quality_check"];
+
+        document.querySelectorAll('.status-update-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const newStatus = this.querySelector('.status-dropdown').value;
+                const rawMaterials = this.dataset.materials; 
+                
+                if (loggableStages.includes(newStatus)) {
+                    e.preventDefault(); 
+                    currentSubmittingForm = this; 
+                    
+                    const niceStatusName = newStatus.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    lockedContainer.innerHTML = '';
+                    
+                    if (newStatus === 'milling_or_printing') {
+                        modalInstructions.innerHTML = `Moving case to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. Below are the structural materials prescribed by the dentist. Please log the percentage used.`;
+                        addMaterialBtn.style.display = 'none';
+
+                        if (rawMaterials && rawMaterials.trim() !== '') {
+                            const materialsArray = rawMaterials.split(',');
+                            materialsArray.forEach(mat => {
+                                const formattedMat = mat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                const row = document.createElement('div');
+                                row.className = 'material-row';
+                                row.style.gridTemplateColumns = '1fr 120px'; 
+                                row.innerHTML = `
+                                    <div>
+                                        <label class="info-label">Prescribed Material</label>
+                                        <div style="font-size: 14px; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                            <svg width="16" height="16" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            ${formattedMat}
+                                        </div>
+                                        <input type="hidden" name="modal_material[]" value="${mat}">
+                                    </div>
+                                    <div>
+                                        <label class="info-label">Amount (%)</label>
+                                        <div class="percent-wrapper">
+                                            <input type="number" name="modal_percentage[]" class="input-dark" placeholder="e.g. 15" min="1" max="100" required>
+                                            <span class="percent-symbol">%</span>
+                                        </div>
+                                    </div>
+                                `;
+                                lockedContainer.appendChild(row);
+                            });
+                        } else {
+                            lockedContainer.innerHTML = `<div style="padding: 15px; border: 1px dashed var(--border-color); border-radius: 8px; text-align: center; color: var(--text-muted); font-size: 13px;">No specific materials were prescribed for this case.</div>`;
+                        }
+                    } else {
+                        modalInstructions.innerHTML = `Moving case to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. Please select the consumables used from inventory and input the percentage used.`;
+                        addMaterialBtn.style.display = 'block';
+                        addMaterialRow();
+                    }
+                    materialModal.style.display = 'flex';
+                }
+            });
+        });
+
+        function addMaterialRow() {
+            lockedContainer.insertAdjacentHTML('beforeend', rowTemplate);
+        }
+
+        function closeMaterialModal() {
+            materialModal.style.display = 'none';
+            currentSubmittingForm = null;
+        }
+
+        function skipLogging() {
+            if(currentSubmittingForm) { currentSubmittingForm.submit(); }
+        }
+
+        function submitStatusWithMaterials() {
+            if(!currentSubmittingForm) return;
+
+            const materials = lockedContainer.querySelectorAll('input[name="modal_material[]"], select[name="modal_material[]"]');
+            const percentages = lockedContainer.querySelectorAll('input[name="modal_percentage[]"]');
+            
+            let isValid = true;
+            percentages.forEach(input => {
+                if(!input.value || input.value <= 0) {
+                    isValid = false;
+                    input.style.borderColor = 'var(--accent-red)';
+                } else {
+                    input.style.borderColor = 'var(--border-color)';
+                }
+            });
+
+            materials.forEach(mat => {
+                if(mat.tagName === 'SELECT' && !mat.value) {
+                    isValid = false;
+                    mat.style.borderColor = 'var(--accent-red)';
+                }
+            });
+
+            if(!isValid && materials.length > 0) {
+                alert("Please select a material and valid percentage, or click 'Skip Logging'.");
+                return;
+            }
+
+            materials.forEach((mat, index) => {
+                if(mat.value && percentages[index].value) {
+                    const hiddenMat = document.createElement('input');
+                    hiddenMat.type = 'hidden';
+                    hiddenMat.name = 'logged_materials';
+                    hiddenMat.value = mat.value;
+                    
+                    const hiddenPct = document.createElement('input');
+                    hiddenPct.type = 'hidden';
+                    hiddenPct.name = 'logged_percentages';
+                    hiddenPct.value = percentages[index].value;
+                    
+                    currentSubmittingForm.appendChild(hiddenMat);
+                    currentSubmittingForm.appendChild(hiddenPct);
+                }
+            });
+
+            currentSubmittingForm.submit();
+        }
+    </script>
 </body>
 </html>

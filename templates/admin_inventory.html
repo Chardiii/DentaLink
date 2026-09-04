@@ -3,143 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Inventory - DentaLink</title>
+    <title>Lab Inventory - DentaLink LIS</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
-        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
-        th { background: #eee; }
-        button { padding: 6px 12px; border: 1px solid #999; border-radius: 6px; background: white; cursor: pointer; font-weight: bold; }
-        button:hover { background: #eee; }
-        input, select { padding: 6px; border-radius: 4px; border: 1px solid #aaa; }
-        .low-stock { background: #ffe6e6; color: #cc0000; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
-        .normal-stock { background: #e8f5e9; color: #2e7d32; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
+        /* Dark Theme Variables */
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-card-hover: #1A2132;
+            --bg-input: #0B101E;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #131825;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .app-header {
+            background-color: var(--bg-main);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo-box { background-color: var(--accent-cyan); border-radius: 8px; padding: 5px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 12px; color: var(--text-muted); }
+
+        .header-center-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .nav-pill { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px; border: 1px solid transparent; transition: all 0.2s; background: transparent; cursor: pointer; font-family: inherit; }
+        .nav-pill:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.02); border-color: var(--border-color); }
+        .nav-pill.active { background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border-color: rgba(66, 221, 242, 0.3); }
+
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 10px; border-radius: 12px; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; }
+
+        /* Modern Notifications Popover */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 6px; border-radius: 6px; cursor: pointer; transition: 0.2s; position: relative; display: flex; align-items: center; justify-content: center;}
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--text-main); background: rgba(255,255,255,0.05);}
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid var(--bg-main);}
+        
+        .notif-dropdown { position: absolute; top: 45px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 200; overflow: hidden;}
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header);}
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: normal; transition: color 0.2s;}
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 15px; border-bottom: 1px solid var(--border-color); position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; transition: background 0.2s; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4;}
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 6px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; transition: color 0.2s;}
+        .notif-close:hover { color: var(--accent-red); }
+
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; background-color: rgba(66, 221, 242, 0.1); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; }
+        .user-info p { margin: 0; font-size: 13px; font-weight: 600; }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); }
+        .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
+        /* Main Container */
+        .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+
+        /* Panels */
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .panel-title { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 10px; font-weight: 600; }
+        .panel-subtitle { margin: 5px 0 0 0; font-size: 13px; color: var(--text-muted); }
+
+        /* Buttons & Inputs */
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-outline:hover { color: var(--text-main); border-color: var(--text-main); }
+
+        .input-dark, .select-dark { width: 100%; padding: 10px 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; font-size: 13px; outline: none; transition: border-color 0.2s; }
+        .input-dark:focus, .select-dark:focus { border-color: var(--accent-cyan); }
+        .select-dark { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 14px top 50%; background-size: 10px auto; }
+        .select-dark option { background-color: var(--bg-card); color: var(--text-main); }
+
+        /* Tables */
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dark-table th { text-align: left; padding: 12px 15px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
+        .dark-table td { padding: 14px 15px; border-bottom: 1px solid rgba(38, 47, 68, 0.5); vertical-align: middle; }
+        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
+        .dark-table tr:last-child td { border-bottom: none; }
+
+        .low-stock { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
+        .normal-stock { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
+
+        /* Blur Popup Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 650px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: slideUp 0.3s ease-out forwards; display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { background-color: var(--panel-header); padding: 20px 25px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { margin: 0; font-size: 16px; color: var(--text-main); font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .modal-body { padding: 25px; overflow-y: auto; }
+        .modal-footer { background-color: var(--panel-header); padding: 20px 25px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 15px; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; }
+        .close-btn:hover { color: var(--accent-red); }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-weight: 600; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <div>
-                <h1 style="margin: 0;">BW11 DentaLink</h1>
-                <p style="margin: 5px 0 0 0;">Laboratory Inventory Management</p>
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
             </div>
-            <div>
-                <a href="{{ url_for('admin_inventory_logs') }}">
-                    <button type="button" style="background: #333; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-right: 10px;">
-                        📋 View Audit Logs
-                    </button>
-                </a>
-                <a href="{{ url_for('admin_dashboard') }}">
-                    <button type="button" style="padding: 8px 14px; font-weight: bold; cursor: pointer;">← Back to Admin Dashboard</button>
-                </a>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Mrkzter Dental Laboratory</p>
             </div>
         </div>
-        <hr style="margin-top: 15px;">
+
+        <nav class="header-center-nav">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Admin Portal
+            </a>
+            
+            <a href="{{ url_for('admin_inventory') }}" class="nav-pill active">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                Manage Inventory
+            </a>
+
+            <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Audit Logs
+            </a>
+        </nav>
+
+        <div class="header-right">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Online
+            </div>
+
+            <!-- Modern Notification Bell Dropdown -->
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear All</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Take Action →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="user-profile">
+                <div class="avatar">AD</div>
+                <div class="user-info">
+                    <p>{{ profile.display_name }}</p>
+                    <span>Admin</span>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                <button type="submit" class="btn-icon" title="Logout">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </form>
+        </div>
     </header>
 
-    <main>
-        <!-- ADD NEW ITEM SECTION -->
-        <section style="background: #eef6fc; border-left: 5px solid #0077cc;">
-            <h2 style="margin-top: 0; color: #0077cc;">Add New Inventory Item</h2>
-            <form method="POST" action="{{ url_for('add_inventory_item') }}" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+    <main class="dashboard-container">
+        
+        <!-- INVENTORY TABLE PANEL -->
+        <div class="panel">
+            <div class="panel-header">
                 <div>
-                    <label>Item Name:</label><br>
-                    <input type="text" name="item_name" placeholder="e.g., Zirconia Disc A2" required>
+                    <h2 class="panel-title">
+                        <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Current Lab Stock Levels
+                    </h2>
+                    <p class="panel-subtitle">Monitor raw material consumption, thresholds, and perform quick adjustments.</p>
                 </div>
-                <div>
-                    <label>Category:</label><br>
-                    <select name="category" required>
-                        <option value="">Select Category</option>
-                        <option value="Zirconia">Zirconia</option>
-                        <option value="Acrylic & Denture">Acrylic & Denture</option>
-                        <option value="3D Printing Resin">3D Printing Resin</option>
-                        <option value="Ceramic & E.max">Ceramic & E.max</option>
-                        <option value="Consumables">Consumables / Burrs</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Quantity:</label><br>
-                    <input type="number" name="quantity" value="10" min="0" required style="width: 90px;">
-                </div>
-                <div>
-                    <label>Unit:</label><br>
-                    <input type="text" name="unit" placeholder="e.g., discs, bottles" required style="width: 120px;">
-                </div>
-                <div>
-                    <label>Low Alert Threshold:</label><br>
-                    <input type="number" name="minimum_threshold" value="3" min="1" required style="width: 90px;">
-                </div>
-                <div>
-                    <label>Supplier Name:</label><br>
-                    <input type="text" name="supplier_name" placeholder="e.g., DentalDepot Inc." style="width: 140px;">
-                </div>
-                <div>
-                    <label>Unit Cost (₱):</label><br>
-                    <input type="number" step="0.01" name="unit_cost" value="0.00" min="0" required style="width: 90px;">
-                </div>
-                <div>
-                    <button type="submit" style="background: #0077cc; color: white; border: none; padding: 8px 14px;">Add Item</button>
-                </div>
-            </form>
-        </section>
+                <button type="button" class="btn btn-cyan" onclick="openAddItemModal()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    + Add New Item
+                </button>
+            </div>
 
-        <!-- INVENTORY TABLE -->
-        <section>
-            <h2>Current Lab Stock Levels</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Item Name</th>
-                        <th>Category</th>
-                        <th>Supplier</th>
-                        <th>Unit Cost</th>
-                        <th>Quantity</th>
-                        <th>Status</th>
-                        <th>Quick Stock Adjust</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in inventory %}
+            <div style="overflow-x: auto;">
+                <table class="dark-table">
+                    <thead>
                         <tr>
-                            <td><strong>{{ item.item_name }}</strong></td>
-                            <td>{{ item.category }}</td>
-                            <td>{{ item.supplier_name or 'N/A' }}</td>
-                            <td>₱{{ "%.2f"|format(item.unit_cost or 0.00) }}</td>
-                            <td>{{ item.quantity }} {{ item.unit }}</td>
-                            <td>
-                                {% if item.quantity <= item.minimum_threshold %}
-                                    <span class="low-stock">⚠️ Low Stock</span>
-                                {% else %}
-                                    <span class="normal-stock">In Stock</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <form method="POST" action="/admin/inventory/update/{{ item.id }}" style="display: flex; gap: 5px; align-items: center;">
-                                    <select name="action">
-                                        <option value="add">Restock (+)</option>
-                                        <option value="subtract">Use (-)</option>
-                                    </select>
-                                    <input type="number" name="amount" value="1" min="1" style="width: 60px;" required>
-                                    <button type="submit" style="background: #168a45; color: white; border: none;">Update</button>
-                                </form>
-                            </td>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Supplier</th>
+                            <th>Unit Cost</th>
+                            <th>Quantity</th>
+                            <th>Status</th>
+                            <th>Quick Stock Adjust</th>
                         </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="7">No inventory items recorded yet. Use the form above to add supplies.</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
+                    </thead>
+                    <tbody>
+                        {% for item in inventory %}
+                            <tr>
+                                <td><strong style="color: var(--text-main);">{{ item.item_name }}</strong></td>
+                                <td>{{ item.category }}</td>
+                                <td>{{ item.supplier_name or 'N/A' }}</td>
+                                <td>₱{{ "%.2f"|format(item.unit_cost or 0.00) }}</td>
+                                <td>{{ item.quantity }} {{ item.unit }}</td>
+                                <td>
+                                    {% if item.quantity <= item.minimum_threshold %}
+                                        <span class="low-stock">⚠️ Low Stock</span>
+                                    {% else %}
+                                        <span class="normal-stock">In Stock</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="/admin/inventory/update/{{ item.id }}" style="display: flex; gap: 8px; align-items: center;">
+                                        <select name="action" class="select-dark" style="padding: 6px 10px; font-size: 12px; background-color: var(--bg-main);">
+                                            <option value="add">Restock (+)</option>
+                                            <option value="subtract">Use (-)</option>
+                                        </select>
+                                        <input type="number" name="amount" value="1" min="0.01" step="any" class="input-dark" style="width: 75px; padding: 6px 10px; font-size: 12px;" placeholder="Qty" required>
+                                        <button type="submit" class="btn btn-cyan" style="padding: 6px 12px; font-size: 12px;">Apply</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No inventory items recorded yet. Use the button above to add supplies.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </main>
 
-    <footer>
-        <hr>
-        <p>BW11 DentaLink</p>
-    </footer>
+    <!-- ADD INVENTORY ITEM POPUP MODAL WITH BLUR BACKGROUND -->
+    <div class="modal-overlay" id="addItemModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    Add New Inventory Item
+                </h2>
+                <button type="button" class="close-btn" onclick="closeAddItemModal()">×</button>
+            </div>
+            
+            <form method="POST" action="{{ url_for('add_inventory_item') }}">
+                <div class="modal-body">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label class="form-label">Item Name <span>*</span></label>
+                        <input type="text" name="item_name" class="input-dark" placeholder="e.g., Zirconia Disc A2" required>
+                    </div>
 
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Category <span>*</span></label>
+                            <select name="category" class="select-dark" required>
+                                <option value="">Select Category</option>
+                                <option value="Zirconia">Zirconia</option>
+                                <option value="Acrylic & Denture">Acrylic & Denture</option>
+                                <option value="3D Printing Resin">3D Printing Resin</option>
+                                <option value="Ceramic & E.max">Ceramic & E.max</option>
+                                <option value="Consumables">Consumables / Burrs</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Supplier Name</label>
+                            <input type="text" name="supplier_name" class="input-dark" placeholder="e.g., DentalDepot Inc.">
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Initial Quantity <span>*</span></label>
+                            <input type="number" name="quantity" value="10" min="0" class="input-dark" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Unit of Measure <span>*</span></label>
+                            <input type="text" name="unit" class="input-dark" placeholder="e.g., discs, bottles" required>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Low Alert Threshold <span>*</span></label>
+                            <input type="number" name="minimum_threshold" value="3" min="1" class="input-dark" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Unit Cost (₱) <span>*</span></label>
+                            <input type="number" step="0.01" name="unit_cost" value="0.00" min="0" class="input-dark" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeAddItemModal()">Cancel</button>
+                    <button type="submit" class="btn btn-cyan">Save New Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openAddItemModal() { document.getElementById('addItemModal').style.display = 'flex'; }
+        function closeAddItemModal() { document.getElementById('addItemModal').style.display = 'none'; }
+
+        function toggleNotif(e) {
+            e.stopPropagation();
+            const bell = document.getElementById('bell-icon');
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('show');
+            bell.classList.toggle('active');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if(count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper') && !event.target.closest('#addItemModal')) {
+                const dd = document.getElementById('notifDropdown');
+                const bell = document.getElementById('bell-icon');
+                if (dd && dd.classList.contains('show')) {
+                    dd.classList.remove('show');
+                    bell.classList.remove('active');
+                }
+            }
+            if (event.target === document.getElementById('addItemModal')) { closeAddItemModal(); }
+        }
+    </script>
 </body>
 </html>

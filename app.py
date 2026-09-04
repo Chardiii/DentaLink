@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
@@ -181,72 +181,6 @@ def admin_dashboard():
 # =========================
 # HELPER: AUTO-DEDUCT INVENTORY
 # =========================
-def auto_deduct_material_for_case(case_id, user_id, status):
-    """Automatically deducts inventory based on the production stage and case materials."""
-    try:
-        case_res = supabase_admin.table("dental_cases").select("case_number, case_type").eq("id", case_id).execute()
-        if not case_res.data:
-            return
-        
-        case_number = case_res.data[0]["case_number"]
-        
-        teeth_res = supabase_admin.table("case_teeth").select("material").eq("id", case_id).execute() # or case_id
-        teeth_res = supabase_admin.table("case_teeth").select("material").eq("case_id", case_id).execute()
-        teeth = teeth_res.data or []
-        
-        if not teeth:
-            return
-
-        # Define which materials/keywords relate to which status stages
-        # e.g., milling stage uses zirconia/resin blocks, packing stage uses acrylic
-        target_keywords = []
-        if status == "milling_or_printing":
-            target_keywords = ["zirconia", "resin", "e.max", "block", "disc"]
-        elif status == "packing_and_curing":
-            target_keywords = ["acrylic", "powder", "liquid", "polymer"]
-        elif status == "finishing_and_quality_check":
-            target_keywords = ["burr", "polishing", "wheel", "paste"]
-        
-        if not target_keywords:
-            return
-
-        for tooth in teeth:
-            mat = (tooth.get("material") or "").lower()
-            if not mat:
-                continue
-
-            # Check if this material matches the stage's target categories
-            if not any(keyword in mat for keyword in target_keywords):
-                continue
-
-            # Search inventory for an item matching this material name
-            inv_res = supabase_admin.table("inventory").select("*").ilike("item_name", f"%{mat}%").execute()
-            matched_items = inv_res.data or []
-
-            if matched_items:
-                item = matched_items[0]
-                item_id = item["id"]
-                current_qty = item["quantity"]
-                
-                if current_qty > 0:
-                    new_qty = current_qty - 1
-                    
-                    # Update stock level
-                    supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
-                    
-                    # Insert record into inventory audit logs
-                    supabase_admin.table("inventory_logs").insert({
-                        "inventory_id": item_id,
-                        "user_id": user_id,
-                        "action_type": "case_deduction",
-                        "quantity_changed": -1,
-                        "previous_quantity": current_qty,
-                        "new_quantity": new_qty,
-                        "notes": f"Auto-deducted at [{status}] stage for Case {case_number} ({mat})"
-                    }).execute()
-    except Exception as e:
-        print(f"Auto-deduct error: {str(e)}")
-
 
 # =========================
 # TECHNICIAN: UPDATE CASE STAGE
@@ -267,6 +201,7 @@ def update_case_status(case_id):
         new_status = request.form.get("status")
         
         allowed_statuses = [
+            "assigned",
             "in_progress", 
             "cad_designing", 
             "wax_up_or_try_in",
@@ -289,6 +224,7 @@ def update_case_status(case_id):
 
         # Friendly labels for the notification message
         status_labels = {
+            "assigned": "Assigned",
             "in_progress": "In Progress",
             "cad_designing": "in CAD Designing (exocad)",
             "wax_up_or_try_in": "in Wax-up / Tooth Setup",
@@ -318,11 +254,68 @@ def update_case_status(case_id):
             print(f"History log error: {str(hist_err)}")
 
         # ==========================================
-        # AUTOMATIC STAGE-BASED INVENTORY DEDUCTION TRIGGER
+        # JIT MATERIAL INVENTORY DEDUCTION & AUTO-CREATE LOGIC
         # ==========================================
-        stage_related_statuses = ["milling_or_printing", "packing_and_curing", "finishing_and_quality_check"]
-        if new_status in stage_related_statuses:
-            auto_deduct_material_for_case(case_id, user_id, new_status)
+        logged_materials = request.form.getlist("logged_materials")
+        logged_percentages = request.form.getlist("logged_percentages")
+
+        if logged_materials and logged_percentages:
+            for item_name, percent_str in zip(logged_materials, logged_percentages):
+                try:
+                    # Safely parse percentage as float (e.g., 25 -> 0.25)
+                    deduct_amount = float(percent_str) / 100.0  
+                    
+                    # Check if the item exists in the inventory table (case-insensitive search)
+                    inv_res = supabase_admin.table("inventory").select("*").ilike("item_name", item_name.strip()).execute()
+                    
+                    if inv_res.data:
+                        # SCENARIO A: Item exists. Deduct exact decimal amount.
+                        item = inv_res.data[0]
+                        item_id = item["id"]
+                        current_qty = float(item["quantity"])
+                        new_qty = round(current_qty - deduct_amount, 2)
+                        
+                        # Update stock level safely (Requires NUMERIC column in Supabase)
+                        supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
+                        
+                        # Log into audit logs
+                        supabase_admin.table("inventory_logs").insert({
+                            "inventory_id": item_id,
+                            "user_id": user_id,
+                            "action_type": "case_deduction",
+                            "quantity_changed": -deduct_amount,
+                            "previous_quantity": current_qty,
+                            "new_quantity": new_qty,
+                            "notes": f"Deducted {percent_str}% at [{new_status}] stage for Case {case_number}"
+                        }).execute()
+                    
+                    else:
+                        # SCENARIO B: Item is missing. Auto-create it cleanly!
+                        initial_qty = 1.0
+                        new_qty = round(initial_qty - deduct_amount, 2)
+                        
+                        new_item_res = supabase_admin.table("inventory").insert({
+                            "item_name": item_name.strip(),
+                            "category": "Auto-Added", 
+                            "quantity": new_qty, 
+                            "unit": "Piece"      
+                        }).execute()
+                        
+                        if new_item_res.data:
+                            new_item_id = new_item_res.data[0]["id"]
+                            
+                            supabase_admin.table("inventory_logs").insert({
+                                "inventory_id": new_item_id,
+                                "user_id": user_id,
+                                "action_type": "auto_created_and_deducted",
+                                "quantity_changed": -deduct_amount,
+                                "previous_quantity": initial_qty,
+                                "new_quantity": new_qty,
+                                "notes": f"Missing item auto-created. Deducted {percent_str}% for Case {case_number}."
+                            }).execute()
+
+                except Exception as mat_err:
+                    print(f"Material deduction error for {item_name}: {str(mat_err)}")
 
         # 1. Notify the Dentist
         create_notification(
@@ -351,6 +344,45 @@ def update_case_status(case_id):
     except Exception as e:
         return f"Status update error: {str(e)}"
 
+@app.route("/admin/cases/<case_id>/reassign", methods=["POST"])
+def admin_reassign_case(case_id):
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        # Verify Admin
+        profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
+        if not profile_res.data or profile_res.data[0]["role"] != "admin" or profile_res.data[0]["status"] != "approved":
+            return "Access denied.", 403
+
+        new_tech_id = request.form.get("technician_id")
+        if not new_tech_id:
+            return "No technician selected.", 400
+
+        # Fetch case and new tech info for logging/notification
+        case_res = supabase_admin.table("dental_cases").select("case_number").eq("id", case_id).execute()
+        case_number = case_res.data[0]["case_number"] if case_res.data else "Unknown"
+
+        tech_res = supabase_admin.table("profiles").select("display_name").eq("id", new_tech_id).execute()
+        tech_name = tech_res.data[0]["display_name"] if tech_res.data else "New Technician"
+
+        # UPDATE ONLY THE TECHNICIAN_ID (Status is intentionally preserved)
+        supabase_admin.table("dental_cases").update({
+            "technician_id": new_tech_id
+        }).eq("id", case_id).execute()
+
+        # Notify the newly assigned technician
+        create_notification(
+            user_id=new_tech_id,
+            message=f"Case Reassigned: You have been assigned to take over Case {case_number}.",
+            link="/technician"
+        )
+
+        return redirect(url_for("admin_dashboard"))
+
+    except Exception as e:
+        return f"Reassignment error: {str(e)}", 500
 # =========================
 # ADMIN: VIEW INVENTORY AUDIT LOGS
 # =========================
@@ -366,18 +398,23 @@ def admin_inventory_logs():
         if not profile_res.data or profile_res.data[0]["role"] != "admin" or profile_res.data[0]["status"] != "approved":
             return "Access denied.", 403
 
-        # Fetch logs with joined inventory item name and user display name
-        logs_res = (
-            supabase_admin
-            .table("inventory_logs")
-            .select("*, inventory(item_name, unit), profiles(display_name, first_name)")
-            .order("created_at", desc=True)
-            .limit(100)
-            .execute()
-        )
+        # Get query parameters for date filtering
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
+
+        # Base query joining inventory and profiles
+        query = supabase_admin.table("inventory_logs").select("*, inventory(item_name, unit), profiles(display_name, first_name)").order("created_at", desc=True)
+
+        # Apply date filters if provided
+        if start_date:
+            query = query.gte("created_at", f"{start_date}T00:00:00")
+        if end_date:
+            query = query.lte("created_at", f"{end_date}T23:59:59")
+
+        logs_res = query.limit(100).execute()
         logs = logs_res.data or []
 
-        # Fetch notifications for layout consistency
+        # Notifications for header consistency
         notif_res = supabase_admin.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
         notifications = notif_res.data or []
 
@@ -1119,48 +1156,29 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
     if request.method == "POST":
-
         email = request.form["email"].strip().lower()
         password = request.form["password"]
 
-
         try:
-
             # =========================
             # SUPABASE LOGIN
             # =========================
-
             response = supabase.auth.sign_in_with_password({
                 "email": email,
                 "password": password
             })
 
-
             if not response.user:
-
-                return "Login failed."
-
-
-            # =========================
-            # GET USER ID
-            # =========================
+                flash("Login failed. Please check your credentials.", "error")
+                return render_template("login.html")
 
             user_id = response.user.id
-
-
-            # =========================
-            # STORE USER ID IN SESSION
-            # =========================
-
             session["user_id"] = user_id
-
 
             # =========================
             # GET USER PROFILE
             # =========================
-
             profile_response = (
                 supabase_admin
                 .table("profiles")
@@ -1171,81 +1189,54 @@ def login():
 
             profiles = profile_response.data or []
 
-
-            # =========================
-            # PROFILE NOT FOUND
-            # =========================
-
             if not profiles:
-
                 session.clear()
-
-                return "Profile not found.", 404
-
+                flash("User profile not found in the system.", "error")
+                return render_template("login.html")
 
             profile = profiles[0]
-
 
             # =========================
             # CHECK ACCOUNT STATUS
             # =========================
-
             if profile["status"] == "pending":
-
                 return render_template("account_pending.html")
 
-
             if profile["status"] == "rejected":
-
-                return "Your account application was rejected.", 403
-
+                flash("Your account application was rejected.", "error")
+                return render_template("login.html")
 
             if profile["status"] != "approved":
-
-                return "Your account is not approved.", 403
-
+                flash("Your account is not yet approved by the administrator.", "error")
+                return render_template("login.html")
 
             # =========================
             # REDIRECT BY ROLE
             # =========================
-
             if profile["role"] == "admin":
-
-                return redirect(
-                    url_for("admin_dashboard")
-                )
-
+                return redirect(url_for("admin_dashboard"))
 
             if profile["role"] == "dentist":
-
-                return redirect(
-                    url_for("dentist_dashboard")
-                )
-
+                return redirect(url_for("dentist_dashboard"))
 
             if profile["role"] == "technician":
-
-                return redirect(
-                    url_for("technician_dashboard")
-                )
-
-
-            # =========================
-            # INVALID ROLE
-            # =========================
+                return redirect(url_for("technician_dashboard"))
 
             session.clear()
-
-            return "Invalid account role.", 403
-
+            flash("Invalid account role assigned.", "error")
+            return render_template("login.html")
 
         except Exception as e:
-
-            return f"Login error: {str(e)}"
-
+            # Catch wrong password, invalid email format, or connection drops from Supabase
+            error_message = str(e)
+            if "Invalid login credentials" in error_message or "invalid_grant" in error_message:
+                flash("Incorrect email or password. Please try again.", "error")
+            else:
+                flash(f"Login error: {error_message}", "error")
+            
+            return render_template("login.html")
 
     return render_template("login.html")
-
 # =========================
 # REVIEW USER
 # =========================
@@ -1681,10 +1672,11 @@ def technician_dashboard():
         profile = profiles[0]
 
         # GET ONLY CASES ASSIGNED TO THIS TECHNICIAN
+        # NOTE: Changed .select("*") to include case_teeth so we can see the materials
         cases_response = (
             supabase_admin
             .table("dental_cases")
-            .select("*")
+            .select("*, case_teeth(material)") 
             .eq("technician_id", user_id)
             .order("created_at", desc=True)
             .execute()
@@ -2205,55 +2197,65 @@ def update_inventory_stock(item_id):
         return redirect(url_for("login"))
 
     try:
-        action = request.form.get("action")  # 'add' or 'subtract'
-        amount = int(request.form.get("amount", 0))
-        notes = request.form.get("notes", "Manual adjustment").strip()
+        # Verify admin
+        profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
+        if not profile_res.data or profile_res.data[0]["role"] != "admin" or profile_res.data[0]["status"] != "approved":
+            return "Access denied.", 403
 
+        action = request.form.get("action")
+        amount = float(request.form.get("amount", 0))
+
+        if amount <= 0:
+            return "Invalid quantity amount.", 400
+
+        # Fetch current item stock
         item_res = supabase_admin.table("inventory").select("*").eq("id", item_id).execute()
         if not item_res.data:
             return "Item not found.", 404
 
         item = item_res.data[0]
-        current_qty = item["quantity"]
+        current_qty = float(item["quantity"])
+        item_name = item["item_name"]
 
+        # Calculate new quantity based on action
         if action == "add":
-            new_qty = current_qty + amount
-            change_val = amount
+            new_qty = round(current_qty + amount, 2)
+            quantity_changed = amount
             action_type = "restock"
+            notes = f"Manual restock of +{amount}"
+        elif action == "subtract":
+            # PREVENT NEGATIVE STOCK SAFELY
+            if current_qty - amount < 0:
+                # Option A: Cap at 0 or return an error message
+                new_qty = 0.00
+                quantity_changed = -current_qty # Only deducted what was left
+                notes = f"Manual adjustment: attempted -{amount}, capped at 0 to avoid negative inventory."
+            else:
+                new_qty = round(current_qty - amount, 2)
+                quantity_changed = -amount
+                action_type = "manual_deduction"
+                notes = f"Manual usage of -{amount}"
         else:
-            new_qty = max(0, current_qty - amount)
-            change_val = -amount
-            action_type = "manual_deduction"
+            return "Invalid action type.", 400
 
-        # Update Inventory
-        supabase_admin.table("inventory").update({
-            "quantity": new_qty
-        }).eq("id", item_id).execute()
+        # Update inventory item quantity
+        supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
 
-        # Insert Audit Log
+        # Insert audit log entry
         supabase_admin.table("inventory_logs").insert({
             "inventory_id": item_id,
             "user_id": user_id,
             "action_type": action_type,
-            "quantity_changed": change_val,
+            "quantity_changed": quantity_changed,
             "previous_quantity": current_qty,
             "new_quantity": new_qty,
             "notes": notes
         }).execute()
 
-        # Low stock check...
-        if new_qty <= item["minimum_threshold"]:
-            admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
-            for admin in (admins_res.data or []):
-                create_notification(
-                    user_id=admin["id"],
-                    message=f"⚠️ Low Stock Alert: {item['item_name']} is down to {new_qty} {item['unit']}!",
-                    link="/admin/inventory"
-                )
-
         return redirect(url_for("admin_inventory"))
+
     except Exception as e:
-        return f"Update stock error: {str(e)}", 500
+        return f"Stock update error: {str(e)}", 500
     
 # =========================
 # START FLASK

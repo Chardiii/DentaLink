@@ -3,90 +3,334 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Audit Logs - DentaLink</title>
+    <title>Inventory Audit Logs - DentaLink LIS</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #222; }
-        header, section { background: white; padding: 20px; margin-bottom: 25px; border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
-        th { background: #eee; }
-        .badge-deduction { background: #ffe6e6; color: #cc0000; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        .badge-restock { background: #e8f5e9; color: #2e7d32; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        .badge-manual { background: #eef6fc; color: #0077cc; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        /* Dark Theme Variables */
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-card-hover: #1A2132;
+            --bg-input: #0B101E;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #131825;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .app-header {
+            background-color: var(--bg-main);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .logo-box { background-color: var(--accent-cyan); border-radius: 8px; padding: 5px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 12px; color: var(--text-muted); }
+
+        .header-center-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .nav-pill { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px; border: 1px solid transparent; transition: all 0.2s; background: transparent; cursor: pointer; font-family: inherit; }
+        .nav-pill:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.02); border-color: var(--border-color); }
+        .nav-pill.active { background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border-color: rgba(66, 221, 242, 0.3); }
+        
+        .header-right { display: flex; align-items: center; gap: 15px; }
+        
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 10px; border-radius: 12px; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; }
+
+        /* Modern Notifications Popover */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 6px; border-radius: 6px; cursor: pointer; transition: 0.2s; position: relative; display: flex; align-items: center; justify-content: center;}
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--text-main); background: rgba(255,255,255,0.05);}
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid var(--bg-main);}
+        
+        .notif-dropdown { position: absolute; top: 45px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 200; overflow: hidden;}
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header);}
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: normal; transition: color 0.2s;}
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 15px; border-bottom: 1px solid var(--border-color); position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; transition: background 0.2s; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4;}
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 6px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; transition: color 0.2s;}
+        .notif-close:hover { color: var(--accent-red); }
+
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; background-color: rgba(66, 221, 242, 0.1); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; }
+        .user-info p { margin: 0; font-size: 13px; font-weight: 600; }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); }
+        .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
+        /* Main Container & Panels */
+        .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .panel-title { margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 10px; font-weight: 600; }
+        .panel-subtitle { margin: 5px 0 0 0; font-size: 13px; color: var(--text-muted); }
+
+        /* Buttons & Inputs */
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-outline:hover { color: var(--text-main); border-color: var(--text-main); }
+
+        .input-dark { width: 100%; padding: 8px 12px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; font-size: 12px; outline: none; }
+        .input-dark:focus { border-color: var(--accent-cyan); }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+
+        /* Tables & Badges */
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dark-table th { text-align: left; padding: 12px 15px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
+        .dark-table td { padding: 14px 15px; border-bottom: 1px solid rgba(38, 47, 68, 0.5); vertical-align: middle; }
+        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
+        .dark-table tr:last-child td { border-bottom: none; }
+
+        .badge-deduction { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        .badge-restock { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        .badge-manual { background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border: 1px solid rgba(66, 221, 242, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+
+        /* Calendar Filter Bar */
+        .filter-bar { display: flex; gap: 15px; align-items: flex-end; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px; flex-wrap: wrap; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <div>
-                <h1 style="margin: 0;">BW11 DentaLink</h1>
-                <p style="margin: 5px 0 0 0;">Inventory Audit & Consumption Logs</p>
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
             </div>
-            <div>
-                <a href="{{ url_for('admin_inventory') }}">
-                    <button type="button" style="padding: 8px 14px; font-weight: bold; cursor: pointer;">← Back to Inventory</button>
-                </a>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Mrkzter Dental Laboratory</p>
             </div>
         </div>
-        <hr style="margin-top: 15px;">
+
+        <nav class="header-center-nav">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Admin Portal
+            </a>
+            
+            <a href="{{ url_for('admin_inventory') }}" class="nav-pill">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                Manage Inventory
+            </a>
+
+            <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill active">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Audit Logs
+            </a>
+        </nav>
+
+        <div class="header-right">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Online
+            </div>
+
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear All</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Take Action →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="user-profile">
+                <div class="avatar">AD</div>
+                <div class="user-info">
+                    <p>{{ profile.display_name }}</p>
+                    <span>Admin</span>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                <button type="submit" class="btn-icon" title="Logout">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </form>
+        </div>
     </header>
 
-    <main>
-        <section>
-            <h2>Stock History & Usage Records</h2>
-            <p>Showing the last 100 inventory movements across the laboratory system.</p>
+    <main class="dashboard-container">
+        
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">
+                        <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Stock History & Usage Records
+                    </h2>
+                    <p class="panel-subtitle">Track laboratory movements, case deductions, and stock adjustments over custom date ranges.</p>
+                </div>
+            </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Item Name</th>
-                        <th>Action Type</th>
-                        <th>Change</th>
-                        <th>Stock Shift</th>
-                        <th>User / Trigger</th>
-                        <th>Notes / Context</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
+            <form method="GET" action="{{ url_for('admin_inventory_logs') }}" class="filter-bar">
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">Start Date</label>
+                    <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="input-dark">
+                </div>
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">End Date</label>
+                    <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="input-dark">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit" class="btn btn-cyan">Filter Logs</button>
+                    <a href="{{ url_for('admin_inventory_logs') }}" class="btn btn-outline" style="align-items: center; display: inline-flex;">Reset</a>
+                </div>
+            </form>
+
+            <div style="overflow-x: auto;">
+                <table class="dark-table">
+                    <thead>
                         <tr>
-                            <td><small>{{ log.created_at[:19].replace('T', ' ') }}</small></td>
-                            <td><strong>{{ log.inventory.item_name if log.inventory else 'Unknown Item' }}</strong></td>
-                            <td>
-                                {% if log.action_type == 'case_deduction' %}
-                                    <span class="badge-deduction">Case Deduction</span>
-                                {% elif log.action_type == 'restock' %}
-                                    <span class="badge-restock">Restock</span>
-                                {% else %}
-                                    <span class="badge-manual">Manual Edit</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span style="font-weight: bold; color: {% if log.quantity_changed < 0 %}#cc0000{% else %}#2e7d32{% endif %};">
-                                    {{ log.quantity_changed }}
-                                </span>
-                                {{ log.inventory.unit if log.inventory else '' }}
-                            </td>
-                            <td>{{ log.previous_quantity }} → <strong>{{ log.new_quantity }}</strong></td>
-                            <td>{{ log.profiles.display_name or log.profiles.first_name if log.profiles else 'System / Auto' }}</td>
-                            <td>{{ log.notes or 'N/A' }}</td>
+                            <th>Timestamp</th>
+                            <th>Item Name</th>
+                            <th>Action Type</th>
+                            <th>Change</th>
+                            <th>Stock Shift</th>
+                            <th>User / Trigger</th>
+                            <th>Notes / Context</th>
                         </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="7">No inventory audit logs recorded yet.</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr>
+                                <td><small style="color: var(--text-muted);">{{ log.created_at[:19].replace('T', ' ') }}</small></td>
+                                <td><strong style="color: var(--text-main);">{{ log.inventory.item_name if log.inventory else 'Unknown Item' }}</strong></td>
+                                <td>
+                                    {% if log.action_type == 'case_deduction' %}
+                                        <span class="badge-deduction">Case Deduction</span>
+                                    {% elif log.action_type == 'restock' %}
+                                        <span class="badge-restock">Restock</span>
+                                    {% else %}
+                                        <span class="badge-manual">Manual Edit</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span style="font-weight: bold; color: {% if log.quantity_changed < 0 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
+                                        {{ log.quantity_changed }}
+                                    </span>
+                                    {{ log.inventory.unit if log.inventory else '' }}
+                                </td>
+                                <td>{{ log.previous_quantity }} → <strong>{{ log.new_quantity }}</strong></td>
+                                <td>{{ log.profiles.display_name or log.profiles.first_name if log.profiles else 'System / Auto' }}</td>
+                                <td><span style="color: var(--text-muted);">{{ log.notes or 'N/A' }}</span></td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No inventory audit logs found for the selected date range.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </main>
 
-    <footer>
-        <hr>
-        <p>BW11 DentaLink</p>
-    </footer>
+    <script>
+        function toggleNotif(e) {
+            e.stopPropagation();
+            const bell = document.getElementById('bell-icon');
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('show');
+            bell.classList.toggle('active');
+        }
 
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if(count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper')) {
+                const dd = document.getElementById('notifDropdown');
+                const bell = document.getElementById('bell-icon');
+                if (dd && dd.classList.contains('show')) {
+                    dd.classList.remove('show');
+                    bell.classList.remove('active');
+                }
+            }
+        }
+    </script>
 </body>
 </html>

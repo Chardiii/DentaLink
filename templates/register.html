@@ -1,214 +1,352 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - DentaLink LIS</title>
+    <style>
+        :root {
+            /* Dark Theme Colors based on DentaLink reference */
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-input: #0B101E;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+        }
 
-    <title>Register - BW11 DentaLink</title>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            /* Subtle glowing gradients */
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px 20px;
+            box-sizing: border-box;
+        }
+
+        /* Branding Header */
+        .brand-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-container {
+            background: #FFFFFF; 
+            padding: 10px 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .mrkzter-logo {
+            height: 40px;
+            width: auto;
+            display: block;
+        }
+
+        .title-denta {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle-lis {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin: 0 0 8px 0;
+        }
+
+        .subtitle-lab {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        /* Register Card */
+        .register-wrapper {
+            width: 100%;
+            max-width: 650px;
+        }
+
+        .register-card {
+            background-color: var(--bg-card);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .instruction-text {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .section-title {
+            font-size: 13px;
+            color: var(--accent-cyan);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section-title:first-of-type {
+            margin-top: 0;
+        }
+
+        /* Form Grid Layout */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 11px;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input, 
+        .form-group select {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input::placeholder {
+            color: #4B5563;
+        }
+
+        .form-group input:focus, 
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 1px var(--border-focus);
+        }
+
+        /* Custom Select Styling */
+        .form-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px top 50%;
+            background-size: 10px auto;
+        }
+
+        .form-group select option {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+        }
+
+        .submit-btn {
+            width: 100%;
+            background-color: var(--accent-cyan);
+            color: #0B101E;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .submit-btn:hover {
+            background-color: var(--accent-cyan-hover);
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .links-container {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .links-container a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .links-container a.primary-link {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .links-container a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Page Footer */
+        .page-footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+            .register-card {
+                padding: 30px 20px;
+            }
+        }
+    </style>
 </head>
-
 <body>
 
-    <h1>Create Your DentaLink Account</h1>
-
-    <p>
-        Your account will need to be reviewed and approved
-        by an administrator before you can access the system.
-    </p>
-
-    <form method="POST">
-
-        <!-- PERSONAL INFORMATION -->
-
-        <h2>Personal Information</h2>
-
-        <div>
-            <label for="first_name">First Name</label>
-            <br>
-
-            <input
-                type="text"
-                id="first_name"
-                name="first_name"
-                required
-            >
+    <div class="brand-header">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='images/mrkzter_logo.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
         </div>
+        <h1 class="title-denta">Create Account</h1>
+        <p class="subtitle-lis">DentaLink Laboratory Information System</p>
+    </div>
 
-        <br>
+    <div class="register-wrapper">
+        <div class="register-card">
+            
+            <p class="instruction-text">
+                Your account will need to be reviewed and approved by an administrator before you can access the system.
+            </p>
 
-        <div>
-            <label for="last_name">Last Name</label>
-            <br>
+            <form method="POST">
+                
+                <!-- PERSONAL INFORMATION -->
+                <div class="section-title">Personal Information</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" placeholder="John" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" placeholder="Doe" required>
+                    </div>
+                </div>
 
-            <input
-                type="text"
-                id="last_name"
-                name="last_name"
-                required
-            >
-        </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="display_name">Display Name</label>
+                        <input type="text" id="display_name" name="display_name" placeholder="Visible to others" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone" placeholder="09XXXXXXXXX" required>
+                    </div>
+                </div>
 
-        <br>
+                <!-- PROFESSIONAL INFORMATION -->
+                <div class="section-title">Professional Information</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="role">Requested Role</label>
+                        <select id="role" name="role" required>
+                            <option value="" disabled selected>Select your role</option>
+                            <option value="dentist">Dentist</option>
+                            <option value="technician">Dental Technician</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="professional_id">Professional / License ID</label>
+                        <input type="text" id="professional_id" name="professional_id" placeholder="Enter your ID" required>
+                    </div>
+                </div>
 
-        <div>
-            <label for="display_name">Display Name</label>
-            <br>
+                <!-- ACCOUNT INFORMATION -->
+                <div class="section-title">Account Security</div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="name@clinic.com" required>
+                </div>
 
-            <input
-                type="text"
-                id="display_name"
-                name="display_name"
-                required
-            >
-        </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" minlength="8" placeholder="••••••••••••" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" minlength="8" placeholder="••••••••••••" required>
+                    </div>
+                </div>
 
-        <br>
+                <button type="submit" class="submit-btn">
+                    Submit Registration
+                    <svg style="width: 16px; height: 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </form>
 
-        <div>
-            <label for="phone">Phone Number</label>
-            <br>
-
-            <input
-                type="tel"
-                id="phone"
-                name="phone"
-                placeholder="09XXXXXXXXX"
-                required
-            >
-        </div>
-
-        <br>
-
-
-        <!-- PROFESSIONAL INFORMATION -->
-
-        <h2>Professional Information</h2>
-
-        <div>
-
-            <label for="role">Requested Role</label>
-            <br>
-
-            <select id="role" name="role" required>
-
-                <option value="">
-                    -- Select your role --
-                </option>
-
-                <option value="dentist">
-                    Dentist
-                </option>
-
-                <option value="technician">
-                    Dental Technician
-                </option>
-
-            </select>
+            <div class="links-container">
+                <div>Already have an account? <a href="{{ url_for('login') }}" class="primary-link">Sign In</a></div>
+                <a href="{{ url_for('home') }}">← Back to Home</a>
+            </div>
 
         </div>
+    </div>
 
-        <br>
-
-        <div>
-
-            <label for="professional_id">
-                Professional / License ID
-            </label>
-
-            <br>
-
-            <input
-                type="text"
-                id="professional_id"
-                name="professional_id"
-                placeholder="Enter your professional ID"
-                required
-            >
-
-        </div>
-
-        <br>
-
-
-        <!-- ACCOUNT INFORMATION -->
-
-        <h2>Account Information</h2>
-
-        <div>
-
-            <label for="email">Email Address</label>
-            <br>
-
-            <input
-                type="email"
-                id="email"
-                name="email"
-                required
-            >
-
-        </div>
-
-        <br>
-
-        <div>
-
-            <label for="password">Password</label>
-            <br>
-
-            <input
-                type="password"
-                id="password"
-                name="password"
-                minlength="8"
-                required
-            >
-
-        </div>
-
-        <br>
-
-        <div>
-
-            <label for="confirm_password">
-                Confirm Password
-            </label>
-
-            <br>
-
-            <input
-                type="password"
-                id="confirm_password"
-                name="confirm_password"
-                minlength="8"
-                required
-            >
-
-        </div>
-
-        <br>
-
-        <button type="submit">
-            Submit Registration
-        </button>
-
-    </form>
-
-    <br>
-
-    <p>
-        Already have an account?
-        <a href="{{ url_for('login') }}">
-            Login
-        </a>
-    </p>
-
-    <p>
-        <a href="{{ url_for('home') }}">
-            Back to Home
-        </a>
-    </p>
+    <div class="page-footer">
+        © 2026 Mrkzter Dental Laboratory • All Rights Reserved
+    </div>
 
 </body>
-
 </html>
