@@ -100,23 +100,6 @@
         /* Dashboard Container */
         .dashboard-container { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
 
-        /* Command Bar */
-        .command-bar {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 18px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .command-left h2 { margin: 0 0 4px 0; font-size: 20px; font-weight: 700; color: var(--text-main); }
-        .command-left p { margin: 0; font-size: 12px; color: var(--text-muted); }
-
         /* Metrics Strip */
         .metrics-grid {
             display: grid;
@@ -211,7 +194,6 @@
             color: var(--bg-main);
         }
 
-        /* Case Grid View (No side-scrolling bar) */
         .stage-section { display: none; }
         .stage-section.active { display: block; animation: fadeIn 0.25s ease-out; }
 
@@ -232,7 +214,6 @@
             font-size: 13px;
         }
 
-        /* Refined Pipeline Card */
         .k-card {
             background-color: var(--bg-input);
             border: 1px solid var(--border-color);
@@ -265,14 +246,12 @@
             align-items: center;
         }
 
-        /* Buttons & Inputs */
         .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
         .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
         .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
         .btn-outline-cyan { background-color: transparent; border: 1px solid var(--accent-cyan); color: var(--accent-cyan); }
         .btn-outline-cyan:hover { background-color: rgba(66, 221, 242, 0.08); }
 
-        /* Tables & User Directory Grid */
         .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .dark-table th { text-align: left; padding: 12px 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
         .dark-table td { padding: 12px 14px; border-bottom: 1px solid rgba(38, 47, 68, 0.5); vertical-align: middle; }
@@ -289,7 +268,6 @@
         .item-card p { margin: 4px 0; font-size: 12px; color: var(--text-muted); }
         .item-card strong { color: var(--text-main); }
 
-        /* Modal Overlays */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 920px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
@@ -396,7 +374,6 @@
 
     <main class="dashboard-container">
         
-
         <div class="metrics-grid">
             <div class="metric-card" style="border-left: 3px solid var(--accent-green);">
                 <div class="metric-top">
@@ -443,18 +420,19 @@
                 </div>
             </div>
 
+            <!-- LIVE ONLINE USERS & DEVICES METRIC CARD -->
             <div class="metric-card" style="border-left: 3px solid var(--accent-cyan);">
                 <div class="metric-top">
                     <div>
-                        <p class="metric-title">Active Network</p>
-                        <p class="metric-value">{{ approved_count }}</p>
+                        <p class="metric-title">Active Sessions Online</p>
+                        <p class="metric-value" id="onlineCount">Connecting...</p>
                     </div>
                     <div class="metric-icon" style="background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan);">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     </div>
                 </div>
                 <div class="metric-bottom" style="color: var(--accent-cyan);">
-                    <span>Clinics & technicians registered</span>
+                    <span id="onlineSubtext">Real-time device tracking active</span>
                 </div>
             </div>
         </div>
@@ -785,7 +763,45 @@
         </div>
     </div>
 
+    <!-- SUPABASE REALTIME PRESENCE SCRIPT -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        // Supabase Realtime Online Device / User Presence Tracking
+        const SUPABASE_URL = "{{ SUPABASE_URL }}";
+        const SUPABASE_KEY = "{{ SUPABASE_KEY }}";
+
+        if (typeof supabase !== 'undefined' && SUPABASE_URL) {
+            const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            const roomOnline = client.channel('dentalink_online_presence', {
+                config: { presence: { key: '{{ profile.id }}' } }
+            });
+
+            roomOnline.on('presence', { event: 'sync' }, () => {
+                const state = roomOnline.presenceState();
+                const userKeys = Object.keys(state);
+                let totalDevices = 0;
+                userKeys.forEach(userId => {
+                    totalDevices += state[userId].length;
+                });
+
+                document.getElementById('onlineCount').innerText = userKeys.length + " Users (" + totalDevices + " Devices)";
+                document.getElementById('onlineSubtext').innerText = "Live tracking via Supabase Realtime";
+            });
+
+            roomOnline.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await roomOnline.track({
+                        online_at: new Date().toISOString(),
+                        role: '{{ profile.role }}',
+                        name: '{{ profile.display_name }}'
+                    });
+                }
+            });
+        } else {
+            document.getElementById('onlineCount').innerText = "{{ approved_count }} Registered";
+            document.getElementById('onlineSubtext').innerText = "Database records synced";
+        }
+
         function switchStage(event, stageId) {
             document.querySelectorAll('.stage-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.stage-tab-btn').forEach(el => el.classList.remove('active'));
