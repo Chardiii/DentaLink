@@ -1109,6 +1109,9 @@ def register():
 
         role = request.form.get("role", "").strip()
         professional_id = request.form.get("professional_id", "N/A")
+        
+        # Grab clinic name if user selected dentist, otherwise set to None/Empty
+        clinic_name = request.form.get("clinic_name", "").strip() if role == "dentist" else None
 
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password")
@@ -1156,6 +1159,7 @@ def register():
                 "display_name": display_name,
                 "phone": phone,
                 "professional_id": professional_id,
+                "clinic_name": clinic_name,  # <--- SAVED TO DATABASE HERE
                 "role": role,
                 "status": "pending"
             }).execute()

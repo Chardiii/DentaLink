@@ -160,6 +160,50 @@
             box-shadow: 0 0 0 1px var(--border-focus);
         }
 
+        /* Password Input Wrapper with Toggle Icon */
+        .password-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-input-wrap input {
+            padding-right: 45px;
+        }
+
+        .toggle-password-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .toggle-password-btn:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Conditional Clinic Field Container */
+        #clinicFieldContainer {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.3s ease, margin-bottom 0.35s ease;
+            margin-bottom: 0;
+        }
+
+        #clinicFieldContainer.visible {
+            max-height: 100px;
+            opacity: 1;
+            margin-bottom: 20px;
+        }
+
         /* Select Styling */
         .form-group select {
             appearance: none;
@@ -174,10 +218,22 @@
             color: var(--text-main);
         }
 
-        /* Password Strength Meter & Requirement Checklist */
+        /* Password Strength Meter & Requirement Checklist (Initially Hidden) */
+        .password-feedback-wrapper {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, opacity 0.3s ease;
+        }
+
+        .password-feedback-wrapper.visible {
+            max-height: 250px;
+            opacity: 1;
+        }
+
         .strength-meter-container {
-            margin-top: 8px;
-            margin-bottom: 12px;
+            margin-top: 10px;
+            margin-bottom: 8px;
         }
 
         .strength-bar-bg {
@@ -208,7 +264,7 @@
             background: rgba(0, 0, 0, 0.25);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            margin-top: 10px;
+            margin-top: 8px;
         }
 
         .requirement-item {
@@ -397,7 +453,7 @@
 
     <div class="brand-header">
         <div class="logo-container">
-            <img src="{{ url_for('static', filename='images/mrkzter_logo.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
+            <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
         </div>
         <h1 class="title-denta">Create Account</h1>
         <p class="subtitle-lis">DentaLink Laboratory Information System</p>
@@ -412,7 +468,6 @@
 
             <form method="POST" id="registerForm">
                 
-                <!-- PERSONAL INFORMATION -->
                 <div class="section-title">Personal Information</div>
                 <div class="form-row">
                     <div class="form-group">
@@ -434,12 +489,11 @@
                     </div>
                     <div class="form-group">
                         <label for="phone">Phone Number</label>
-                        <input type="tel" id="phone" name="phone" placeholder="09123456789" required maxlength="11" pattern="[0-9]{11}" inputmode="numeric" title="Please enter an 11-digit mobile number (e.g., 09XXXXXXXXX)">
-                        <span class="field-hint" id="phoneHint" style="color: var(--text-muted);">Format: 11-digit mobile number</span>
+                        <input type="tel" id="phone" name="phone" placeholder="09123456789" required maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" title="Please enter an 11-digit mobile number starting with 09 (e.g., 09XXXXXXXXX)">
+                        <span class="field-hint" id="phoneHint" style="color: var(--text-muted);">Must start with 09 (11 digits)</span>
                     </div>
                 </div>
 
-                <!-- ROLE SELECTION -->
                 <div class="section-title">Role Assignment</div>
                 <div class="form-group">
                     <label for="role">Requested Account Role</label>
@@ -450,7 +504,12 @@
                     </select>
                 </div>
 
-                <!-- ACCOUNT CREDENTIALS -->
+                <div class="form-group" id="clinicFieldContainer">
+                    <label for="clinic_name">Dental Clinic Name</label>
+                    <input type="text" id="clinic_name" name="clinic_name" placeholder="e.g. SmileCare Dental Clinic">
+                    <span class="field-hint" style="color: var(--text-muted);">Name of your primary clinic or practice</span>
+                </div>
+
                 <div class="section-title">Account Security</div>
                 <div class="form-group">
                     <label for="email">Email Address</label>
@@ -460,40 +519,50 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" placeholder="••••••••••••" required autocomplete="new-password">
-                        
-                        <!-- Real-time Strength Meter -->
-                        <div class="strength-meter-container">
-                            <div class="strength-bar-bg">
-                                <div class="strength-bar-fill" id="strengthBar"></div>
-                            </div>
-                            <div class="strength-text" id="strengthText" style="color: var(--text-muted);">Password Strength</div>
+                        <div class="password-input-wrap">
+                            <input type="password" id="password" name="password" placeholder="••••••••••••" required autocomplete="new-password">
+                            <button type="button" class="toggle-password-btn" id="togglePassword" aria-label="Toggle password visibility">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="confirm_password">Confirm Password</label>
-                        <input type="password" id="confirm_password" name="confirm_password" placeholder="••••••••••••" required autocomplete="new-password">
+                        <div class="password-input-wrap">
+                            <input type="password" id="confirm_password" name="confirm_password" placeholder="••••••••••••" required autocomplete="new-password">
+                            <button type="button" class="toggle-password-btn" id="toggleConfirmPassword" aria-label="Toggle confirm password visibility">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                        </div>
                         <span class="field-hint" id="matchHint" style="color: var(--text-muted);">Passwords must match</span>
                     </div>
                 </div>
 
-                <!-- Password Requirements Checklist -->
-                <div class="password-requirements">
-                    <div class="requirement-item" id="reqLength">
-                        <span class="req-bullet">•</span> Min 8 characters
+                <div class="password-feedback-wrapper" id="passwordFeedbackWrapper">
+                    <div class="strength-meter-container">
+                        <div class="strength-bar-bg">
+                            <div class="strength-bar-fill" id="strengthBar"></div>
+                        </div>
+                        <div class="strength-text" id="strengthText" style="color: var(--text-muted);">Password Strength</div>
                     </div>
-                    <div class="requirement-item" id="reqUpper">
-                        <span class="req-bullet">•</span> One uppercase letter
-                    </div>
-                    <div class="requirement-item" id="reqLower">
-                        <span class="req-bullet">•</span> One lowercase letter
-                    </div>
-                    <div class="requirement-item" id="reqNumber">
-                        <span class="req-bullet">•</span> One number
-                    </div>
-                    <div class="requirement-item" id="reqSpecial">
-                        <span class="req-bullet">•</span> One symbol (@$!%*?&#)
+
+                    <div class="password-requirements">
+                        <div class="requirement-item" id="reqLength">
+                            <span class="req-bullet">•</span> Min 8 characters
+                        </div>
+                        <div class="requirement-item" id="reqUpper">
+                            <span class="req-bullet">•</span> One uppercase letter
+                        </div>
+                        <div class="requirement-item" id="reqLower">
+                            <span class="req-bullet">•</span> One lowercase letter
+                        </div>
+                        <div class="requirement-item" id="reqNumber">
+                            <span class="req-bullet">•</span> One number
+                        </div>
+                        <div class="requirement-item" id="reqSpecial">
+                            <span class="req-bullet">•</span> One symbol (@$!%*?&#)
+                        </div>
                     </div>
                 </div>
 
@@ -513,7 +582,6 @@
         </div>
     </div>
 
-    <!-- ERROR / DUPLICATE POPUP MODAL -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="error-modal-overlay" id="errorModal">
@@ -545,8 +613,16 @@
         const lastNameInput = document.getElementById('last_name');
         const phoneInput = document.getElementById('phone');
         const phoneHint = document.getElementById('phoneHint');
+        const roleSelect = document.getElementById('role');
+        const clinicFieldContainer = document.getElementById('clinicFieldContainer');
+        const clinicNameInput = document.getElementById('clinic_name');
+        
         const passwordInput = document.getElementById('password');
         const confirmPasswordInput = document.getElementById('confirm_password');
+        const togglePasswordBtn = document.getElementById('togglePassword');
+        const toggleConfirmPasswordBtn = document.getElementById('toggleConfirmPassword');
+        
+        const passwordFeedbackWrapper = document.getElementById('passwordFeedbackWrapper');
         const matchHint = document.getElementById('matchHint');
         const strengthBar = document.getElementById('strengthBar');
         const strengthText = document.getElementById('strengthText');
@@ -566,20 +642,80 @@
             });
         });
 
-        // Strict 11-digit phone sanitization
+        // Phone number formatting & validation (Must start with 09)
         phoneInput.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '');
-            if (this.value.length === 11) {
+            let val = this.value.replace(/[^0-9]/g, '');
+            
+            if (val.length === 1 && val !== '0') {
+                val = '09';
+            } else if (val.length >= 2 && val.slice(0, 2) !== '09') {
+                val = '09' + val.slice(2);
+            }
+            if (val.length > 11) {
+                val = val.slice(0, 11);
+            }
+            this.value = val;
+
+            if (this.value.length === 11 && this.value.startsWith('09')) {
                 phoneHint.textContent = "Valid phone number format";
                 phoneHint.style.color = "var(--accent-green)";
             } else {
-                phoneHint.textContent = `11 digits required (${this.value.length}/11)`;
+                phoneHint.textContent = `Must start with 09 (${this.value.length}/11 digits)`;
                 phoneHint.style.color = "var(--text-muted)";
             }
             validateForm();
         });
 
-        passwordInput.addEventListener('input', evaluatePassword);
+        // Ensure 09 prefix if user focuses an empty phone box
+        phoneInput.addEventListener('focus', function() {
+            if (!this.value) {
+                this.value = '09';
+            }
+        });
+
+        // Role selection listener for Dental Clinic Name
+        roleSelect.addEventListener('change', function() {
+            if (this.value === 'dentist') {
+                clinicFieldContainer.classList.add('visible');
+                clinicNameInput.required = true;
+            } else {
+                clinicFieldContainer.classList.remove('visible');
+                clinicNameInput.required = false;
+                clinicNameInput.value = '';
+            }
+            validateForm();
+        });
+
+        clinicNameInput.addEventListener('input', validateForm);
+
+        // Show/Hide Password functionality
+        function setupPasswordToggle(inputField, toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
+                inputField.setAttribute('type', type);
+                
+                // Switch Eye SVG Icon
+                if (type === 'text') {
+                    toggleBtn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.057 10.057 0 012.356-4.264M9.88 4.88A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7-10.025 10.025 0 01-4.132 5.411m0 0L21 21M3 3l18 18"/></svg>`;
+                } else {
+                    toggleBtn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`;
+                }
+            });
+        }
+
+        setupPasswordToggle(passwordInput, togglePasswordBtn);
+        setupPasswordToggle(confirmPasswordInput, toggleConfirmPasswordBtn);
+
+        // Reveal password checklist requirements when user interacts or types
+        passwordInput.addEventListener('focus', function() {
+            passwordFeedbackWrapper.classList.add('visible');
+        });
+
+        passwordInput.addEventListener('input', function() {
+            passwordFeedbackWrapper.classList.add('visible');
+            evaluatePassword();
+        });
+
         confirmPasswordInput.addEventListener('input', checkPasswordMatch);
 
         function evaluatePassword() {
@@ -654,6 +790,8 @@
         function validateForm() {
             const isFirstNameValid = /^[A-Za-z\s]{2,}$/.test(firstNameInput.value.trim());
             const isLastNameValid = /^[A-Za-z\s]{2,}$/.test(lastNameInput.value.trim());
+            const isRoleSelected = roleSelect.value !== "";
+            const isClinicValid = roleSelect.value !== 'dentist' || clinicNameInput.value.trim().length > 0;
 
             const pVal = passwordInput.value;
             const isPasswordValid = pVal.length >= 8 &&
@@ -663,9 +801,9 @@
                                     /[@$!%*?&#^()_\-+={}[\]:;"'<>,.]/.test(pVal);
 
             const isMatch = passwordInput.value === confirmPasswordInput.value;
-            const isPhoneValid = phoneInput.value.length === 11;
+            const isPhoneValid = phoneInput.value.length === 11 && phoneInput.value.startsWith('09');
 
-            submitBtn.disabled = !(isFirstNameValid && isLastNameValid && isPasswordValid && isMatch && isPhoneValid);
+            submitBtn.disabled = !(isFirstNameValid && isLastNameValid && isRoleSelected && isClinicValid && isPasswordValid && isMatch && isPhoneValid);
         }
 
         function closeErrorModal() {
@@ -689,14 +827,19 @@
                 alert("First and last names must contain letters only.");
                 return;
             }
+            if (phoneInput.value.length !== 11 || !phoneInput.value.startsWith('09')) {
+                e.preventDefault();
+                alert("Please enter a valid 11-digit mobile number starting with 09.");
+                return;
+            }
+            if (roleSelect.value === 'dentist' && !clinicNameInput.value.trim()) {
+                e.preventDefault();
+                alert("Please provide your Dental Clinic Name.");
+                return;
+            }
             if (passwordInput.value !== confirmPasswordInput.value) {
                 e.preventDefault();
                 alert("Passwords do not match.");
-                return;
-            }
-            if (phoneInput.value.length !== 11) {
-                e.preventDefault();
-                alert("Please enter a valid 11-digit phone number.");
                 return;
             }
         });

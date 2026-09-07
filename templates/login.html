@@ -6,7 +6,6 @@
     <title>Login - DentaLink LIS</title>
     <style>
         :root {
-            /* Dark Theme Colors based on reference */
             --bg-main: #0B101E;
             --bg-card: #161B28;
             --bg-input: #0B101E;
@@ -23,7 +22,6 @@
         body {
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-main);
-            /* Adds the subtle glowing gradients in the corners */
             background-image: 
                 radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
                 radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
@@ -36,69 +34,112 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            padding: 20px;
         }
 
-        /* Branding Header */
-        .brand-header {
+        /* Split Login Container Card */
+        .login-split-card {
+            display: flex;
+            flex-direction: row;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 860px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        /* Left Branding Panel */
+        .brand-panel {
+            flex: 1;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border-right: 1px solid var(--border-color);
+            padding: 50px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
-            margin-bottom: 30px;
+            position: relative;
         }
 
         .logo-container {
-            background: #FFFFFF; /* White background to make your JPG logo pop cleanly */
-            padding: 10px 20px;
+            background: #FFFFFF;
+            padding: 12px 24px;
             border-radius: 12px;
             display: inline-block;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
         }
 
         .mrkzter-logo {
-            height: 40px;
+            height: 42px;
             width: auto;
             display: block;
         }
 
-        .title-denta {
-            font-size: 32px;
-            font-weight: 700;
-            margin: 0 0 5px 0;
+        .brand-panel .title-denta {
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0 0 6px 0;
             color: var(--text-main);
             letter-spacing: -0.5px;
         }
 
-        .subtitle-lis {
+        .brand-panel .subtitle-lis {
             font-size: 11px;
             font-weight: 700;
             color: var(--accent-cyan);
             letter-spacing: 1.5px;
             text-transform: uppercase;
-            margin: 0 0 8px 0;
+            margin: 0 0 10px 0;
         }
 
-        .subtitle-lab {
+        .brand-panel .subtitle-lab {
             font-size: 13px;
             color: var(--text-muted);
             margin: 0;
+            line-height: 1.4;
         }
 
-        /* Login Card */
-        .login-wrapper {
-            width: 100%;
-            max-width: 440px;
-            padding: 0 20px;
-            box-sizing: border-box;
+        .brand-badge {
+            margin-top: 35px;
+            background: rgba(66, 221, 242, 0.08);
+            border: 1px solid rgba(66, 221, 242, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
-        .login-card {
-            background-color: var(--bg-card);
-            padding: 40px;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        /* Right Form Panel */
+        .form-panel {
+            flex: 1.1;
+            padding: 50px 45px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .form-panel h2 {
+            margin: 0 0 6px 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .form-panel p.form-desc {
+            margin: 0 0 25px 0;
+            font-size: 12.5px;
+            color: var(--text-muted);
         }
 
         .form-group {
-            margin-bottom: 22px;
+            margin-bottom: 20px;
             text-align: left;
         }
 
@@ -143,12 +184,12 @@
 
         .form-group input {
             width: 100%;
-            padding: 14px 40px;
+            padding: 13px 40px;
             background-color: var(--bg-input);
             border: 1px solid var(--border-color);
             color: var(--text-main);
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13.5px;
             box-sizing: border-box;
             transition: all 0.3s ease;
         }
@@ -167,14 +208,37 @@
             color: var(--border-focus);
         }
 
+        .form-row-checkbox {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12.5px;
+            margin-bottom: 20px;
+            color: var(--text-muted);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            accent-color: var(--accent-cyan);
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
         .login-btn {
             width: 100%;
             background-color: var(--accent-cyan);
-            color: #0B101E; /* Dark text for contrast against cyan */
-            padding: 14px;
+            color: #0B101E;
+            padding: 13px;
             border: none;
             border-radius: 8px;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 700;
             cursor: pointer;
             transition: background-color 0.2s ease, transform 0.1s ease;
@@ -182,7 +246,7 @@
             justify-content: center;
             align-items: center;
             gap: 8px;
-            margin-top: 10px;
+            margin-bottom: 20px;
         }
 
         .login-btn:hover {
@@ -195,11 +259,11 @@
 
         /* Auxiliary Links */
         .links-container {
-            margin-top: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 13px;
+            font-size: 12.5px;
+            margin-bottom: 20px;
         }
 
         .links-container a {
@@ -217,38 +281,40 @@
             font-weight: 600;
         }
 
-        /* Footer inside card */
+        /* Card Footer */
         .card-footer {
-            margin-top: 25px;
-            padding-top: 20px;
+            margin-top: 15px;
+            padding-top: 18px;
             border-top: 1px solid var(--border-color);
             display: flex;
             justify-content: center;
             align-items: center;
             gap: 6px;
-            font-size: 12px;
+            font-size: 11.5px;
             color: var(--text-muted);
+            text-align: center;
         }
 
         .shield-icon {
             width: 14px;
             height: 14px;
             color: var(--accent-cyan);
+            flex-shrink: 0;
         }
 
         /* Page Footer */
         .page-footer {
-            margin-top: 40px;
-            font-size: 12px;
+            margin-top: 25px;
+            font-size: 11.5px;
             color: var(--text-muted);
             text-align: center;
         }
 
-        /* Error Popup Modal (Blur Overlay) */
+        /* Error Popup Modal */
         .error-modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(11, 16, 30, 0.8);
+            background-color: rgba(11, 16, 30, 0.85);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             z-index: 1000;
@@ -267,7 +333,7 @@
             border-radius: 12px;
             width: 100%;
             max-width: 400px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
             animation: slideUp 0.3s ease-out forwards;
             display: flex;
             flex-direction: column;
@@ -277,7 +343,7 @@
         }
         .error-icon-box {
             width: 50px; height: 50px;
-            background: rgba(239, 68, 68, 0.1);
+            background: rgba(239, 68, 68, 0.12);
             color: var(--accent-red);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
@@ -298,7 +364,7 @@
         .error-modal-btn {
             background-color: var(--accent-cyan);
             color: var(--bg-main);
-            padding: 10px 20px;
+            padding: 11px 20px;
             border: none;
             border-radius: 6px;
             font-size: 13px;
@@ -310,22 +376,41 @@
         .error-modal-btn:hover {
             background-color: var(--accent-cyan-hover);
         }
+
+        @media (max-width: 768px) {
+            .login-split-card {
+                flex-direction: column;
+            }
+            .brand-panel {
+                padding: 35px 25px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .form-panel {
+                padding: 35px 25px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="brand-header">
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='images/mrkzter_logo.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
+    <div class="login-split-card">
+        <!-- Left Side Branding Panel -->
+        <div class="brand-panel">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
+            </div>
+            <h1 class="title-denta">DentaLink</h1>
+            <p class="subtitle-lis">Laboratory Information System</p>
+            <p class="subtitle-lab">Mrkzter Dental Laboratory</p>
+            <div class="brand-badge">Secure Portal Access</div>
         </div>
-        <h1 class="title-denta">DentaLink</h1>
-        <p class="subtitle-lis">Laboratory Information System</p>
-        <p class="subtitle-lab">Mrkzter Dental Laboratory</p>
-    </div>
 
-    <div class="login-wrapper">
-        <div class="login-card">
-            
+        <!-- Right Side Form Panel -->
+        <div class="form-panel">
+            <h2>Sign In</h2>
+            <p class="form-desc">Staff portal & clinical partner workspace</p>
+
             <form method="POST">
                 <div class="form-group">
                     <label for="email">Username / Email Address</label>
@@ -333,7 +418,7 @@
                         <svg class="input-icon-left" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
-                        <input type="email" id="email" name="email" placeholder="admin@dentalink.com or clinic email" required>
+                        <input type="email" id="email" name="email" placeholder="you@dentalink.com" required>
                     </div>
                 </div>
                 
@@ -343,7 +428,7 @@
                         <svg class="input-icon-left" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        <input type="password" id="password" name="password" placeholder="••••••••••••" required>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
                         <!-- Eye Icon -->
                         <svg class="input-icon-right" id="togglePassword" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -352,32 +437,36 @@
                     </div>
                 </div>
 
+                <div class="form-row-checkbox">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="remember"> Keep me signed in
+                    </label>
+                    <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+                </div>
+
                 <button type="submit" class="login-btn">
-                    Sign In to DentaLink 
                     <svg style="width: 16px; height: 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                     </svg>
+                    Sign in
                 </button>
             </form>
 
             <div class="links-container">
-                <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
                 <a href="{{ url_for('register') }}" class="register-link">Register Account</a>
-            </div>
-            <div style="text-align: center; margin-top: 10px;">
-                <a href="{{ url_for('home') }}" style="color: var(--text-muted); text-decoration: none; font-size: 12px; transition: color 0.2s;">← Back to Home</a>
+                <a href="{{ url_for('home') }}">← Back to Home</a>
             </div>
 
             <div class="card-footer">
                 <svg class="shield-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-1.998A11.954 11.954 0 0110 1.944z" clip-rule="evenodd" />
                 </svg>
-                Authorized Personnel & Partner Clinics Only
+                Authorized personnel & partner clinics only
             </div>
         </div>
     </div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="error-modal-overlay" id="errorModal">
                 <div class="error-modal-container">
@@ -401,25 +490,14 @@
     </div>
 
     <script>
-        function closeErrorModal() {
-            const modal = document.getElementById('errorModal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        }
-    </script>
-    <script>
         // Toggle Password Visibility
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
 
         if (togglePassword && passwordInput) {
             togglePassword.addEventListener('click', function () {
-                // Toggle the type attribute
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordInput.setAttribute('type', type);
-                
-                // Optional: Change icon color or style when active
                 this.style.color = type === 'text' ? 'var(--accent-cyan)' : 'var(--text-muted)';
             });
         }
