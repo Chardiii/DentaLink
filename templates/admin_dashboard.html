@@ -420,19 +420,19 @@
                 </div>
             </div>
 
-            <!-- LIVE ONLINE USERS & DEVICES METRIC CARD -->
+            <!-- ACTIVE USERS ONLINE METRIC CARD (DATABASE BACKED) -->
             <div class="metric-card" style="border-left: 3px solid var(--accent-cyan);">
                 <div class="metric-top">
                     <div>
-                        <p class="metric-title">Active Sessions Online</p>
-                        <p class="metric-value" id="onlineCount">Connecting...</p>
+                        <p class="metric-title">Active Users Online</p>
+                        <p class="metric-value">{{ online_count }}</p>
                     </div>
                     <div class="metric-icon" style="background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan);">
                         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     </div>
                 </div>
                 <div class="metric-bottom" style="color: var(--accent-cyan);">
-                    <span id="onlineSubtext">Real-time device tracking active</span>
+                    <span>Logged in within the last 5 minutes</span>
                 </div>
             </div>
         </div>
@@ -763,45 +763,7 @@
         </div>
     </div>
 
-    <!-- SUPABASE REALTIME PRESENCE SCRIPT -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Supabase Realtime Online Device / User Presence Tracking
-        const SUPABASE_URL = "{{ SUPABASE_URL }}";
-        const SUPABASE_KEY = "{{ SUPABASE_KEY }}";
-
-        if (typeof supabase !== 'undefined' && SUPABASE_URL) {
-            const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            const roomOnline = client.channel('dentalink_online_presence', {
-                config: { presence: { key: '{{ profile.id }}' } }
-            });
-
-            roomOnline.on('presence', { event: 'sync' }, () => {
-                const state = roomOnline.presenceState();
-                const userKeys = Object.keys(state);
-                let totalDevices = 0;
-                userKeys.forEach(userId => {
-                    totalDevices += state[userId].length;
-                });
-
-                document.getElementById('onlineCount').innerText = userKeys.length + " Users (" + totalDevices + " Devices)";
-                document.getElementById('onlineSubtext').innerText = "Live tracking via Supabase Realtime";
-            });
-
-            roomOnline.subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await roomOnline.track({
-                        online_at: new Date().toISOString(),
-                        role: '{{ profile.role }}',
-                        name: '{{ profile.display_name }}'
-                    });
-                }
-            });
-        } else {
-            document.getElementById('onlineCount').innerText = "{{ approved_count }} Registered";
-            document.getElementById('onlineSubtext').innerText = "Database records synced";
-        }
-
         function switchStage(event, stageId) {
             document.querySelectorAll('.stage-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.stage-tab-btn').forEach(el => el.classList.remove('active'));

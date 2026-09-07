@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 # Load variables from .env
 load_dotenv()
 
@@ -79,6 +80,16 @@ def admin_dashboard():
         if profile["role"] != "admin" or profile["status"] != "approved":
             return "Access denied.", 403
 
+        # ==========================================
+        # UPDATE ACTIVE SESSION HEARTBEAT
+        # ==========================================
+        from datetime import datetime, timedelta
+        now_iso = datetime.utcnow().isoformat()
+        try:
+            supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
+        except Exception:
+            pass
+
         # Get all users
         all_response = supabase_admin.table("profiles").select("*").order("created_at", desc=True).execute()
         all_users = all_response.data or []
@@ -88,9 +99,21 @@ def admin_dashboard():
         rejected_users = [u for u in all_users if u["status"] == "rejected"]
 
         # ==========================================
+        # ACTIVE USERS ONLINE COUNT (Last 5 mins)
+        # ==========================================
+        five_mins_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+        online_res = (
+            supabase_admin
+            .table("profiles")
+            .select("id", count="exact")
+            .gte("last_seen", five_mins_ago)
+            .execute()
+        )
+        online_count = online_res.count or 0
+
+        # ==========================================
         # LAB PERFORMANCE ANALYTICS METRICS
         # ==========================================
-        from datetime import datetime
         now_str = datetime.now().strftime("%Y-%m-%d")
 
         # 1. Total Completed Cases
@@ -166,7 +189,8 @@ def admin_dashboard():
             unassigned_cases=unassigned_cases,
             technicians=technicians,
             active_cases=active_cases,
-            notifications=notifications
+            notifications=notifications,
+            online_count=online_count
         )
 
     except Exception as e:
