@@ -130,7 +130,7 @@ def admin_dashboard():
         # ==========================================
         restock_res = (
             supabase_admin
-            .table("restock_requests")
+            .table("material_requests")  # <--- Updated table name here
             .select("*, profiles(display_name), dental_cases(case_number)")
             .order("created_at", desc=True)
             .execute()
