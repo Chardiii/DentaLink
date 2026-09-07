@@ -126,6 +126,18 @@ def admin_dashboard():
         online_count = online_res.count or 0
 
         # ==========================================
+        # FETCH RESTOCK REQUESTS
+        # ==========================================
+        restock_res = (
+            supabase_admin
+            .table("restock_requests")
+            .select("*, profiles(display_name), dental_cases(case_number)")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        restock_requests = restock_res.data or []
+
+        # ==========================================
         # LAB PERFORMANCE ANALYTICS METRICS
         # ==========================================
         now_str = datetime.now().strftime("%Y-%m-%d")
@@ -204,12 +216,12 @@ def admin_dashboard():
             technicians=technicians,
             active_cases=active_cases,
             notifications=notifications,
-            online_count=online_count
+            online_count=online_count,
+            restock_requests=restock_requests
         )
 
     except Exception as e:
         return f"Admin dashboard error: {str(e)}", 500
-
 # =========================
 # TECHNICIAN: UPDATE CASE STAGE
 # =========================
