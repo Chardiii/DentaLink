@@ -1047,108 +1047,88 @@ def create_dental_case():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-
     if request.method == "POST":
 
         # =========================
         # GET FORM DATA
         # =========================
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        display_name = request.form.get("display_name", "").strip()
+        phone = request.form.get("phone", "").strip()
 
-        first_name = request.form["first_name"]
-        last_name = request.form["last_name"]
-        display_name = request.form["display_name"]
-        phone = request.form["phone"]
+        role = request.form.get("role", "").strip()
+        professional_id = request.form.get("professional_id", "N/A")
 
-        role = request.form["role"]
-        professional_id = request.form["professional_id"]
-
-        email = request.form["email"]
-        password = request.form["password"]
-        confirm_password = request.form["confirm_password"]
-
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
 
         # =========================
         # VALIDATE PASSWORD
         # =========================
-
         if password != confirm_password:
-
-            return "Passwords do not match."
-
+            flash("Passwords do not match.", "error")
+            return render_template("register.html")
 
         # =========================
         # PREVENT ADMIN REGISTRATION
         # =========================
-
         if role not in ["dentist", "technician"]:
-
-            return "Invalid role."
-
+            flash("Invalid role selected.", "error")
+            return render_template("register.html")
 
         try:
-
             # =========================
             # CREATE SUPABASE AUTH USER
             # =========================
-
             response = supabase.auth.sign_up({
                 "email": email,
                 "password": password
             })
 
-
             if not response.user:
-
-                return "Registration failed."
-
+                flash("Registration failed. Please check your information.", "error")
+                return render_template("register.html")
 
             # =========================
             # GET USER UUID
             # =========================
-
             user_id = response.user.id
-
 
             # =========================
             # CREATE PROFILE
             # =========================
-
             supabase_admin.table("profiles").insert({
-
                 "id": user_id,
-
                 "first_name": first_name,
                 "last_name": last_name,
                 "display_name": display_name,
-
                 "phone": phone,
-
                 "professional_id": professional_id,
-
                 "role": role,
-
                 "status": "pending"
-
             }).execute()
-
 
             # =========================
             # SHOW EMAIL VERIFICATION
             # =========================
-
             return render_template(
                 "verify_email.html",
                 email=email
             )
 
-
         except Exception as e:
+            err_str = str(e)
+            # Catch Postgres unique constraint 23505 or Supabase duplicate user notifications
+            if "23505" in err_str or "already registered" in err_str or "already exists" in err_str:
+                flash("An account with this email address already exists. Please sign in or use a different email.", "error")
+            else:
+                flash("Unable to complete registration. Please verify your details and try again.", "error")
 
-            return f"Registration error: {str(e)}"
-
+            return render_template("register.html")
 
     return render_template("register.html")
-
 
 # =========================
 # LOGIN
@@ -1247,20 +1227,15 @@ def review_user(user_id):
     # =========================
     # CHECK LOGIN
     # =========================
-
     admin_id = session.get("user_id")
 
     if not admin_id:
-
         return redirect(url_for("login"))
 
-
     try:
-
         # =========================
         # GET ADMIN PROFILE
         # =========================
-
         admin_response = (
             supabase_admin
             .table("profiles")
@@ -1271,39 +1246,24 @@ def review_user(user_id):
 
         admin_profiles = admin_response.data or []
 
-
         if not admin_profiles:
-
             session.clear()
-
             return "Admin profile not found.", 404
-
 
         admin_profile = admin_profiles[0]
 
-
         # =========================
-        # CHECK ADMIN ROLE
+        # CHECK ADMIN ROLE & STATUS
         # =========================
-
         if admin_profile["role"] != "admin":
-
             return "Access denied.", 403
 
-
-        # =========================
-        # CHECK ADMIN APPROVAL
-        # =========================
-
         if admin_profile["status"] != "approved":
-
             return "Administrator account is not approved.", 403
 
-
         # =========================
-        # GET USER APPLICATION
+        # GET USER APPLICATION PROFILE
         # =========================
-
         user_response = (
             supabase_admin
             .table("profiles")
@@ -1314,37 +1274,39 @@ def review_user(user_id):
 
         users = user_response.data or []
 
-
         if not users:
-
             return "User application not found.", 404
-
 
         user = users[0]
 
+        # =========================
+        # CHECK SUPABASE AUTH EMAIL CONFIRMATION
+        # =========================
+        auth_user_response = supabase_admin.auth.admin.get_user_by_id(user_id)
+        auth_user = getattr(auth_user_response, "user", None)
+        
+        # Check if email_confirmed_at exists and is populated
+        email_verified = False
+        if auth_user and getattr(auth_user, "email_confirmed_at", None):
+            email_verified = True
 
         # =========================
         # ONLY ALLOW PENDING
         # OR REJECTED USERS
         # =========================
-
         if user["status"] not in ["pending", "rejected"]:
-
             return "This application cannot be reviewed.", 400
-
 
         # =========================
         # SHOW REVIEW PAGE
         # =========================
-
         return render_template(
             "admin_review.html",
-            user=user
+            user=user,
+            email_verified=email_verified
         )
 
-
     except Exception as e:
-
         return f"Review application error: {str(e)}", 500
 
 # =========================
