@@ -35,6 +35,20 @@ supabase_admin: Client = create_client(
     SUPABASE_SERVICE_ROLE_KEY
 )
 
+@app.before_request
+def update_user_activity():
+    user_id = session.get("user_id")
+    if user_id:
+        # Only update once every minute to prevent spamming database queries on every click
+        last_update = session.get("last_activity_update")
+        now = datetime.utcnow()
+        
+        if not last_update or (now - datetime.fromisoformat(last_update)) > timedelta(minutes=1):
+            try:
+                supabase_admin.table("profiles").update({"last_seen": now.isoformat()}).eq("id", user_id).execute()
+                session["last_activity_update"] = now.isoformat()
+            except Exception:
+                pass
 # =========================
 # HOME PAGE
 # =========================
@@ -1213,6 +1227,15 @@ def login():
             if profile["status"] != "approved":
                 flash("Your account is not yet approved by the administrator.", "error")
                 return render_template("login.html")
+
+            # =========================
+            # UPDATE LAST SEEN TIMESTAMP
+            # =========================
+            try:
+                from datetime import datetime
+                supabase_admin.table("profiles").update({"last_seen": datetime.utcnow().isoformat()}).eq("id", user_id).execute()
+            except Exception:
+                pass
 
             # =========================
             # REDIRECT BY ROLE
