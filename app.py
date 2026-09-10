@@ -5,6 +5,9 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
+import urllib.request
+import json
+import threading
 # Load variables from .env
 load_dotenv()
 
@@ -36,7 +39,48 @@ supabase_admin: Client = create_client(
     SUPABASE_SERVICE_ROLE_KEY
 )
 
+def send_email_in_background(recipient_email, user_name, action_type):
+    try:
+        api_key = os.getenv("BREVO_SMTP_PASS") 
+        sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+        app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
 
+        if not api_key or not recipient_email:
+            print("⚠️ Brevo API key or recipient email missing.")
+            return
+
+        is_approved = (action_type == "approved")
+        subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
+        template_file = "email_approved.html" if is_approved else "email_rejected.html"
+
+        with app.app_context():
+            html_content = render_template(template_file, full_name=user_name, app_url=app_url)
+
+        payload = {
+            "sender": {"name": "DentaLink LIS", "email": sender_email},
+            "to": [{"email": recipient_email, "name": user_name}],
+            "subject": subject,
+            "htmlContent": html_content
+        }
+
+        req = urllib.request.Request(
+            "https://api.brevo.com/v3/smtp/email",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "accept": "application/json",
+                "api-key": api_key,
+                "content-type": "application/json"
+            },
+            method="POST"
+        )
+
+        print(f"📧 [Background] Sending email via Brevo HTTP API to {recipient_email}...")
+        with urllib.request.urlopen(req) as response:
+            res_body = json.loads(response.read().decode("utf-8"))
+            print(f"✅ [Background] Email successfully sent! Message ID: {res_body.get('messageId')}")
+
+    except Exception as err:
+        print(f"❌ [Background] Brevo HTTP API error: {str(err)}")
 
 
 @app.before_request
