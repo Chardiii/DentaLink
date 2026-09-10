@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import threading
 # Load variables from .env
 load_dotenv()
 
@@ -38,6 +39,48 @@ supabase_admin: Client = create_client(
     SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY
 )
+def send_email_in_background(recipient_email, user_name, action_type):
+    """
+    Helper to send emails asynchronously in a background thread
+    so it never blocks or causes Gunicorn worker timeouts.
+    """
+    try:
+        smtp_host = "smtp-relay.brevo.com"
+        smtp_port = 587
+        smtp_user = "b5b7a3001@smtp-brevo.com"
+        smtp_pass = os.getenv("BREVO_SMTP_PASS")
+        sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+        app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
+
+        if not smtp_pass or not recipient_email:
+            print("⚠️ Brevo SMTP password or recipient email missing.")
+            return
+
+        is_approved = (action_type == "approved")
+        subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
+
+        template_file = "email_approved.html" if is_approved else "email_rejected.html"
+
+        # Note: render_template requires an active Flask app context if called outside requests
+        with app.app_context():
+            html_content = render_template(template_file, full_name=user_name, app_url=app_url)
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"DentaLink <{sender_email}>"
+        msg["To"] = recipient_email
+        msg.attach(MIMEText(html_content, "html"))
+
+        print(f"📧 [Background] Connecting to Brevo SMTP for {recipient_email}...")
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+        print(f"✅ [Background] Email successfully dispatched to {recipient_email}")
+
+    except Exception as err:
+        print(f"❌ [Background] Email dispatch failed: {str(err)}")
+
 def send_brevo_status_email(to_email, full_name, action_type):
     smtp_host = "smtp-relay.brevo.com"
     smtp_port = 587
@@ -791,119 +834,89 @@ def admin_finalize_case(case_id):
     except Exception as e:
         return f"Finalize case error: {str(e)}", 500
 
+import threading
+
+def send_email_in_background(recipient_email, user_name, action_type):
+    """
+    Helper to send emails asynchronously in a background thread
+    so it never blocks or causes Gunicorn worker timeouts.
+    """
+    try:
+        smtp_host = "smtp-relay.brevo.com"
+        smtp_port = 587
+        smtp_user = "b5b7a3001@smtp-brevo.com"
+        smtp_pass = os.getenv("BREVO_SMTP_PASS")
+        sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+        app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
+
+        if not smtp_pass or not recipient_email:
+            print("⚠️ Brevo SMTP password or recipient email missing.")
+            return
+
+        is_approved = (action_type == "approved")
+        subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
+
+        template_file = "email_approved.html" if is_approved else "email_rejected.html"
+
+        # Note: render_template requires an active Flask app context if called outside requests
+        with app.app_context():
+            html_content = render_template(template_file, full_name=user_name, app_url=app_url)
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"DentaLink <{sender_email}>"
+        msg["To"] = recipient_email
+        msg.attach(MIMEText(html_content, "html"))
+
+        print(f"📧 [Background] Connecting to Brevo SMTP for {recipient_email}...")
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+        print(f"✅ [Background] Email successfully dispatched to {recipient_email}")
+
+    except Exception as err:
+        print(f"❌ [Background] Email dispatch failed: {str(err)}")
+
+
 @app.route("/admin/users/<user_id>/approve", methods=["POST"])
 def approve_user(user_id):
-
-    # =========================
-    # CHECK LOGIN
-    # =========================
     admin_id = session.get("user_id")
     if not admin_id:
         return redirect(url_for("login"))
 
     try:
-        # =========================
-        # GET CURRENT ADMIN PROFILE
-        # =========================
-        admin_response = (
-            supabase_admin
-            .table("profiles")
-            .select("id, role, status")
-            .eq("id", admin_id)
-            .execute()
-        )
+        admin_response = supabase_admin.table("profiles").select("id, role, status").eq("id", admin_id).execute()
         admin_profiles = admin_response.data or []
-
-        if not admin_profiles:
-            session.clear()
-            return "Admin profile not found.", 404
-
-        admin_profile = admin_profiles[0]
-
-        # =========================
-        # VERIFY ADMIN
-        # =========================
-        if admin_profile["role"] != "admin":
+        if not admin_profiles or admin_profiles[0]["role"] != "admin" or admin_profiles[0]["status"] != "approved":
             return "Access denied.", 403
 
-        if admin_profile["status"] != "approved":
-            return "Administrator account is not approved.", 403
-
-        # =========================
-        # GET USER
-        # =========================
-        user_response = (
-            supabase_admin
-            .table("profiles")
-            .select("id, role, status, display_name, first_name")
-            .eq("id", user_id)
-            .execute()
-        )
+        user_response = supabase_admin.table("profiles").select("id, role, status, display_name, first_name").eq("id", user_id).execute()
         users = user_response.data or []
-
         if not users:
             return "User not found.", 404
 
         user = users[0]
-
-        # =========================
-        # PREVENT APPROVING ADMIN
-        # =========================
         if user["role"] == "admin":
             return "Admin accounts cannot be approved here.", 403
 
-        # =========================
-        # APPROVE USER
-        # =========================
-        supabase_admin \
-            .table("profiles") \
-            .update({
-                "status": "approved"
-            }) \
-            .eq("id", user_id) \
-            .execute()
+        # Update status in database
+        supabase_admin.table("profiles").update({"status": "approved"}).eq("id", user_id).execute()
 
-        # =========================
-        # SEND APPROVAL EMAIL VIA BREVO SMTP (WITH DEBUGGING)
-        # =========================
+        # Fire email asynchronously in background thread so Gunicorn doesn't timeout
         try:
             auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
             if auth_user_res and getattr(auth_user_res, "user", None):
                 recipient_email = auth_user_res.user.email
                 user_name = user.get("display_name") or user.get("first_name") or "Colleague"
 
-                smtp_host = "smtp-relay.brevo.com"
-                smtp_port = 587
-                smtp_user = "b5b7a3001@smtp-brevo.com"
-                smtp_pass = os.getenv("BREVO_SMTP_PASS")
-                sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-                app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
-
-                print(f"📧 Attempting to send approval email to: {recipient_email} using sender: {sender_email}")
-
-                if not smtp_pass:
-                    print("❌ ERROR: BREVO_SMTP_PASS environment variable is missing or empty on Railway!")
-                elif not recipient_email:
-                    print("❌ ERROR: Recipient email address could not be retrieved from auth.users!")
-                else:
-                    subject = "✅ Welcome to DentaLink LIS - Account Approved"
-                    html_content = render_template("email_approved.html", full_name=user_name, app_url=app_url)
-
-                    msg = MIMEMultipart("alternative")
-                    msg["Subject"] = subject
-                    msg["From"] = f"DentaLink <{sender_email}>"
-                    msg["To"] = recipient_email
-                    msg.attach(MIMEText(html_content, "html"))
-
-                    with smtplib.SMTP(smtp_host, smtp_port) as server:
-                        server.starttls()
-                        server.login(smtp_user, smtp_pass)
-                        server.sendmail(sender_email, recipient_email, msg.as_string())
-                    print(f"✅ Successfully dispatched approval email to {recipient_email}")
-            else:
-                print("❌ ERROR: Could not find user object in auth.users for this ID.")
+                email_thread = threading.Thread(
+                    target=send_email_in_background,
+                    args=(recipient_email, user_name, "approved")
+                )
+                email_thread.start()
         except Exception as mail_err:
-            print(f"❌ CRITICAL EMAIL ERROR in approve_user: {str(mail_err)}")
+            print(f"Failed to start approval email thread: {str(mail_err)}")
 
         return redirect(url_for("admin_dashboard"))
 
@@ -913,122 +926,47 @@ def approve_user(user_id):
 
 @app.route("/admin/users/<user_id>/reject", methods=["POST"])
 def reject_user(user_id):
-
-    # =========================
-    # CHECK LOGIN
-    # =========================
     admin_id = session.get("user_id")
     if not admin_id:
         return redirect(url_for("login"))
 
     try:
-        # =========================
-        # GET CURRENT ADMIN PROFILE
-        # =========================
-        admin_response = (
-            supabase_admin
-            .table("profiles")
-            .select("id, role, status")
-            .eq("id", admin_id)
-            .execute()
-        )
+        admin_response = supabase_admin.table("profiles").select("id, role, status").eq("id", admin_id).execute()
         admin_profiles = admin_response.data or []
-
-        if not admin_profiles:
-            session.clear()
-            return "Admin profile not found.", 404
-
-        admin_profile = admin_profiles[0]
-
-        # =========================
-        # VERIFY ADMIN
-        # =========================
-        if admin_profile["role"] != "admin":
+        if not admin_profiles or admin_profiles[0]["role"] != "admin" or admin_profiles[0]["status"] != "approved":
             return "Access denied.", 403
 
-        if admin_profile["status"] != "approved":
-            return "Administrator account is not approved.", 403
-
-        # =========================
-        # GET USER
-        # =========================
-        user_response = (
-            supabase_admin
-            .table("profiles")
-            .select("id, role, status, display_name, first_name")
-            .eq("id", user_id)
-            .execute()
-        )
+        user_response = supabase_admin.table("profiles").select("id, role, status, display_name, first_name").eq("id", user_id).execute()
         users = user_response.data or []
-
         if not users:
             return "User not found.", 404
 
         user = users[0]
-
-        # =========================
-        # PREVENT REJECTING ADMIN
-        # =========================
         if user["role"] == "admin":
             return "Admin accounts cannot be rejected here.", 403
 
-        # =========================
-        # REJECT USER
-        # =========================
-        supabase_admin \
-            .table("profiles") \
-            .update({
-                "status": "rejected"
-            }) \
-            .eq("id", user_id) \
-            .execute()
+        # Update status in database
+        supabase_admin.table("profiles").update({"status": "rejected"}).eq("id", user_id).execute()
 
-        # =========================
-        # SEND REJECTION EMAIL VIA BREVO SMTP (WITH DEBUGGING)
-        # =========================
+        # Fire email asynchronously in background thread
         try:
             auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
             if auth_user_res and getattr(auth_user_res, "user", None):
                 recipient_email = auth_user_res.user.email
                 user_name = user.get("display_name") or user.get("first_name") or "Colleague"
 
-                smtp_host = "smtp-relay.brevo.com"
-                smtp_port = 587
-                smtp_user = "b5b7a3001@smtp-brevo.com"
-                smtp_pass = os.getenv("BREVO_SMTP_PASS")
-                sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-
-                print(f"📧 Attempting to send rejection email to: {recipient_email} using sender: {sender_email}")
-
-                if not smtp_pass:
-                    print("❌ ERROR: BREVO_SMTP_PASS environment variable is missing or empty on Railway!")
-                elif not recipient_email:
-                    print("❌ ERROR: Recipient email address could not be retrieved from auth.users!")
-                else:
-                    subject = "Notice Regarding Your DentaLink LIS Account Application"
-                    html_content = render_template("email_rejected.html", full_name=user_name)
-
-                    msg = MIMEMultipart("alternative")
-                    msg["Subject"] = subject
-                    msg["From"] = f"DentaLink <{sender_email}>"
-                    msg["To"] = recipient_email
-                    msg.attach(MIMEText(html_content, "html"))
-
-                    with smtplib.SMTP(smtp_host, smtp_port) as server:
-                        server.starttls()
-                        server.login(smtp_user, smtp_pass)
-                        server.sendmail(sender_email, recipient_email, msg.as_string())
-                    print(f"✅ Successfully dispatched rejection email to {recipient_email}")
-            else:
-                print("❌ ERROR: Could not find user object in auth.users for this ID.")
+                email_thread = threading.Thread(
+                    target=send_email_in_background,
+                    args=(recipient_email, user_name, "rejected")
+                )
+                email_thread.start()
         except Exception as mail_err:
-            print(f"❌ CRITICAL EMAIL ERROR in reject_user: {str(mail_err)}")
+            print(f"Failed to start rejection email thread: {str(mail_err)}")
 
         return redirect(url_for("admin_dashboard"))
 
     except Exception as e:
         return f"Rejection error: {str(e)}", 500
-
 # =========================
 # DENTIST DASHBOARD
 # =========================
