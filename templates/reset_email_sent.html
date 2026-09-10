@@ -1,36 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Reset Email Sent - DentaLink</title>
-
+    <title>Reset Email Sent - DentaLink LIS</title>
 </head>
+<body style="margin: 0; padding: 0; background-color: #0B101E; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #F3F4F6; display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+    
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0B101E; padding: 40px 0;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #151C2C; border: 1px solid #243048; border-radius: 12px; max-width: 440px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #101626; padding: 24px 28px; border-bottom: 1px solid #243048; text-align: center;">
+                            <h1 style="font-size: 18px; font-weight: 700; color: #F3F4F6; margin: 0; letter-spacing: 0.5px;">DentaLink <span style="color: #42DDF2; font-size: 11px; font-weight: 600; background: rgba(66,221,242,0.1); padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(66,221,242,0.2);">LIS v2.0</span></h1>
+                            <p style="color: #8E9BAE; font-size: 12px; margin: 5px 0 0 0;">Laboratory Information System</p>
+                        </td>
+                    </tr>
 
-<body>
+                    <!-- Body Content -->
+                    <tr>
+                        <td style="padding: 32px 28px; text-align: center;">
+                            
+                            <!-- Status Badge -->
+                            <div style="display: inline-block; background-color: rgba(66, 221, 242, 0.1); color: #42DDF2; border: 1px solid rgba(66, 221, 242, 0.3); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 6px; margin-bottom: 16px;">
+                                Instructions Sent
+                            </div>
 
-    <h1>DentaLink</h1>
+                            <h2 style="color: #F3F4F6; font-size: 20px; font-weight: 700; margin-top: 0; margin-bottom: 16px;">Check Your Email</h2>
+                            
+                            <p style="font-size: 14px; line-height: 1.6; color: #C5CEE0; margin-top: 0; margin-bottom: 16px;">
+                                If the email address is registered, a password reset link has been sent.
+                            </p>
+                            
+                            <p style="font-size: 13px; line-height: 1.6; color: #8E9BAE; margin-top: 0; margin-bottom: 24px;">
+                                Check your inbox and follow the link to create a new password.
+                            </p>
 
-    <h2>Check Your Email</h2>
+                            <!-- Back to Login Link Button -->
+                            <div style="margin-top: 8px;">
+                                <a href="{{ url_for('login') }}" style="background-color: #42DDF2; color: #0B101E; text-decoration: none; font-size: 13px; font-weight: 700; padding: 12px 24px; border-radius: 8px; border: 1px solid #42DDF2; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    &larr; Back to Login
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
 
-    <p>
-        If the email address is registered, a password reset
-        link has been sent.
-    </p>
-
-    <p>
-        Check your inbox and follow the link to create a new password.
-    </p>
-
-    <br>
-
-    <a href="{{ url_for('login') }}">
-        Back to Login
-    </a>
+                    <!-- Footer Info -->
+                    <tr>
+                        <td style="background-color: #0E1424; padding: 16px 28px; border-top: 1px solid #243048; text-align: center;">
+                            <p style="margin: 0; font-size: 11px; color: #8E9BAE;">
+                                &copy; 2026 Mrkzter Dental Laboratory. All Rights Reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 
 </body>
-
 </html>
