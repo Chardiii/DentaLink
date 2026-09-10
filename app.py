@@ -904,7 +904,6 @@ def reject_user(user_id):
 
 @app.route("/dentist")
 def dentist_dashboard():
-
     # =========================
     # 1. CHECK LOGIN
     # =========================
@@ -953,7 +952,6 @@ def dentist_dashboard():
         # =========================
         # 3. UPDATE USER HEARTBEAT
         # =========================
-        from datetime import datetime
         now_iso = datetime.utcnow().isoformat()
         try:
             supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
@@ -961,12 +959,12 @@ def dentist_dashboard():
             pass
 
         # =========================
-        # 4. GET DENTIST CASES (WITH TECH DISPLAY NAME)
+        # 4. GET DENTIST CASES (SAFE QUERY)
         # =========================
         cases_response = (
             supabase_admin
             .table("dental_cases")
-            .select("*, profiles!dental_cases_technician_id_fkey(display_name)")
+            .select("*")
             .eq("dentist_id", user_id)
             .order("created_at", desc=True)
             .execute()
@@ -1050,6 +1048,8 @@ def dentist_dashboard():
         )
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # Prints the exact error file and line to Railway logs
         return f"Dentist dashboard error: {str(e)}", 500
 
 @app.route("/dentist/cases/new", methods=["GET", "POST"])
