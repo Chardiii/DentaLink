@@ -756,51 +756,6 @@ def admin_finalize_case(case_id):
     except Exception as e:
         return f"Finalize case error: {str(e)}", 500
 
-import threading
-
-def send_email_in_background(recipient_email, user_name, action_type):
-    """
-    Helper to send emails asynchronously in a background thread
-    so it never blocks or causes Gunicorn worker timeouts.
-    """
-    try:
-        smtp_host = "smtp-relay.brevo.com"
-        smtp_port = 587
-        smtp_user = "b5b7a3001@smtp-brevo.com"
-        smtp_pass = os.getenv("BREVO_SMTP_PASS")
-        sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-        app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
-
-        if not smtp_pass or not recipient_email:
-            print("⚠️ Brevo SMTP password or recipient email missing.")
-            return
-
-        is_approved = (action_type == "approved")
-        subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
-
-        template_file = "email_approved.html" if is_approved else "email_rejected.html"
-
-        # Note: render_template requires an active Flask app context if called outside requests
-        with app.app_context():
-            html_content = render_template(template_file, full_name=user_name, app_url=app_url)
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"DentaLink <{sender_email}>"
-        msg["To"] = recipient_email
-        msg.attach(MIMEText(html_content, "html"))
-
-        print(f"📧 [Background] Connecting to Brevo SMTP for {recipient_email}...")
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(sender_email, recipient_email, msg.as_string())
-        print(f"✅ [Background] Email successfully dispatched to {recipient_email}")
-
-    except Exception as err:
-        print(f"❌ [Background] Email dispatch failed: {str(err)}")
-
-
 @app.route("/admin/users/<user_id>/approve", methods=["POST"])
 def approve_user(user_id):
     admin_id = session.get("user_id")
