@@ -6,19 +6,19 @@
     <title>Review Application: {{ user.display_name }} - DentaLink LIS</title>
     <style>
         :root {
-            --bg-main: #0B101E;
-            --bg-card: #151C2C;
-            --bg-input: #0E1424;
-            --border-color: #243048;
-            --border-focus: #42DDF2;
-            --text-main: #F3F4F6;
-            --text-muted: #8E9BAE;
-            --accent-cyan: #42DDF2;
-            --accent-cyan-hover: #2bbacb;
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --border-color: #E2E8F0;
+            --border-focus: #0284C7;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
             --accent-green: #10B981;
-            --accent-yellow: #F59E0B;
+            --accent-yellow: #D97706;
             --accent-red: #EF4444;
-            --panel-header: #101626;
+            --panel-header: #F0F9FF;
         }
 
         * { box-sizing: border-box; }
@@ -30,10 +30,12 @@
             margin: 0;
             padding: 40px 20px;
             line-height: 1.5;
-            color-scheme: dark;
+            color-scheme: light;
             background-image: 
-                radial-gradient(circle at 10% 10%, rgba(66, 221, 242, 0.07) 0%, transparent 45%),
-                radial-gradient(circle at 90% 90%, rgba(29, 66, 138, 0.12) 0%, transparent 45%);
+                radial-gradient(circle at 15% 15%, rgba(2, 132, 199, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
             background-attachment: fixed;
             min-height: 100vh;
             display: flex;
@@ -56,11 +58,12 @@
             margin: 0 0 4px 0;
             font-size: 22px;
             font-weight: 700;
+            color: #0F172A;
         }
 
         .brand-header p {
             margin: 0;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--accent-cyan);
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -70,9 +73,9 @@
         .panel {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 30px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
             margin-bottom: 20px;
         }
 
@@ -89,7 +92,7 @@
             margin: 0;
             font-size: 16px;
             font-weight: 700;
-            color: var(--text-main);
+            color: #0F172A;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -122,7 +125,7 @@
         .info-value {
             font-size: 14px;
             font-weight: 600;
-            color: var(--text-main);
+            color: #0F172A;
         }
 
         .pill {
@@ -136,18 +139,18 @@
             text-transform: uppercase;
         }
 
-        .pill-green { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
-        .pill-yellow { background: rgba(245, 158, 11, 0.12); color: var(--accent-yellow); border: 1px solid rgba(245, 158, 11, 0.3); }
-        .pill-red { background: rgba(239, 68, 68, 0.12); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .pill-green { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.25); }
+        .pill-yellow { background: rgba(217, 119, 6, 0.1); color: var(--accent-yellow); border: 1px solid rgba(217, 119, 6, 0.25); }
+        .pill-red { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.25); }
 
         .warning-banner {
-            background: rgba(245, 158, 11, 0.08);
-            border: 1px solid rgba(245, 158, 11, 0.3);
+            background: rgba(217, 119, 6, 0.08);
+            border: 1px solid rgba(217, 119, 6, 0.25);
             border-radius: 8px;
             padding: 14px 16px;
             margin-bottom: 20px;
             font-size: 12.5px;
-            color: var(--text-main);
+            color: #334155;
             display: flex;
             align-items: flex-start;
             gap: 10px;
@@ -177,15 +180,18 @@
             gap: 6px;
         }
 
-        .btn-green { background-color: var(--accent-green); color: #0B101E; }
+        .btn-green { background-color: var(--accent-green); color: #FFFFFF; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
         .btn-green:hover { background-color: #059669; }
-        .btn-green:disabled { background: rgba(16, 185, 129, 0.2); color: rgba(243, 244, 246, 0.4); cursor: not-allowed; }
+        .btn-green:disabled { background: #E2E8F0; color: #94A3B8; cursor: not-allowed; box-shadow: none; }
 
-        .btn-red { background-color: var(--accent-red); color: white; }
+        .btn-red { background-color: var(--accent-red); color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2); }
         .btn-red:hover { background-color: #dc2626; }
 
-        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
-        .btn-outline:hover { color: var(--text-main); border-color: var(--text-muted); }
+        .btn-cyan { background-color: var(--accent-cyan); color: white; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+
+        .btn-outline { background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-outline:hover { color: #0F172A; border-color: var(--text-muted); background: #F8FAFC; }
 
         .page-footer {
             margin-top: 24px;

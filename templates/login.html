@@ -6,25 +6,25 @@
     <title>Login - DentaLink LIS</title>
     <style>
         :root {
-            --bg-main: #0B101E;
-            --bg-card: #161B28;
-            --bg-input: #0B101E;
-            --accent-cyan: #42DDF2;
-            --accent-cyan-hover: #2bbacb;
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
             --accent-red: #EF4444;
-            --text-main: #F3F4F6;
-            --text-muted: #8E9BAE;
-            --border-color: #262F44;
-            --border-focus: #42DDF2;
-            --panel-header: #131825;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+            --border-focus: #0284C7;
+            --panel-header: #E0F2FE;
         }
 
         body {
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-main);
             background-image: 
-                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+                radial-gradient(circle at 15% 15%, rgba(2, 132, 199, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
             background-repeat: no-repeat;
             background-size: cover;
             color: var(--text-main);
@@ -46,14 +46,14 @@
             border-radius: 16px;
             width: 100%;
             max-width: 860px;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
             overflow: hidden;
         }
 
         /* Left Branding Panel */
         .brand-panel {
             flex: 1;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%);
             border-right: 1px solid var(--border-color);
             padding: 50px 40px;
             display: flex;
@@ -70,7 +70,8 @@
             border-radius: 12px;
             display: inline-block;
             margin-bottom: 25px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.1);
+            border: 1px solid rgba(2, 132, 199, 0.15);
         }
 
         .mrkzter-logo {
@@ -83,7 +84,7 @@
             font-size: 26px;
             font-weight: 800;
             margin: 0 0 6px 0;
-            color: var(--text-main);
+            color: #0F172A;
             letter-spacing: -0.5px;
         }
 
@@ -105,8 +106,8 @@
 
         .brand-badge {
             margin-top: 35px;
-            background: rgba(66, 221, 242, 0.08);
-            border: 1px solid rgba(66, 221, 242, 0.2);
+            background: #FFFFFF;
+            border: 1px solid rgba(2, 132, 199, 0.25);
             padding: 8px 16px;
             border-radius: 20px;
             font-size: 11px;
@@ -114,6 +115,7 @@
             color: var(--accent-cyan);
             letter-spacing: 0.5px;
             text-transform: uppercase;
+            box-shadow: 0 2px 6px rgba(2, 132, 199, 0.05);
         }
 
         /* Right Form Panel */
@@ -123,13 +125,14 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+            background-color: var(--bg-card);
         }
 
         .form-panel h2 {
             margin: 0 0 6px 0;
             font-size: 22px;
             font-weight: 700;
-            color: var(--text-main);
+            color: #0F172A;
         }
 
         .form-panel p.form-desc {
@@ -148,7 +151,7 @@
             margin-bottom: 8px;
             font-weight: 700;
             font-size: 11px;
-            color: var(--text-main);
+            color: #475569;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -195,13 +198,14 @@
         }
 
         .form-group input::placeholder {
-            color: #4B5563;
+            color: #94A3B8;
         }
 
         .form-group input:focus {
             outline: none;
             border-color: var(--border-focus);
-            box-shadow: 0 0 0 1px var(--border-focus);
+            background-color: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
         }
 
         .form-group input:focus + .input-icon-left {
@@ -234,7 +238,7 @@
         .login-btn {
             width: 100%;
             background-color: var(--accent-cyan);
-            color: #0B101E;
+            color: #FFFFFF;
             padding: 13px;
             border: none;
             border-radius: 8px;
@@ -247,6 +251,7 @@
             align-items: center;
             gap: 8px;
             margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
         }
 
         .login-btn:hover {
@@ -314,9 +319,9 @@
         .error-modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(11, 16, 30, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 1000;
             display: flex;
             justify-content: center;
@@ -329,11 +334,11 @@
         
         .error-modal-container {
             background-color: var(--bg-card);
-            border: 1px solid var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
             border-radius: 12px;
             width: 100%;
             max-width: 400px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
             animation: slideUp 0.3s ease-out forwards;
             display: flex;
             flex-direction: column;
@@ -343,7 +348,7 @@
         }
         .error-icon-box {
             width: 50px; height: 50px;
-            background: rgba(239, 68, 68, 0.12);
+            background: rgba(239, 68, 68, 0.1);
             color: var(--accent-red);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
@@ -352,7 +357,7 @@
         .error-modal-title {
             margin: 0 0 10px 0;
             font-size: 18px;
-            color: var(--text-main);
+            color: #0F172A;
             font-weight: 700;
         }
         .error-modal-message {
@@ -363,7 +368,7 @@
         }
         .error-modal-btn {
             background-color: var(--accent-cyan);
-            color: var(--bg-main);
+            color: #FFFFFF;
             padding: 11px 20px;
             border: none;
             border-radius: 6px;
@@ -490,7 +495,6 @@
     </div>
 
     <script>
-        // Toggle Password Visibility
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
 
