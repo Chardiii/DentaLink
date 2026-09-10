@@ -511,7 +511,7 @@
                             <th>Supplier</th>
                             <th>Unit Cost</th>
                             <th>Quantity</th>
-                            <th>Status</th>
+                            <th>Status & Forecast</th>
                             <th>Quick Stock Adjust</th>
                         </tr>
                     </thead>
@@ -524,11 +524,23 @@
                                 <td>₱{{ "%.2f"|format(item.unit_cost or 0.00) }}</td>
                                 <td><strong style="font-size: 14px;">{{ item.quantity }}</strong> <span style="font-size: 11px; color: var(--text-muted);">{{ item.unit }}</span></td>
                                 <td>
-                                    {% if item.quantity <= item.minimum_threshold %}
-                                        <span class="low-stock">⚠️ Low Stock (≤{{ item.minimum_threshold }})</span>
-                                    {% else %}
-                                        <span class="normal-stock">In Stock</span>
-                                    {% endif %}
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        {% if item.quantity <= item.minimum_threshold %}
+                                            <span class="low-stock">⚠️ Low Stock (≤{{ item.minimum_threshold }})</span>
+                                        {% else %}
+                                            <span class="normal-stock">In Stock</span>
+                                        {% endif %}
+                                        
+                                        <!-- ML FORECAST INJECTION -->
+                                        {% set pred = pred_map.get(item.id) %}
+                                        {% if pred %}
+                                            <span style="font-size: 11px; color: var(--accent-cyan); font-weight: 600;">
+                                                ⏳ ~{{ pred.estimated_days_left }} days left <small style="color: var(--text-muted);">({{ pred.projected_stockout_date }})</small>
+                                            </span>
+                                        {% else %}
+                                            <span style="font-size: 11px; color: var(--text-muted);">No usage logs yet</span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                                 <td>
                                     <form method="POST" action="/admin/inventory/update/{{ item.id }}" style="display: flex; gap: 6px; align-items: center; margin:0;">

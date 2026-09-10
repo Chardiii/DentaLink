@@ -5,6 +5,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
+from ml_models.forecaster import InventoryForecaster
 
 # Load variables from .env
 load_dotenv()
@@ -2396,6 +2397,25 @@ def admin_inventory():
         inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
         inventory_items = inv_res.data or []
 
+        # ==========================================
+        # MACHINE LEARNING FORECASTER INTEGRATION (Idea C)
+        # ==========================================
+        try:
+            # Fetch historical audit/usage logs from Supabase
+            logs_res = supabase_admin.table("inventory_logs").select("*").execute()
+            historical_logs = logs_res.data or []
+        except Exception:
+            historical_logs = []
+
+        # Run the forecaster class
+        from ml_models.forecaster import InventoryForecaster
+        forecaster = InventoryForecaster(inventory_items, historical_logs)
+        predictions = forecaster.predict_stockouts()
+        
+        # Build a quick lookup dictionary: { item_id: prediction_dict }
+        pred_map = {p['item_id']: p for p in predictions}
+        # ==========================================
+
         # 4. Fetch notifications for layout consistency
         notif_res = (
             supabase_admin
@@ -2489,6 +2509,7 @@ def admin_inventory():
             "admin_inventory.html",
             profile=profile,
             inventory=inventory_items,
+            pred_map=pred_map,  # Passed to HTML for forecasting UI display
             notifications=notifications,
             restock_requests=restock_requests,
             unassigned_cases=unassigned_cases,
@@ -2616,6 +2637,37 @@ def update_inventory_stock(item_id):
 
     except Exception as e:
         return f"Stock update error: {str(e)}", 500
+
+
+# =========================
+# MACHINE LEARNING
+# =========================
+@app.route('/admin/inventory/forecast')
+def inventory_forecast():
+    # 1. Fetch your actual inventory items and logs from your database
+    # (Adjust query according to your SQLAlchemy models, e.g., Inventory.query.all())
+    inventory_items = [
+        {"id": item.id, "item_name": item.item_name, "quantity": item.quantity} 
+        for item in Inventory.query.all()
+    ]
+    
+    historical_logs = [
+        {
+            "inventory_id": log.inventory_id, 
+            "quantity_changed": log.quantity_changed, 
+            "created_at": log.created_at
+        } 
+        for log in InventoryLog.query.all()
+    ]
+
+    # 2. Run the forecaster class we just created
+    forecaster = InventoryForecaster(inventory_items, historical_logs)
+    predictions = forecaster.predict_stockouts()
+
+    # 3. Pass predictions to your admin inventory HTML page
+    return render_template('admin_inventory.html', predictions=predictions, inventory=Inventory.query.all(), profile=...)
+
+
 # =========================
 # START FLASK
 # =========================
