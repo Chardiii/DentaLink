@@ -5,12 +5,6 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import threading
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
 # Load variables from .env
 load_dotenv()
 
@@ -41,88 +35,9 @@ supabase_admin: Client = create_client(
     SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY
 )
-def send_email_in_background(recipient_email, user_name, action_type):
-    """
-    Sends account status emails securely via Brevo's HTTP API 
-    (bypassing SMTP port blocks on cloud hosts like Railway).
-    """
-    try:
-        api_key = os.getenv("BREVO_SMTP_PASS") # Your Brevo master API key / SMTP key works here too
-        sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-        app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
 
-        if not api_key or not recipient_email:
-            print("⚠️ Brevo API key or recipient email missing.")
-            return
 
-        is_approved = (action_type == "approved")
-        subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
-        template_file = "email_approved.html" if is_approved else "email_rejected.html"
 
-        # Render HTML template inside Flask app context
-        with app.app_context():
-            html_content = render_template(template_file, full_name=user_name, app_url=app_url)
-
-        # Configure Brevo API client
-        configuration = sib_api_v3_sdk.Configuration()
-        configuration.api_key['api-key'] = api_key
-
-        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-        
-        sender = {"name": "DentaLink LIS", "email": sender_email}
-        to = [{"email": recipient_email, "name": user_name}]
-        
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            sender=sender,
-            to=to,
-            subject=subject,
-            html_content=html_content
-        )
-
-        print(f"📧 [Background] Sending email via Brevo API to {recipient_email}...")
-        api_response = api_instance.send_transac_email(send_smtp_email)
-        print(f"✅ [Background] Email successfully sent via API! Message ID: {api_response.message_id}")
-
-    except ApiException as e:
-        print(f"❌ [Background] Brevo API error: {str(e)}")
-    except Exception as err:
-        print(f"❌ [Background] Unexpected error sending email: {str(err)}")
-
-def send_brevo_status_email(to_email, full_name, action_type):
-    smtp_host = "smtp-relay.brevo.com"
-    smtp_port = 587
-    smtp_user = "b5b7a3001@smtp-brevo.com"
-    smtp_pass = os.getenv("BREVO_SMTP_PASS")
-    sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-    app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/") # Strips trailing slash to prevent double slashes
-
-    if not smtp_pass or not to_email:
-        print("⚠️ Brevo SMTP password or recipient email missing. Skipping notification.")
-        return
-
-    is_approved = (action_type == "approved")
-    subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
-
-    if is_approved:
-        html_content = render_template("email_approved.html", full_name=full_name, app_url=app_url)
-    else:
-        html_content = render_template("email_rejected.html", full_name=full_name)
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"DentaLink <{sender_email}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(sender_email, to_email, msg.as_string())
-
-        print(f"✅ Brevo email successfully dispatched to {to_email} [{action_type}]")
-    except Exception as err:
-        print(f"❌ Brevo email failed to send: {str(err)}")
 
 @app.before_request
 def update_user_activity():
