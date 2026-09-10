@@ -5,9 +5,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
-import urllib.request
-import json
-import threading
+
 # Load variables from .env
 load_dotenv()
 
@@ -38,6 +36,10 @@ supabase_admin: Client = create_client(
     SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY
 )
+
+import urllib.request
+import json
+import threading
 
 def send_email_in_background(recipient_email, user_name, action_type):
     try:
