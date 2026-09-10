@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Command Center - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #151C2C;
+            --bg-card-hover: #1C263B;
+            --bg-input: #0E1424;
+            --border-color: #243048;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #101626;
+            --sidebar-width: 260px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(66, 221, 242, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(29, 66, 138, 0.12) 0%, transparent 45%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation Layout */
+        .app-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background-color: rgba(11, 16, 30, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 100;
+            padding: 24px 16px;
+        }
+
+        .sidebar-top {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-box { background: linear-gradient(135deg, var(--accent-cyan), #1d4ed8); border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+        .sidebar-titles h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 9px; padding: 2px 5px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .sidebar-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .nav-pill { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 8px; border: 1px solid transparent; transition: all 0.2s; background: transparent; cursor: pointer; font-family: inherit; width: 100%; text-align: left; }
+        .nav-pill span.nav-content { display: flex; align-items: center; gap: 10px; }
+        .nav-pill:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.03); border-color: var(--border-color); }
+        .nav-pill.active { background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border-color: rgba(66, 221, 242, 0.3); }
+        
+        .pill-badge { background-color: var(--accent-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+        .pill-badge.yellow { background-color: var(--accent-yellow); color: var(--bg-main); }
+
+        .sidebar-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 6px 10px; border-radius: 20px; justify-content: center; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
+
+        .user-profile-box { display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .user-profile { display: flex; align-items: center; gap: 10px; overflow: hidden; }
+        .avatar { width: 32px; height: 32px; background: linear-gradient(135deg, rgba(66, 221, 242, 0.2), rgba(16, 185, 129, 0.2)); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; flex-shrink: 0; }
+        .user-info { overflow: hidden; }
+        .user-info p { margin: 0; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-info span { font-size: 10px; color: var(--accent-cyan); }
+        
+        .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); background: rgba(239, 68, 68, 0.05); }
+
+        /* Top Bar for Notifications in Main Area */
+        .top-utility-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        /* Notifications Popover */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;}
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--accent-cyan); background: rgba(66, 221, 242, 0.05); }
+        .notif-badge { background: var(--accent-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: bold; }
+        .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header); }
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; }
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4; }
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
+        .notif-close:hover { color: var(--accent-red); }
+
+        /* Dashboard Container Shifted for Sidebar */
+        .dashboard-container { 
+            margin-left: var(--sidebar-width);
+            max-width: calc(1600px + var(--sidebar-width)); 
+            padding: 28px 36px; 
+        }
+
+        /* Metrics Strip */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover { transform: translateY(-2px); border-color: rgba(66, 221, 242, 0.3); }
+
+        .metric-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .metric-title { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px 0; }
+        .metric-value { font-size: 26px; font-weight: 800; color: var(--text-main); margin: 0; line-height: 1; }
+        .metric-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .metric-bottom { margin-top: 12px; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
+        /* Panels */
+        .panel {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 22px;
+            margin-bottom: 24px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 14px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 14px;
+        }
+
+        .panel-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+        .panel-subtitle { margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted); }
+
+        /* Tabbed Pipeline Navigation */
+        .pipeline-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+        }
+        .pipeline-tabs::-webkit-scrollbar { height: 4px; }
+        .pipeline-tabs::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .stage-tab-btn {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .stage-tab-btn:hover { border-color: var(--text-muted); color: var(--text-main); }
+        .stage-tab-btn.active {
+            background-color: rgba(66, 221, 242, 0.08);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .stage-tab-badge {
+            background-color: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .stage-tab-btn.active .stage-tab-badge {
+            background-color: var(--accent-cyan);
+            color: var(--bg-main);
+        }
+
+        .stage-section { display: none; }
+        .stage-section.active { display: block; animation: fadeIn 0.25s ease-out; }
+
+        .cases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .empty-grid {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px 20px;
+            background-color: var(--bg-input);
+            border: 1px dashed var(--border-color);
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .k-card {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .k-card:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .k-card-header { display: flex; justify-content: space-between; align-items: center; }
+        .k-badge-cyan { background: rgba(66, 221, 242, 0.12); color: var(--accent-cyan); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(66, 221, 242, 0.25); }
+        .k-due-chip { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); border: 1px solid rgba(245, 158, 11, 0.25); }
+
+        .k-card-title { color: var(--text-main); font-size: 15px; font-weight: 700; margin: 0; line-height: 1.3; }
+        .k-card-subtitle { color: var(--text-muted); font-size: 12px; margin: 0; display: flex; justify-content: space-between; align-items: center; }
+
+        /* Enhanced Case Card Clinical Meta Info */
+        .case-clinical-meta {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .meta-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; font-weight: 600; }
+        .meta-val { color: var(--text-main); font-weight: 600; }
+        .tooth-badge-list { display: flex; gap: 4px; flex-wrap: wrap; }
+        .tooth-pill { background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); font-size: 10px; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(66, 221, 242, 0.2); font-weight: 700; }
+
+        .reassign-form {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 10px;
+            align-items: center;
+        }
+
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; font-family: inherit; }
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline-cyan { background-color: transparent; border: 1px solid var(--accent-cyan); color: var(--accent-cyan); }
+        .btn-outline-cyan:hover { background-color: rgba(66, 221, 242, 0.08); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-outline:hover { color: var(--text-main); border-color: var(--text-muted); }
+
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dark-table th { text-align: left; padding: 12px 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
+        .dark-table td { padding: 12px 14px; border-bottom: 1px solid rgba(38, 47, 68, 0.5); vertical-align: middle; }
+        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
+        .dark-table tr:last-child td { border-bottom: none; }
+
+        .tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border: 1px solid rgba(66, 221, 242, 0.2); }
+        .select-dark { background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 6px 8px; border-radius: 6px; font-size: 11px; outline: none; font-family: inherit; }
+
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+        .item-card { background-color: var(--bg-main); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; transition: border-color 0.2s; }
+        .item-card:hover { border-color: rgba(66, 221, 242, 0.3); }
+        .item-card h4 { margin: 0 0 6px 0; color: var(--accent-cyan); font-size: 14px; }
+        .item-card p { margin: 4px 0; font-size: 12px; color: var(--text-muted); }
+        .item-card strong { color: var(--text-main); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 920px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { background-color: var(--panel-header); padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 24px; overflow-y: auto; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; }
+        .close-btn:hover { color: var(--accent-red); }
+
+        /* Sound Editor Slider Range */
+        .slider-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            outline: none;
+        }
+        .slider-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(66, 221, 242, 0.6);
+        }
+
+        @media (max-width: 1024px) {
+            :root { --sidebar-width: 0px; }
+            .app-sidebar { display: none; }
+            .dashboard-container { margin-left: 0; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="app-sidebar">
+        <div class="sidebar-top">
+            <div class="sidebar-brand">
+                <div class="logo-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                    </svg>
+                </div>
+                <div class="sidebar-titles">
+                    <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                    <p>Mrkzter Dental Lab</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-pill active">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Admin Command
+                    </span>
+                </a>
+                
+                <button type="button" class="nav-pill" onclick="openIncomingModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        Incoming Cases
+                    </span>
+                    <span class="pill-badge">{{ unassigned_cases|length }}</span>
+                </button>
+
+                <button type="button" class="nav-pill" onclick="openRestockModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Restock Requests
+                    </span>
+                    <span class="pill-badge yellow">{{ restock_requests|length if restock_requests else 0 }}</span>
+                </button>
+
+                <a href="{{ url_for('admin_inventory') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Inventory
+                    </span>
+                </a>
+
+                <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Audit Logs
+                    </span>
+                </a>
+
+                <!-- WORKSPACE SETTINGS BUTTON -->
+                <button type="button" class="nav-pill" onclick="openSettingsModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        System Settings
+                    </span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Active
+            </div>
+
+            <div class="user-profile-box">
+                <div class="user-profile">
+                    <div class="avatar">{{ profile.display_name[0] if profile.display_name else 'AD' }}</div>
+                    <div class="user-info">
+                        <p>{{ profile.display_name }}</p>
+                        <span>Administrator</span>
+                    </div>
+                </div>
+                <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                    <button type="submit" class="btn-icon" title="Logout">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </aside>
+
+    <main class="dashboard-container">
+        
+        <!-- TOP NOTIFICATION BAR -->
+        <div class="top-utility-bar">
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Notifications
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Review →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No unread notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card" style="border-left: 3px solid var(--accent-green);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Delivered Units</p>
+                        <p class="metric-value">{{ completed_this_month }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: var(--accent-green);">
+                    <span>Fabrication schedule optimal</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="border-left: 3px solid var(--accent-red);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Overdue Deliveries</p>
+                        <p class="metric-value">{{ overdue_count }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-red);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: {% if overdue_count > 0 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
+                    <span>{% if overdue_count > 0 %}Expedite priority needed{% else %}No backlogs detected{% endif %}</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="border-left: 3px solid var(--accent-yellow);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Pending Access</p>
+                        <p class="metric-value">{{ pending_count }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: var(--accent-yellow);">
+                    <span>Awaiting credential check</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="border-left: 3px solid var(--accent-cyan);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Active Users Online</p>
+                        <p class="metric-value">{{ online_count }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: var(--accent-cyan);">
+                    <span>Logged in within the last 5 minutes</span>
+                </div>
+            </div>
+        </div>
+
+        {% set assigned_cases = active_cases | selectattr('status', 'in', ['assigned', 'pending', 'new']) | list %}
+        {% set setup_cases = active_cases | selectattr('status', 'in', ['in_progress', 'cad_designing', 'wax_up_or_try_in']) | list %}
+        {% set milling_cases = active_cases | selectattr('status', 'equalto', 'milling_or_printing') | list %}
+        {% set packing_cases = active_cases | selectattr('status', 'equalto', 'packing_and_curing') | list %}
+        {% set qc_cases = active_cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
+
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">
+                        <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                        Laboratory Production Workflow
+                        <span class="tag" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">{{ active_cases|length }} In Flight</span>
+                    </h2>
+                    <p class="panel-subtitle">Select a stage below to view active bench orders. You can reassign technicians anytime without altering case stage status.</p>
+                </div>
+            </div>
+
+            <div class="pipeline-tabs">
+                <button type="button" class="stage-tab-btn active" onclick="switchStage(event, 'stage-intake')">
+                    0. Intake / Assigned <span class="stage-tab-badge">{{ assigned_cases|length }}</span>
+                </button>
+                <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-cad')">
+                    1. CAD & Setup <span class="stage-tab-badge">{{ setup_cases|length }}</span>
+                </button>
+                <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-cam')">
+                    2. CAM / Printing <span class="stage-tab-badge">{{ milling_cases|length }}</span>
+                </button>
+                <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-packing')">
+                    3. Packing & Curing <span class="stage-tab-badge">{{ packing_cases|length }}</span>
+                </button>
+                <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-qc')">
+                    4. Finishing & QA <span class="stage-tab-badge">{{ qc_cases|length }}</span>
+                </button>
+            </div>
+
+            <!-- MACRO FOR RENDERING ENHANCED CASE CARDS WITH CLINIC, TEETH & SHADE INFO -->
+            {% macro render_case_cards(cases_list) %}
+                <div class="cases-grid">
+                    {% for c in cases_list %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            
+                            <div>
+                                <div class="k-card-title">{{ c.patient_name }}</div>
+                                <div class="k-card-subtitle">
+                                    <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                                    <span style="color: var(--accent-cyan); font-size: 11px; font-weight: 600;">Tech: {{ c.profiles.display_name if c.profiles else 'Unassigned' }}</span>
+                                </div>
+                            </div>
+
+                            <!-- CLINIC, TEETH & SHADE DISPLAY BLOCK -->
+                            <div class="case-clinical-meta">
+                                <div class="meta-row">
+                                    <span class="meta-label">Clinic:</span>
+                                    <span class="meta-val" style="color: var(--accent-yellow);">{{ c.profiles.clinic_name if c.profiles and c.profiles.clinic_name else 'Independent Practice' }}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Teeth Units:</span>
+                                    <div class="tooth-badge-list">
+                                        {% if c.teeth %}
+                                            {% for t in c.teeth %}
+                                                <span class="tooth-pill">#{{ t.tooth_number }} ({{ t.shade or 'N/A' }})</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span style="font-size: 11px; color: var(--text-muted);">Standard spec</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <form class="reassign-form" method="POST" action="{{ url_for('admin_reassign_case', case_id=c.id) }}">
+                                <select name="technician_id" class="select-dark" style="flex: 1;" required>
+                                    <option value="" disabled>Reassign Tech...</option>
+                                    {% for tech in technicians %}
+                                        <option value="{{ tech.id }}" {% if c.technician_id == tech.id %}selected{% endif %}>{{ tech.first_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-outline-cyan" style="padding: 5px 10px; font-size: 11px;">Move</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div class="empty-grid">No cases currently in this stage.</div>
+                    {% endfor %}
+                </div>
+            {% endmacro %}
+
+            <!-- STAGE SECTIONS -->
+            <div id="stage-intake" class="stage-section active">
+                {{ render_case_cards(assigned_cases) }}
+            </div>
+
+            <div id="stage-cad" class="stage-section">
+                {{ render_case_cards(setup_cases) }}
+            </div>
+
+            <div id="stage-cam" class="stage-section">
+                {{ render_case_cards(milling_cases) }}
+            </div>
+
+            <div id="stage-packing" class="stage-section">
+                {{ render_case_cards(packing_cases) }}
+            </div>
+
+            <div id="stage-qc" class="stage-section">
+                {{ render_case_cards(qc_cases) }}
+            </div>
+
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">
+                        <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-round="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        Network Access Directory
+                    </h2>
+                    <p class="panel-subtitle">Review authorizations and monitor technician workload distributions.</p>
+                </div>
+            </div>
+
+            {% if pending_users %}
+                <h3 style="font-size: 13px; font-weight: 700; color: var(--accent-yellow); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Pending Access Authorizations</h3>
+                <div class="card-grid" style="margin-bottom: 24px;">
+                    {% for user in pending_users %}
+                        <div class="item-card" style="border-left: 3px solid var(--accent-yellow);">
+                            <h4>{{ user.display_name }}</h4>
+                            <p><strong>Role:</strong> {{ user.role | capitalize }}</p>
+                            <p><strong>License:</strong> {{ user.professional_id }}</p>
+                            <form method="GET" action="{{ url_for('review_user', user_id=user.id) }}" style="margin-top: 10px;">
+                                <button type="submit" class="btn btn-outline-cyan" style="width: 100%; justify-content: center; font-size: 11px;">Inspect Credentials →</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <h3 style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Verified Personnel & Clinics</h3>
+            {% if approved_users %}
+                <div class="card-grid">
+                    {% for user in approved_users %}
+                        <div class="item-card">
+                            <h4>{{ user.display_name }}</h4>
+                            <p><strong>Role:</strong> {{ user.role | capitalize }}</p>
+                            <p><strong>Contact:</strong> {{ user.phone or 'N/A' }}</p>
+                            {% if user.role == 'technician' %}
+                                <div style="margin-top: 8px;">
+                                    <span class="tag" style="background: rgba(66,221,242,0.08); font-size: 10px;">
+                                        Bench Units: 
+                                        {% for tech in technicians %}{% if tech.id == user.id %}{{ tech.active_workload }}{% endif %}{% endfor %}
+                                    </span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p style="color: var(--text-muted); font-size: 13px;">No verified users registered.</p>
+            {% endif %}
+        </div>
+
+    </main>
+
+    <!-- INCOMING CASES MODAL -->
+    <div class="modal-overlay" id="incomingModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:var(--text-main); font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Incoming Unassigned Cases ({{ unassigned_cases|length }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeIncomingModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if unassigned_cases %}
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Patient</th>
+                                    <th>Classification</th>
+                                    <th>Delivery Target</th>
+                                    <th>Assign Technician</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for case in unassigned_cases %}
+                                    <tr>
+                                        <td><span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span></td>
+                                        <td><strong>{{ case.patient_name }}</strong></td>
+                                        <td><span class="tag">{{ case.case_type | replace('_', ' ') | title }}</span></td>
+                                        <td><span style="color: var(--accent-yellow); font-weight: 600;">{{ case.due_date or 'Not Set' }}</span></td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('admin_assign_case', case_id=case.id) }}" style="display: flex; gap: 8px; margin: 0;">
+                                                <select name="technician_id" class="select-dark" required>
+                                                    <option value="">Select Tech...</option>
+                                                    {% for tech in technicians %}
+                                                        <option value="{{ tech.id }}">{{ tech.first_name }} ({{ tech.active_workload }} active)</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="submit" class="btn btn-cyan" style="padding: 5px 12px; font-size: 11px;">Dispatch</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px;">
+                        No incoming cases awaiting technician dispatch.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RESTOCK REQUESTS MODAL POPUP -->
+    <div class="modal-overlay" id="restockModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:var(--text-main); font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-yellow)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    Technician Supply Restock Alerts ({{ restock_requests|length if restock_requests else 0 }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeRestockModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if restock_requests %}
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Technician</th>
+                                    <th>Item Flagged</th>
+                                    <th>Associated Order</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in restock_requests %}
+                                    <tr>
+                                        <td><small style="color: var(--text-muted);">{{ req.created_at[:19].replace('T', ' ') }}</small></td>
+                                        <td><strong>{{ req.profiles.display_name if req.profiles else 'Bench Tech' }}</strong></td>
+                                        <td><span style="color: var(--accent-yellow); font-weight: 700;">{{ req.item_name }}</span></td>
+                                        <td><span class="tag">#{{ req.dental_cases.case_number if req.dental_cases else 'N/A' }}</span></td>
+                                        <td>
+                                            <a href="{{ url_for('admin_inventory') }}" class="btn btn-cyan" style="padding: 4px 10px; font-size: 11px;">Restock Supply →</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px;">
+                        No bench material shortage alerts pending.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKSPACE SETTINGS MODAL (With Sound Editor Controls) -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-container" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:var(--text-main); font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Workspace Preferences
+                </h2>
+                <button type="button" class="close-btn" onclick="closeSettingsModal()">×</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Master Sound Toggle -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="color: var(--text-main); font-size: 13px; display: block;">Notification Sound Alerts</strong>
+                        <span style="font-size: 12px; color: var(--text-muted);">Play audio tone on Milling, QA, and alerts</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer;">
+                        <input type="checkbox" id="settingSoundToggle" onchange="updateSoundSetting(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span id="soundSlider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); border-radius: 24px; transition: .25s;"></span>
+                        <span id="soundKnob" style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .25s;"></span>
+                    </label>
+                </div>
+
+                <!-- Tone Selector & Sound Editor -->
+                <div id="soundEditorGroup" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Tone Preset Selection -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sound Chime Theme</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="settingSoundTone" class="select-dark" style="flex: 1; padding: 8px 10px; font-size: 12px;" onchange="updateToneSetting(this.value)">
+                                <option value="chime">Modern Bell Chime (Default)</option>
+                                <option value="ping">Glass Crystal Ping</option>
+                                <option value="pop">Soft Digital Pop</option>
+                                <option value="alert">Double Dispatch Tone</option>
+                            </select>
+                            <button type="button" class="btn btn-outline" onclick="previewSoundTone()" title="Test Sound" style="padding: 6px 14px; gap: 6px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+                                </svg>
+                                Test
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Volume Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Volume Level</span>
+                            <span id="volumeVal" style="color: var(--accent-cyan);">70%</span>
+                        </div>
+                        <input type="range" id="settingVolume" class="slider-range" min="0.05" max="1.0" step="0.05" value="0.7" oninput="updateVolume(this.value)">
+                    </div>
+
+                    <!-- Pitch / Frequency Drag Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Pitch Tuning (Lower / Higher)</span>
+                            <span id="pitchVal" style="color: var(--accent-cyan);">1.0x (Standard)</span>
+                        </div>
+                        <input type="range" id="settingPitch" class="slider-range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updatePitch(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--panel-header); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button type="button" class="btn btn-cyan" onclick="closeSettingsModal()">Save & Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // SYNTHESIZED WEB AUDIO ENGINE WITH SLIDER SUPPORT
+        // ==========================================
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(toneType) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                // Retrieve volume and pitch multiplier from localStorage
+                const userVol = parseFloat(localStorage.getItem('dl_sound_volume') || '0.7');
+                const userPitch = parseFloat(localStorage.getItem('dl_sound_pitch') || '1.0');
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                switch (toneType) {
+                    case 'chime':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(1320 * userPitch, now + 0.12);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                        osc.start(now);
+                        osc.stop(now + 0.5);
+                        break;
+                    case 'ping':
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(1760 * userPitch, now);
+                        gain.gain.setValueAtTime(0.25 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    case 'pop':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(800 * userPitch, now + 0.08);
+                        gain.gain.setValueAtTime(0.4 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                        osc.start(now);
+                        osc.stop(now + 0.18);
+                        break;
+                    case 'alert':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(950 * userPitch, now);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.setValueAtTime(0.01, now + 0.08);
+                        gain.gain.setValueAtTime(0.3 * userVol, now + 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    default:
+                        this.playTone('chime');
+                }
+            }
+        };
+
+        function triggerNotificationSound() {
+            const soundEnabled = localStorage.getItem('dl_sound_enabled') !== 'false';
+            if (!soundEnabled) return;
+            const selectedTone = localStorage.getItem('dl_sound_tone') || 'chime';
+            AudioEngine.playTone(selectedTone);
+        }
+
+        // ==========================================
+        // SETTINGS & AUDIO SLIDER CONTROLS
+        // ==========================================
+        function openSettingsModal() {
+            initSettingsValues();
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function initSettingsValues() {
+            const soundEnabled = localStorage.getItem('dl_sound_enabled') !== 'false';
+            const selectedTone = localStorage.getItem('dl_sound_tone') || 'chime';
+            const volume = localStorage.getItem('dl_sound_volume') || '0.7';
+            const pitch = localStorage.getItem('dl_sound_pitch') || '1.0';
+
+            const checkbox = document.getElementById('settingSoundToggle');
+            const toneSelect = document.getElementById('settingSoundTone');
+            const volInput = document.getElementById('settingVolume');
+            const pitchInput = document.getElementById('settingPitch');
+            const editorGroup = document.getElementById('soundEditorGroup');
+
+            if (checkbox) checkbox.checked = soundEnabled;
+            if (toneSelect) toneSelect.value = selectedTone;
+            if (volInput) volInput.value = volume;
+            if (pitchInput) pitchInput.value = pitch;
+
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(volume) * 100) + '%';
+            document.getElementById('pitchVal').innerText = pitch + 'x' + (pitch === '1.0' ? ' (Standard)' : (pitch < 1 ? ' (Deeper)' : ' (Higher)'));
+
+            syncToggleStyle(soundEnabled);
+            if (editorGroup) editorGroup.style.opacity = soundEnabled ? '1' : '0.4';
+        }
+
+        function updateSoundSetting(isEnabled) {
+            localStorage.setItem('dl_sound_enabled', isEnabled);
+            syncToggleStyle(isEnabled);
+            const editorGroup = document.getElementById('soundEditorGroup');
+            if (editorGroup) editorGroup.style.opacity = isEnabled ? '1' : '0.4';
+
+            if (isEnabled) {
+                AudioEngine.init();
+                AudioEngine.playTone(localStorage.getItem('dl_sound_tone') || 'chime');
+            }
+        }
+
+        function syncToggleStyle(isEnabled) {
+            const slider = document.getElementById('soundSlider');
+            const knob = document.getElementById('soundKnob');
+            if (slider && knob) {
+                slider.style.backgroundColor = isEnabled ? 'var(--accent-cyan)' : 'var(--border-color)';
+                knob.style.transform = isEnabled ? 'translateX(20px)' : 'translateX(0px)';
+            }
+        }
+
+        function updateToneSetting(newTone) {
+            localStorage.setItem('dl_sound_tone', newTone);
+            AudioEngine.playTone(newTone);
+        }
+
+        function updateVolume(val) {
+            localStorage.setItem('dl_sound_volume', val);
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(val) * 100) + '%';
+        }
+
+        function updatePitch(val) {
+            localStorage.setItem('dl_sound_pitch', val);
+            const num = parseFloat(val);
+            document.getElementById('pitchVal').innerText = val + 'x' + (num === 1.0 ? ' (Standard)' : (num < 1 ? ' (Deeper)' : ' (Higher)'));
+        }
+
+        function previewSoundTone() {
+            const tone = document.getElementById('settingSoundTone').value;
+            AudioEngine.playTone(tone);
+        }
+
+        // ==========================================
+        // TARGETED ACTION DETECTOR (MILLING, QC, INCOMING & ALERTS)
+        // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            initSettingsValues();
+
+            // Track target stage items: Milling & Quality Assurance (Finish)
+            const millingCount = parseInt("{{ milling_cases|length if milling_cases else 0 }}", 10);
+            const finishQcCount = parseInt("{{ qc_cases|length if qc_cases else 0 }}", 10);
+            const notifCount = parseInt("{{ notifications|length if notifications else 0 }}", 10);
+            const incomingCount = parseInt("{{ unassigned_cases|length if unassigned_cases else 0 }}", 10);
+            const restockCount = parseInt("{{ restock_requests|length if restock_requests else 0 }}", 10);
+
+            // Tally monitored critical stages and actions
+            const totalActionCount = millingCount + finishQcCount + notifCount + incomingCount + restockCount;
+            const lastActionCount = parseInt(localStorage.getItem('dl_last_action_count') || '0', 10);
+
+            // Play the customized audio chime if a case moves to milling, finish, or arrives
+            if (totalActionCount > lastActionCount && lastActionCount !== 0) {
+                triggerNotificationSound();
+            }
+
+            // Save updated state
+            localStorage.setItem('dl_last_action_count', totalActionCount);
+        });
+
+        // UI Helpers
+        function switchStage(event, stageId) {
+            document.querySelectorAll('.stage-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.stage-tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(stageId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function openIncomingModal() { document.getElementById('incomingModal').style.display = 'flex'; }
+        function closeIncomingModal() { document.getElementById('incomingModal').style.display = 'none'; }
+
+        function openRestockModal() { document.getElementById('restockModal').style.display = 'flex'; }
+        function closeRestockModal() { document.getElementById('restockModal').style.display = 'none'; }
+
+        function toggleNotif(e) {
+            e.stopPropagation();
+            document.getElementById('notifDropdown').classList.toggle('show');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No notifications.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if (count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper') && !event.target.closest('#incomingModal') && !event.target.closest('#restockModal') && !event.target.closest('#settingsModal')) {
+                const dd = document.getElementById('notifDropdown');
+                if (dd) dd.classList.remove('show');
+            }
+            if (event.target === document.getElementById('incomingModal')) { closeIncomingModal(); }
+            if (event.target === document.getElementById('restockModal')) { closeRestockModal(); }
+            if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
+        }
+
+        // ==========================================
+        // SMART AUTO-REFRESH (Every 30 seconds)
+        // ==========================================
+        const REFRESH_INTERVAL_MS = 30000;
+
+        setInterval(() => {
+            const isIncomingModalOpen = document.getElementById('incomingModal')?.style.display === 'flex';
+            const isRestockModalOpen = document.getElementById('restockModal')?.style.display === 'flex';
+            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
+            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
+
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
+
+            if (!isIncomingModalOpen && !isRestockModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
+                window.location.reload();
+            }
+        }, REFRESH_INTERVAL_MS);
+    </script>
+</body>
+</html>

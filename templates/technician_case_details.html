@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case #{{ case.case_number }} - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #151C2C;
+            --bg-card-hover: #1C263B;
+            --bg-input: #0E1424;
+            --border-color: #243048;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #101626;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(66, 221, 242, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(29, 66, 138, 0.12) 0%, transparent 45%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .app-header {
+            background-color: rgba(11, 16, 30, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .logo-box { background: linear-gradient(135deg, var(--accent-cyan), #1d4ed8); border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
+
+        /* Container & Layout */
+        .container { max-width: 1440px; margin: 0 auto; padding: 28px 32px; }
+        
+        .main-layout {
+            display: grid;
+            grid-template-columns: 8fr 4fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        /* Clinical Banner */
+        .order-hero-card {
+            background: linear-gradient(145deg, var(--bg-card) 0%, rgba(66, 221, 242, 0.04) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .hero-left h2 { margin: 0 0 6px 0; font-size: 26px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 12px; }
+        .hero-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
+        .hero-meta strong { color: var(--text-main); }
+        
+        .hero-badges { display: flex; align-items: center; gap: 10px; }
+        .pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .pill-cyan { background: rgba(66, 221, 242, 0.12); color: var(--accent-cyan); border: 1px solid rgba(66, 221, 242, 0.25); }
+        .pill-yellow { background: rgba(245, 158, 11, 0.12); color: var(--accent-yellow); border: 1px solid rgba(245, 158, 11, 0.3); }
+        .pill-green { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+        /* Panels */
+        .panel {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 22px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 15px;
+            color: var(--text-main);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Clinic Instructions Callout */
+        .instructions-box {
+            background: rgba(66, 221, 242, 0.03);
+            border-left: 3px solid var(--accent-cyan);
+            border-top: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-main);
+        }
+
+        /* Tables */
+        .dark-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .dark-table th {
+            text-align: left;
+            padding: 12px 14px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--panel-header);
+        }
+
+        .dark-table td {
+            padding: 14px;
+            border-bottom: 1px solid rgba(38, 47, 68, 0.5);
+            vertical-align: middle;
+        }
+        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
+        .dark-table tr:last-child td { border-bottom: none; }
+
+        /* File List Items */
+        .file-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-input);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: border-color 0.2s;
+        }
+        .file-item:hover { border-color: rgba(66, 221, 242, 0.3); }
+        .file-info { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+
+        /* Timeline */
+        .timeline-container {
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        .timeline-container.expanded { max-height: none; }
+        .timeline-container::-webkit-scrollbar { width: 4px; }
+        .timeline-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .timeline { position: relative; padding-left: 20px; margin: 0; list-style: none; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 6px;
+            bottom: 6px;
+            width: 2px;
+            background-color: var(--border-color);
+        }
+
+        .timeline-item { position: relative; margin-bottom: 20px; }
+        .timeline-item:last-child { margin-bottom: 0; }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -20px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--accent-cyan);
+            border: 2px solid var(--bg-card);
+        }
+
+        .timeline-status { font-weight: 700; font-size: 13px; color: var(--text-main); display: block; margin-bottom: 2px; }
+        .timeline-date { font-size: 11px; color: var(--text-muted); }
+        .timeline-author { font-size: 11px; color: var(--accent-green); background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; font-weight: 600; }
+
+        /* Form Inputs & Buttons */
+        .input-dark, .textarea-dark {
+            width: 100%;
+            padding: 10px 14px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+        .input-dark:focus, .textarea-dark:focus { border-color: var(--accent-cyan); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { border-color: var(--text-muted); background: rgba(255,255,255,0.02); }
+        .btn-warning { background-color: rgba(245, 158, 11, 0.12); color: var(--accent-yellow); border: 1px solid rgba(245, 158, 11, 0.3); }
+        .btn-warning:hover { background-color: rgba(245, 158, 11, 0.22); }
+        .btn-danger { background-color: var(--accent-red); color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+
+        @media (max-width: 1024px) {
+            .main-layout { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
+            </div>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Technician Bench Oversight</p>
+            </div>
+        </div>
+
+        <a href="{{ url_for('technician_dashboard') }}" class="btn btn-outline">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Back to Bench Pipeline
+        </a>
+    </header>
+
+    <main class="container">
+        
+        <!-- Clinical Order Hero Card -->
+        <div class="order-hero-card">
+            <div class="hero-left">
+                <h2>
+                    Order #{{ case.case_number }}
+                    <span class="pill pill-cyan">{{ case.case_type | replace('_', ' ') | title }}</span>
+                </h2>
+                <div class="hero-meta">
+                    <span>Patient: <strong>{{ case.patient_name }}</strong></span>
+                    <span>Ref: <strong>{{ case.patient_reference or 'N/A' }}</strong></span>
+                    <span>Target Due: <strong style="color: var(--accent-yellow);">{{ case.due_date or 'Not Specified' }}</strong></span>
+                </div>
+            </div>
+
+            <div class="hero-badges">
+                <span class="pill pill-yellow">Phase: {{ case.status | replace('_', ' ') | title }}</span>
+            </div>
+        </div>
+
+        <!-- 2-Column Asymmetric Layout -->
+        <div class="main-layout">
+            
+            <!-- Left Primary Column: Specifications, Files, Directives -->
+            <div class="layout-left">
+                
+                <!-- Clinic Directives & Notes -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Doctor's Prescription & Clinical Directives
+                        </h3>
+                    </div>
+                    <div class="instructions-box">
+                        {{ case.instructions or 'No custom margin or characterization instructions attached to this order.' }}
+                    </div>
+                </section>
+
+                <!-- Tooth & Materials Specifications Table -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                            Odontogram Teeth Specifications
+                        </h3>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Tooth #</th>
+                                    <th>Prescribed Material</th>
+                                    <th>VITA Shade</th>
+                                    <th>Specific Instructions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tooth in teeth %}
+                                    <tr>
+                                        <td><strong style="color: var(--accent-cyan); font-size: 14px;">#{{ tooth.tooth_number }}</strong></td>
+                                        <td><strong>{{ tooth.material | replace('_', ' ') | title if tooth.material else 'Standard' }}</strong></td>
+                                        <td><span class="pill pill-cyan">{{ tooth.shade or 'N/A' }}</span></td>
+                                        <td><span style="color: var(--text-muted);">{{ tooth.notes or 'Standard fabrication' }}</span></td>
+                                    </tr>
+                                {% else %}
+                                    <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No individual units assigned.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Attached CAD/STL & Reference Media -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                            Attached Impression & Media Files
+                        </h3>
+                    </div>
+                    <ul class="file-list">
+                        {% for file in files %}
+                            <li class="file-item">
+                                <div class="file-info">
+                                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                    <div>
+                                        <strong style="color: var(--text-main); display: block;">{{ file.file_name }}</strong>
+                                        <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">{{ file.file_type }} File</span>
+                                    </div>
+                                </div>
+                                <a href="{{ file.download_url }}" target="_blank" download class="btn btn-outline" style="font-size: 11px; padding: 6px 12px;">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    Download
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="file-item" style="justify-content: center; color: var(--text-muted); padding: 24px;">
+                                No intraoral digital scans or photos attached.
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            </div>
+
+            <!-- Right Secondary Column: Bench Controls, Stock Requests, Timeline -->
+            <div class="layout-right">
+                
+                <!-- Quick Restock Request Box -->
+                <section class="panel" style="border-left: 3px solid var(--accent-yellow);">
+                    <div class="panel-header" style="margin-bottom: 12px; padding-bottom: 10px;">
+                        <h3 class="panel-title" style="color: var(--accent-yellow); font-size: 14px;">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                            Flag Low Bench Material
+                        </h3>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 12px 0;">Alert administration of a supply shortage encountered during this case.</p>
+                    <form method="POST" action="/technician/cases/{{ case.id }}/request-material" style="display: flex; gap: 8px;">
+                        <input type="text" name="item_name" class="input-dark" placeholder="Item name (e.g. A2 Zirconia)" required style="flex: 1; font-size: 12px;">
+                        <button type="submit" class="btn btn-warning" style="white-space: nowrap;">Request</button>
+                    </form>
+                </section>
+
+                <!-- Fabrication Timeline History -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">
+                            <svg width="16" height="16" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Audit Trail
+                        </h3>
+                        <button type="button" class="btn btn-outline" id="timelineToggleBtn" onclick="toggleTimeline()" style="font-size: 10px; padding: 3px 8px;">Expand</button>
+                    </div>
+                    <div class="timeline-container" id="timelineContainer">
+                        <ul class="timeline">
+                            {% for h in case_history %}
+                                <li class="timeline-item">
+                                    <span class="timeline-status">{{ h.status | replace('_', ' ') | title }}</span>
+                                    <span class="timeline-date">{{ h.created_at[:19].replace('T', ' ') }}</span>
+                                    {% if h.profiles and h.profiles.display_name %}
+                                        <br><span class="timeline-author">{{ h.profiles.display_name }}</span>
+                                    {% endif %}
+                                </li>
+                            {% else %}
+                                <li class="timeline-item">
+                                    <span class="timeline-status" style="color: var(--text-muted);">No recorded transitions.</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Revision / Return Section -->
+                <section class="panel" style="border-left: 3px solid var(--accent-red); background: rgba(239, 68, 68, 0.02);">
+                    <div class="panel-header" style="margin-bottom: 10px; padding-bottom: 8px;">
+                        <h3 class="panel-title" style="color: var(--accent-red); font-size: 14px;">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            Require Clinical Revision
+                        </h3>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 12px 0;">Return case to the submitting dentist if scan data, margins, or bite registration are insufficient.</p>
+                    
+                    <form method="POST" action="/technician/cases/{{ case.id }}/return">
+                        <textarea name="revision_notes" class="textarea-dark" rows="3" required placeholder="Specify revision reason (e.g. margin distorted around #16)..." style="font-size: 12px; margin-bottom: 10px;"></textarea>
+                        <button type="submit" class="btn btn-danger" style="width: 100%;">
+                            Return Case to Clinic
+                        </button>
+                    </form>
+                </section>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        function toggleTimeline() {
+            const container = document.getElementById('timelineContainer');
+            const btn = document.getElementById('timelineToggleBtn');
+            container.classList.toggle('expanded');
+            if (container.classList.contains('expanded')) {
+                btn.innerText = "Collapse";
+            } else {
+                btn.innerText = "Expand";
+            }
+        }
+    </script>
+</body>
+</html>

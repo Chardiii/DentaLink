@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Audit Logs - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #151C2C;
+            --bg-card-hover: #1C263B;
+            --bg-input: #0E1424;
+            --border-color: #243048;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #101626;
+            --sidebar-width: 260px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(66, 221, 242, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(29, 66, 138, 0.12) 0%, transparent 45%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation Layout */
+        .app-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background-color: rgba(11, 16, 30, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 100;
+            padding: 24px 16px;
+        }
+
+        .sidebar-top {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-box { background: linear-gradient(135deg, var(--accent-cyan), #1d4ed8); border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+        .sidebar-titles h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 9px; padding: 2px 5px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .sidebar-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .nav-pill { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 8px; border: 1px solid transparent; transition: all 0.2s; background: transparent; cursor: pointer; font-family: inherit; width: 100%; text-align: left; }
+        .nav-pill span.nav-content { display: flex; align-items: center; gap: 10px; }
+        .nav-pill:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.03); border-color: var(--border-color); }
+        .nav-pill.active { background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border-color: rgba(66, 221, 242, 0.3); }
+
+        .pill-badge { background-color: var(--accent-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+        .pill-badge.yellow { background-color: var(--accent-yellow); color: var(--bg-main); }
+
+        .sidebar-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 6px 10px; border-radius: 20px; justify-content: center; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
+
+        .user-profile-box { display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .user-profile { display: flex; align-items: center; gap: 10px; overflow: hidden; }
+        .avatar { width: 32px; height: 32px; background: linear-gradient(135deg, rgba(66, 221, 242, 0.2), rgba(16, 185, 129, 0.2)); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; flex-shrink: 0; }
+        .user-info { overflow: hidden; }
+        .user-info p { margin: 0; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-info span { font-size: 10px; color: var(--accent-cyan); }
+
+        .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); background: rgba(239, 68, 68, 0.05); }
+
+        /* Dashboard Container */
+        .dashboard-container { 
+            margin-left: var(--sidebar-width);
+            max-width: calc(1600px + var(--sidebar-width)); 
+            padding: 28px 36px; 
+        }
+
+        /* Top Utility Bar */
+        .top-utility-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        /* Notifications Popover */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--accent-cyan); background: rgba(66, 221, 242, 0.05); }
+        .notif-badge { background: var(--accent-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: bold; }
+        .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header); }
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; }
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4; }
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
+        .notif-close:hover { color: var(--accent-red); }
+
+        /* Metrics Strip */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover { transform: translateY(-2px); border-color: rgba(66, 221, 242, 0.3); }
+        .metric-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .metric-title { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px 0; }
+        .metric-value { font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0; line-height: 1.1; }
+        .metric-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .metric-bottom { margin-top: 12px; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
+        /* Panels */
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 22px; margin-bottom: 24px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px; }
+        .panel-title { margin: 0; font-size: 15px; color: var(--text-main); display: flex; align-items: center; gap: 10px; font-weight: 700; }
+        .panel-subtitle { margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted); }
+
+        /* Buttons & Inputs */
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; font-family: inherit; }
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-outline:hover { color: var(--text-main); border-color: var(--text-muted); }
+
+        .input-dark, .select-dark { width: 100%; padding: 10px 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; font-size: 13px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+        .input-dark:focus, .select-dark:focus { border-color: var(--accent-cyan); }
+        .select-dark { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 14px top 50%; background-size: 10px auto; }
+        .select-dark option { background-color: var(--bg-card); color: var(--text-main); }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+
+        /* Tables & Badges */
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dark-table th { text-align: left; padding: 12px 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
+        .dark-table td { padding: 12px 14px; border-bottom: 1px solid rgba(38, 47, 68, 0.5); vertical-align: middle; }
+        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
+        .dark-table tr:last-child td { border-bottom: none; }
+
+        .tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: rgba(66, 221, 242, 0.1); color: var(--accent-cyan); border: 1px solid rgba(66, 221, 242, 0.2); }
+        .badge-deduction { background: rgba(239, 68, 68, 0.12); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+        .badge-restock { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+        .badge-manual { background: rgba(66, 221, 242, 0.12); color: var(--accent-cyan); border: 1px solid rgba(66, 221, 242, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+
+        /* Filter Controls */
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-search-box {
+            position: relative;
+            flex: 1.2;
+            min-width: 220px;
+        }
+        .filter-search-box svg {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+        .filter-search-box input {
+            padding-left: 36px !important;
+        }
+
+        /* Popup Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 920px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); animation: slideUp 0.3s ease-out forwards; display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { background-color: var(--panel-header); padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { margin: 0; font-size: 15px; color: var(--text-main); font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .modal-body { padding: 24px; overflow-y: auto; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; }
+        .close-btn:hover { color: var(--accent-red); }
+
+        /* Sound Editor Slider Range */
+        .slider-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            outline: none;
+        }
+        .slider-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(66, 221, 242, 0.6);
+        }
+
+        @media (max-width: 1024px) {
+            :root { --sidebar-width: 0px; }
+            .app-sidebar { display: none; }
+            .dashboard-container { margin-left: 0; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CONSISTENT APP SIDEBAR -->
+    <aside class="app-sidebar">
+        <div class="sidebar-top">
+            <div class="sidebar-brand">
+                <div class="logo-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                    </svg>
+                </div>
+                <div class="sidebar-titles">
+                    <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                    <p>Mrkzter Dental Lab</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Admin Command
+                    </span>
+                </a>
+
+                <!-- Incoming Cases Trigger -->
+                <button type="button" class="nav-pill" onclick="openIncomingModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        Incoming Cases
+                    </span>
+                    <span class="pill-badge">{{ unassigned_cases|length if unassigned_cases else 0 }}</span>
+                </button>
+
+                <!-- Restock Requests Trigger -->
+                <button type="button" class="nav-pill" onclick="openRestockModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Restock Requests
+                    </span>
+                    <span class="pill-badge yellow">{{ restock_requests|length if restock_requests else 0 }}</span>
+                </button>
+
+                <a href="{{ url_for('admin_inventory') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Manage Inventory
+                    </span>
+                </a>
+
+                <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill active">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Audit Logs
+                    </span>
+                </a>
+
+                <!-- WORKSPACE SETTINGS BUTTON -->
+                <button type="button" class="nav-pill" onclick="openSettingsModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        System Settings
+                    </span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Online
+            </div>
+
+            <div class="user-profile-box">
+                <div class="user-profile">
+                    <div class="avatar">{{ profile.display_name[0] if profile and profile.display_name else 'AD' }}</div>
+                    <div class="user-info">
+                        <p>{{ profile.display_name if profile else 'Administrator' }}</p>
+                        <span>Administrator</span>
+                    </div>
+                </div>
+                <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                    <button type="submit" class="btn-icon" title="Logout">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </aside>
+
+    <main class="dashboard-container">
+
+        <!-- TOP UTILITY BAR (Notifications) -->
+        <div class="top-utility-bar">
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Notifications
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear All</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Take Action →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- SUMMARY METRICS STRIP -->
+        {% set total_logs = logs|length %}
+        {% set restock_count = logs | selectattr('action_type', 'equalto', 'restock') | list | length %}
+        {% set deduction_count = logs | selectattr('action_type', 'in', ['case_deduction', 'manual_deduction']) | list | length %}
+
+        <div class="metrics-grid">
+            <div class="metric-card" style="border-left: 3px solid var(--accent-cyan);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Recorded Transactions</p>
+                        <p class="metric-value">{{ total_logs }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: var(--accent-cyan);">
+                    <span>Logs in current filter view</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="border-left: 3px solid var(--accent-green);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Restock Operations</p>
+                        <p class="metric-value">{{ restock_count }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: var(--accent-green);">
+                    <span>Stock additions & deliveries</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="border-left: 3px solid var(--accent-red);">
+                <div class="metric-top">
+                    <div>
+                        <p class="metric-title">Usage & Deductions</p>
+                        <p class="metric-value">{{ deduction_count }}</p>
+                    </div>
+                    <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-red);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                    </div>
+                </div>
+                <div class="metric-bottom" style="color: var(--accent-red);">
+                    <span>Case & bench consumption</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">
+                        <svg width="20" height="20" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Stock History & Usage Records
+                    </h2>
+                    <p class="panel-subtitle">Track laboratory movements, case deductions, and stock adjustments over custom date ranges.</p>
+                </div>
+            </div>
+
+            <!-- Enhanced Date Range & Search Filter Bar -->
+            <form method="GET" action="{{ url_for('admin_inventory_logs') }}" class="filter-bar">
+                <div class="filter-search-box">
+                    <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; font-weight:700;">Live Table Search</label>
+                    <div style="position: relative;">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <input type="text" id="logSearch" class="input-dark" placeholder="Filter by item, user, or note..." onkeyup="filterLogsTable()">
+                    </div>
+                </div>
+
+                <div style="flex: 1; min-width: 170px;">
+                    <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; font-weight:700;">Start Date</label>
+                    <input type="date" name="start_date" value="{{ request.args.get('start_date', '') }}" class="input-dark">
+                </div>
+                <div style="flex: 1; min-width: 170px;">
+                    <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; font-weight:700;">End Date</label>
+                    <input type="date" name="end_date" value="{{ request.args.get('end_date', '') }}" class="input-dark">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit" class="btn btn-cyan">Filter Range</button>
+                    <a href="{{ url_for('admin_inventory_logs') }}" class="btn btn-outline" style="align-items: center; display: inline-flex;">Reset</a>
+                </div>
+            </form>
+
+            <div style="overflow-x: auto;">
+                <table class="dark-table" id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Item Name</th>
+                            <th>Action Type</th>
+                            <th>Change</th>
+                            <th>Stock Shift</th>
+                            <th>User / Trigger</th>
+                            <th>Notes / Context</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr class="log-row">
+                                <td style="white-space: nowrap;"><small style="color: var(--text-muted);">{{ log.created_at[:19].replace('T', ' ') }}</small></td>
+                                <td><strong style="color: var(--text-main);" class="log-item-cell">{{ log.inventory.item_name if log.inventory else 'Unknown Item' }}</strong></td>
+                                <td>
+                                    {% if log.action_type in ['case_deduction', 'manual_deduction'] %}
+                                        <span class="badge-deduction">Deduction</span>
+                                    {% elif log.action_type == 'restock' %}
+                                        <span class="badge-restock">Restock</span>
+                                    {% else %}
+                                        <span class="badge-manual">{{ log.action_type | replace('_', ' ') | title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span style="font-weight: bold; color: {% if log.quantity_changed < 0 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
+                                        {{ log.quantity_changed }}
+                                    </span>
+                                    <small style="color: var(--text-muted);">{{ log.inventory.unit if log.inventory else '' }}</small>
+                                </td>
+                                <td style="white-space: nowrap;">{{ log.previous_quantity }} → <strong style="color: var(--text-main);">{{ log.new_quantity }}</strong></td>
+                                <td class="log-user-cell" style="color: var(--accent-cyan); font-weight: 600;">
+                                    {{ log.profiles.display_name or log.profiles.first_name if log.profiles else 'System / Auto' }}
+                                </td>
+                                <td class="log-note-cell"><span style="color: var(--text-muted);">{{ log.notes or 'N/A' }}</span></td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">No inventory audit logs found for the selected filter criteria.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- INCOMING CASES MODAL -->
+    <div class="modal-overlay" id="incomingModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Incoming Unassigned Cases ({{ unassigned_cases|length if unassigned_cases else 0 }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeIncomingModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if unassigned_cases %}
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Patient</th>
+                                    <th>Classification</th>
+                                    <th>Delivery Target</th>
+                                    <th>Assign Technician</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for case in unassigned_cases %}
+                                    <tr>
+                                        <td><span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span></td>
+                                        <td><strong>{{ case.patient_name }}</strong></td>
+                                        <td><span class="tag">{{ case.case_type | replace('_', ' ') | title }}</span></td>
+                                        <td><span style="color: var(--accent-yellow); font-weight: 600;">{{ case.due_date or 'Not Set' }}</span></td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('admin_assign_case', case_id=case.id) }}" style="display: flex; gap: 8px; margin: 0;">
+                                                <select name="technician_id" class="select-dark" required>
+                                                    <option value="">Select Tech...</option>
+                                                    {% for tech in technicians %}
+                                                        <option value="{{ tech.id }}">{{ tech.first_name }} ({{ tech.active_workload }} active)</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="submit" class="btn btn-cyan" style="padding: 5px 12px; font-size: 11px;">Dispatch</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px;">
+                        No incoming cases awaiting technician dispatch.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RESTOCK REQUESTS MODAL -->
+    <div class="modal-overlay" id="restockModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-yellow)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    Technician Supply Restock Alerts ({{ restock_requests|length if restock_requests else 0 }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeRestockModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if restock_requests %}
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Technician</th>
+                                    <th>Item Flagged</th>
+                                    <th>Associated Order</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in restock_requests %}
+                                    <tr>
+                                        <td><small style="color: var(--text-muted);">{{ req.created_at[:19].replace('T', ' ') }}</small></td>
+                                        <td><strong>{{ req.profiles.display_name if req.profiles else 'Bench Tech' }}</strong></td>
+                                        <td><span style="color: var(--accent-yellow); font-weight: 700;">{{ req.item_name }}</span></td>
+                                        <td><span class="tag">#{{ req.dental_cases.case_number if req.dental_cases else 'N/A' }}</span></td>
+                                        <td>
+                                            <a href="{{ url_for('admin_inventory') }}" class="btn btn-cyan" style="padding: 4px 10px; font-size: 11px;">Restock Supply →</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px;">
+                        No bench material shortage alerts pending.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKSPACE SETTINGS MODAL (With Sound Editor Controls) -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-container" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Workspace Preferences
+                </h2>
+                <button type="button" class="close-btn" onclick="closeSettingsModal()">×</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Master Sound Toggle -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="color: var(--text-main); font-size: 13px; display: block;">Notification Sound Alerts</strong>
+                        <span style="font-size: 12px; color: var(--text-muted);">Play audio tone on Milling, QA, and alerts</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer;">
+                        <input type="checkbox" id="settingSoundToggle" onchange="updateSoundSetting(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span id="soundSlider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); border-radius: 24px; transition: .25s;"></span>
+                        <span id="soundKnob" style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .25s;"></span>
+                    </label>
+                </div>
+
+                <!-- Tone Selector & Sound Editor -->
+                <div id="soundEditorGroup" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Tone Preset Selection -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sound Chime Theme</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="settingSoundTone" class="select-dark" style="flex: 1; padding: 8px 10px; font-size: 12px;" onchange="updateToneSetting(this.value)">
+                                <option value="chime">Modern Bell Chime (Default)</option>
+                                <option value="ping">Glass Crystal Ping</option>
+                                <option value="pop">Soft Digital Pop</option>
+                                <option value="alert">Double Dispatch Tone</option>
+                            </select>
+                            <button type="button" class="btn btn-outline" onclick="previewSoundTone()" title="Test Sound" style="padding: 6px 14px; gap: 6px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+                                </svg>
+                                Test
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Volume Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Volume Level</span>
+                            <span id="volumeVal" style="color: var(--accent-cyan);">70%</span>
+                        </div>
+                        <input type="range" id="settingVolume" class="slider-range" min="0.05" max="1.0" step="0.05" value="0.7" oninput="updateVolume(this.value)">
+                    </div>
+
+                    <!-- Pitch / Frequency Drag Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Pitch Tuning (Lower / Higher)</span>
+                            <span id="pitchVal" style="color: var(--accent-cyan);">1.0x (Standard)</span>
+                        </div>
+                        <input type="range" id="settingPitch" class="slider-range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updatePitch(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--panel-header); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button type="button" class="btn btn-cyan" onclick="closeSettingsModal()">Save & Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // SYNTHESIZED WEB AUDIO ENGINE WITH SLIDERS
+        // ==========================================
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(toneType) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                const userVol = parseFloat(localStorage.getItem('dl_sound_volume') || '0.7');
+                const userPitch = parseFloat(localStorage.getItem('dl_sound_pitch') || '1.0');
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                switch (toneType) {
+                    case 'chime':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(1320 * userPitch, now + 0.12);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                        osc.start(now);
+                        osc.stop(now + 0.5);
+                        break;
+                    case 'ping':
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(1760 * userPitch, now);
+                        gain.gain.setValueAtTime(0.25 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    case 'pop':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(800 * userPitch, now + 0.08);
+                        gain.gain.setValueAtTime(0.4 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                        osc.start(now);
+                        osc.stop(now + 0.18);
+                        break;
+                    case 'alert':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(950 * userPitch, now);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.setValueAtTime(0.01, now + 0.08);
+                        gain.gain.setValueAtTime(0.3 * userVol, now + 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    default:
+                        this.playTone('chime');
+                }
+            }
+        };
+
+        function triggerNotificationSound() {
+            const soundEnabled = localStorage.getItem('dl_sound_enabled') !== 'false';
+            if (!soundEnabled) return;
+            const selectedTone = localStorage.getItem('dl_sound_tone') || 'chime';
+            AudioEngine.playTone(selectedTone);
+        }
+
+        // ==========================================
+        // SETTINGS & AUDIO SLIDER CONTROLS
+        // ==========================================
+        function openSettingsModal() {
+            initSettingsValues();
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function initSettingsValues() {
+            const soundEnabled = localStorage.getItem('dl_sound_enabled') !== 'false';
+            const selectedTone = localStorage.getItem('dl_sound_tone') || 'chime';
+            const volume = localStorage.getItem('dl_sound_volume') || '0.7';
+            const pitch = localStorage.getItem('dl_sound_pitch') || '1.0';
+
+            const checkbox = document.getElementById('settingSoundToggle');
+            const toneSelect = document.getElementById('settingSoundTone');
+            const volInput = document.getElementById('settingVolume');
+            const pitchInput = document.getElementById('settingPitch');
+            const editorGroup = document.getElementById('soundEditorGroup');
+
+            if (checkbox) checkbox.checked = soundEnabled;
+            if (toneSelect) toneSelect.value = selectedTone;
+            if (volInput) volInput.value = volume;
+            if (pitchInput) pitchInput.value = pitch;
+
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(volume) * 100) + '%';
+            document.getElementById('pitchVal').innerText = pitch + 'x' + (pitch === '1.0' ? ' (Standard)' : (pitch < 1 ? ' (Deeper)' : ' (Higher)'));
+
+            syncToggleStyle(soundEnabled);
+            if (editorGroup) editorGroup.style.opacity = soundEnabled ? '1' : '0.4';
+        }
+
+        function updateSoundSetting(isEnabled) {
+            localStorage.setItem('dl_sound_enabled', isEnabled);
+            syncToggleStyle(isEnabled);
+            const editorGroup = document.getElementById('soundEditorGroup');
+            if (editorGroup) editorGroup.style.opacity = isEnabled ? '1' : '0.4';
+
+            if (isEnabled) {
+                AudioEngine.init();
+                AudioEngine.playTone(localStorage.getItem('dl_sound_tone') || 'chime');
+            }
+        }
+
+        function syncToggleStyle(isEnabled) {
+            const slider = document.getElementById('soundSlider');
+            const knob = document.getElementById('soundKnob');
+            if (slider && knob) {
+                slider.style.backgroundColor = isEnabled ? 'var(--accent-cyan)' : 'var(--border-color)';
+                knob.style.transform = isEnabled ? 'translateX(20px)' : 'translateX(0px)';
+            }
+        }
+
+        function updateToneSetting(newTone) {
+            localStorage.setItem('dl_sound_tone', newTone);
+            AudioEngine.playTone(newTone);
+        }
+
+        function updateVolume(val) {
+            localStorage.setItem('dl_sound_volume', val);
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(val) * 100) + '%';
+        }
+
+        function updatePitch(val) {
+            localStorage.setItem('dl_sound_pitch', val);
+            const num = parseFloat(val);
+            document.getElementById('pitchVal').innerText = val + 'x' + (num === 1.0 ? ' (Standard)' : (num < 1 ? ' (Deeper)' : ' (Higher)'));
+        }
+
+        function previewSoundTone() {
+            const tone = document.getElementById('settingSoundTone').value;
+            AudioEngine.playTone(tone);
+        }
+
+        // ==========================================
+        // ACTION DETECTION FOR NOTIFICATION SOUNDS
+        // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            initSettingsValues();
+
+            const notifCount = parseInt("{{ notifications|length if notifications else 0 }}", 10);
+            const incomingCount = parseInt("{{ unassigned_cases|length if unassigned_cases else 0 }}", 10);
+            const restockCount = parseInt("{{ restock_requests|length if restock_requests else 0 }}", 10);
+
+            const totalActionCount = notifCount + incomingCount + restockCount;
+            const lastActionCount = parseInt(localStorage.getItem('dl_last_action_count') || '0', 10);
+
+            if (totalActionCount > lastActionCount && lastActionCount !== 0) {
+                triggerNotificationSound();
+            }
+
+            localStorage.setItem('dl_last_action_count', totalActionCount);
+        });
+
+        // UI Helpers
+        function openIncomingModal() { document.getElementById('incomingModal').style.display = 'flex'; }
+        function closeIncomingModal() { document.getElementById('incomingModal').style.display = 'none'; }
+
+        function openRestockModal() { document.getElementById('restockModal').style.display = 'flex'; }
+        function closeRestockModal() { document.getElementById('restockModal').style.display = 'none'; }
+
+        function toggleNotif(e) {
+            e.stopPropagation();
+            document.getElementById('notifDropdown').classList.toggle('show');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if(count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        // Instant Client-Side Table Filter for Logs
+        function filterLogsTable() {
+            const query = document.getElementById('logSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('.log-row');
+
+            rows.forEach(row => {
+                const itemName = row.querySelector('.log-item-cell')?.textContent.toLowerCase() || '';
+                const user = row.querySelector('.log-user-cell')?.textContent.toLowerCase() || '';
+                const note = row.querySelector('.log-note-cell')?.textContent.toLowerCase() || '';
+
+                if (itemName.includes(query) || user.includes(query) || note.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper') && 
+                !event.target.closest('#incomingModal') && 
+                !event.target.closest('#restockModal') &&
+                !event.target.closest('#settingsModal')) {
+                const dd = document.getElementById('notifDropdown');
+                const bell = document.getElementById('bell-icon');
+                if (dd && dd.classList.contains('show')) {
+                    dd.classList.remove('show');
+                    bell.classList.remove('active');
+                }
+            }
+            if (event.target === document.getElementById('incomingModal')) { closeIncomingModal(); }
+            if (event.target === document.getElementById('restockModal')) { closeRestockModal(); }
+            if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
+        }
+
+        // Smart Inactivity Auto-Refresh (Every 30 seconds)
+        const REFRESH_INTERVAL_MS = 30000;
+        setInterval(() => {
+            const isIncomingModalOpen = document.getElementById('incomingModal')?.style.display === 'flex';
+            const isRestockModalOpen = document.getElementById('restockModal')?.style.display === 'flex';
+            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
+            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
+
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
+
+            if (!isIncomingModalOpen && !isRestockModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
+                window.location.reload();
+            }
+        }, REFRESH_INTERVAL_MS);
+    </script>
+</body>
+</html>

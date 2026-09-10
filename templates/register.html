@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-input: #0B101E;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+            --accent-red: #EF4444;
+            --accent-yellow: #F59E0B;
+            --accent-green: #10B981;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        /* Branding Header */
+        .brand-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-container {
+            background: #FFFFFF; 
+            padding: 10px 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .mrkzter-logo {
+            height: 40px;
+            width: auto;
+            display: block;
+        }
+
+        .title-denta {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle-lis {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin: 0 0 8px 0;
+        }
+
+        /* Register Card */
+        .register-wrapper {
+            width: 100%;
+            max-width: 650px;
+        }
+
+        .register-card {
+            background-color: var(--bg-card);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .instruction-text {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .section-title {
+            font-size: 13px;
+            color: var(--accent-cyan);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section-title:first-of-type {
+            margin-top: 0;
+        }
+
+        /* Form Grid Layout */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 11px;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input, 
+        .form-group select {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input::placeholder {
+            color: #4B5563;
+        }
+
+        .form-group input:focus, 
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 1px var(--border-focus);
+        }
+
+        /* Password Input Wrapper with Toggle Icon */
+        .password-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-input-wrap input {
+            padding-right: 45px;
+        }
+
+        .toggle-password-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .toggle-password-btn:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Conditional Clinic Field Container */
+        #clinicFieldContainer {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.3s ease, margin-bottom 0.35s ease;
+            margin-bottom: 0;
+        }
+
+        #clinicFieldContainer.visible {
+            max-height: 100px;
+            opacity: 1;
+            margin-bottom: 20px;
+        }
+
+        /* Select Styling */
+        .form-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px top 50%;
+            background-size: 10px auto;
+        }
+
+        .form-group select option {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+        }
+
+        /* Password Strength Meter & Requirement Checklist (Initially Hidden) */
+        .password-feedback-wrapper {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, opacity 0.3s ease;
+        }
+
+        .password-feedback-wrapper.visible {
+            max-height: 250px;
+            opacity: 1;
+        }
+
+        .strength-meter-container {
+            margin-top: 10px;
+            margin-bottom: 8px;
+        }
+
+        .strength-bar-bg {
+            background: rgba(255, 255, 255, 0.08);
+            height: 4px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .strength-bar-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        .strength-text {
+            font-size: 11px;
+            margin-top: 4px;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .password-requirements {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .requirement-item {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+
+        .requirement-item.valid {
+            color: var(--accent-green);
+        }
+
+        .field-hint {
+            font-size: 11px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background-color: var(--accent-cyan);
+            color: #0B101E;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .submit-btn:hover { background-color: var(--accent-cyan-hover); }
+        .submit-btn:active { transform: scale(0.98); }
+        .submit-btn:disabled {
+            background-color: rgba(66, 221, 242, 0.2);
+            color: rgba(243, 244, 246, 0.4);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .links-container {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .links-container a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .links-container a.primary-link {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .links-container a:hover { color: var(--accent-cyan); }
+
+        .page-footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* Error Popup Modal */
+        .error-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(11, 16, 30, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .error-modal-container {
+            background-color: var(--bg-card);
+            border: 1px solid var(--accent-red);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+            animation: slideUp 0.3s ease-out forwards;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            text-align: center;
+            padding: 30px 24px;
+        }
+
+        .error-icon-box {
+            width: 52px; height: 52px;
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--accent-red);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px auto;
+        }
+
+        .error-modal-title {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        .error-modal-message {
+            margin: 0 0 24px 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .modal-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .error-modal-btn {
+            background-color: var(--accent-cyan);
+            color: var(--bg-main);
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .error-modal-btn:hover {
+            background-color: var(--accent-cyan-hover);
+        }
+
+        .error-modal-btn-secondary {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .error-modal-btn-secondary:hover {
+            color: var(--text-main);
+            border-color: var(--text-muted);
+        }
+
+        @media (max-width: 600px) {
+            .form-row, .password-requirements {
+                grid-template-columns: 1fr;
+            }
+            .register-card {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="brand-header">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
+        </div>
+        <h1 class="title-denta">Create Account</h1>
+        <p class="subtitle-lis">DentaLink Laboratory Information System</p>
+    </div>
+
+    <div class="register-wrapper">
+        <div class="register-card">
+            
+            <p class="instruction-text">
+                Your account will be verified and approved by the laboratory administrator prior to workspace authorization.
+            </p>
+
+            <form method="POST" id="registerForm">
+                
+                <div class="section-title">Personal Information</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" placeholder="John" required pattern="[A-Za-z\s]{2,}" title="First name must only contain letters (no numbers or special characters)">
+                        <span class="field-hint" id="firstNameHint" style="color: var(--text-muted);">Letters only</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" placeholder="Doe" required pattern="[A-Za-z\s]{2,}" title="Last name must only contain letters (no numbers or special characters)">
+                        <span class="field-hint" id="lastNameHint" style="color: var(--text-muted);">Letters only</span>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="display_name">Display Name</label>
+                        <input type="text" id="display_name" name="display_name" placeholder="e.g. Dr. Doe or J. Doe" required minlength="3">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone" placeholder="09123456789" required maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" title="Please enter an 11-digit mobile number starting with 09 (e.g., 09XXXXXXXXX)">
+                        <span class="field-hint" id="phoneHint" style="color: var(--text-muted);">Must start with 09 (11 digits)</span>
+                    </div>
+                </div>
+
+                <div class="section-title">Role Assignment</div>
+                <div class="form-group">
+                    <label for="role">Requested Account Role</label>
+                    <select id="role" name="role" required>
+                        <option value="" disabled selected>Select system role</option>
+                        <option value="dentist">Dentist (Clinical Partner)</option>
+                        <option value="technician">Dental Technician (Lab Bench)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="clinicFieldContainer">
+                    <label for="clinic_name">Dental Clinic Name</label>
+                    <input type="text" id="clinic_name" name="clinic_name" placeholder="e.g. SmileCare Dental Clinic">
+                    <span class="field-hint" style="color: var(--text-muted);">Name of your primary clinic or practice</span>
+                </div>
+
+                <div class="section-title">Account Security</div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="name@clinic.com" required autocomplete="email">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="password" name="password" placeholder="••••••••••••" required autocomplete="new-password">
+                            <button type="button" class="toggle-password-btn" id="togglePassword" aria-label="Toggle password visibility">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="confirm_password" name="confirm_password" placeholder="••••••••••••" required autocomplete="new-password">
+                            <button type="button" class="toggle-password-btn" id="toggleConfirmPassword" aria-label="Toggle confirm password visibility">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                        </div>
+                        <span class="field-hint" id="matchHint" style="color: var(--text-muted);">Passwords must match</span>
+                    </div>
+                </div>
+
+                <div class="password-feedback-wrapper" id="passwordFeedbackWrapper">
+                    <div class="strength-meter-container">
+                        <div class="strength-bar-bg">
+                            <div class="strength-bar-fill" id="strengthBar"></div>
+                        </div>
+                        <div class="strength-text" id="strengthText" style="color: var(--text-muted);">Password Strength</div>
+                    </div>
+
+                    <div class="password-requirements">
+                        <div class="requirement-item" id="reqLength">
+                            <span class="req-bullet">•</span> Min 8 characters
+                        </div>
+                        <div class="requirement-item" id="reqUpper">
+                            <span class="req-bullet">•</span> One uppercase letter
+                        </div>
+                        <div class="requirement-item" id="reqLower">
+                            <span class="req-bullet">•</span> One lowercase letter
+                        </div>
+                        <div class="requirement-item" id="reqNumber">
+                            <span class="req-bullet">•</span> One number
+                        </div>
+                        <div class="requirement-item" id="reqSpecial">
+                            <span class="req-bullet">•</span> One symbol (@$!%*?&#)
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Submit Registration
+                    <svg style="width: 16px; height: 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </form>
+
+            <div class="links-container">
+                <div>Already have an account? <a href="{{ url_for('login') }}" class="primary-link">Sign In</a></div>
+                <a href="{{ url_for('home') }}">← Back to Home</a>
+            </div>
+
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="error-modal-overlay" id="errorModal">
+                <div class="error-modal-container">
+                    <div class="error-icon-box">
+                        <svg width="26" height="26" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="error-modal-title">Account Notice</h3>
+                    {% for category, message in messages %}
+                        <p class="error-modal-message">{{ message }}</p>
+                    {% endfor %}
+                    <div class="modal-btn-group">
+                        <a href="{{ url_for('login') }}" class="error-modal-btn">Go to Sign In</a>
+                        <button type="button" class="error-modal-btn-secondary" onclick="closeErrorModal()">Dismiss</button>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="page-footer">
+        © 2026 Mrkzter Dental Laboratory • All Rights Reserved
+    </div>
+
+    <script>
+        const firstNameInput = document.getElementById('first_name');
+        const lastNameInput = document.getElementById('last_name');
+        const phoneInput = document.getElementById('phone');
+        const phoneHint = document.getElementById('phoneHint');
+        const roleSelect = document.getElementById('role');
+        const clinicFieldContainer = document.getElementById('clinicFieldContainer');
+        const clinicNameInput = document.getElementById('clinic_name');
+        
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm_password');
+        const togglePasswordBtn = document.getElementById('togglePassword');
+        const toggleConfirmPasswordBtn = document.getElementById('toggleConfirmPassword');
+        
+        const passwordFeedbackWrapper = document.getElementById('passwordFeedbackWrapper');
+        const matchHint = document.getElementById('matchHint');
+        const strengthBar = document.getElementById('strengthBar');
+        const strengthText = document.getElementById('strengthText');
+        const submitBtn = document.getElementById('submitBtn');
+
+        const reqLength = document.getElementById('reqLength');
+        const reqUpper = document.getElementById('reqUpper');
+        const reqLower = document.getElementById('reqLower');
+        const reqNumber = document.getElementById('reqNumber');
+        const reqSpecial = document.getElementById('reqSpecial');
+
+        // Letters-only sanitization
+        [firstNameInput, lastNameInput].forEach(input => {
+            input.addEventListener('input', function() {
+                this.value = this.value.replace(/[^A-Za-z\s]/g, '');
+                validateForm();
+            });
+        });
+
+        // Phone number formatting & validation (Must start with 09)
+        phoneInput.addEventListener('input', function() {
+            let val = this.value.replace(/[^0-9]/g, '');
+            
+            if (val.length === 1 && val !== '0') {
+                val = '09';
+            } else if (val.length >= 2 && val.slice(0, 2) !== '09') {
+                val = '09' + val.slice(2);
+            }
+            if (val.length > 11) {
+                val = val.slice(0, 11);
+            }
+            this.value = val;
+
+            if (this.value.length === 11 && this.value.startsWith('09')) {
+                phoneHint.textContent = "Valid phone number format";
+                phoneHint.style.color = "var(--accent-green)";
+            } else {
+                phoneHint.textContent = `Must start with 09 (${this.value.length}/11 digits)`;
+                phoneHint.style.color = "var(--text-muted)";
+            }
+            validateForm();
+        });
+
+        // Ensure 09 prefix if user focuses an empty phone box
+        phoneInput.addEventListener('focus', function() {
+            if (!this.value) {
+                this.value = '09';
+            }
+        });
+
+        // Role selection listener for Dental Clinic Name
+        roleSelect.addEventListener('change', function() {
+            if (this.value === 'dentist') {
+                clinicFieldContainer.classList.add('visible');
+                clinicNameInput.required = true;
+            } else {
+                clinicFieldContainer.classList.remove('visible');
+                clinicNameInput.required = false;
+                clinicNameInput.value = '';
+            }
+            validateForm();
+        });
+
+        clinicNameInput.addEventListener('input', validateForm);
+
+        // Show/Hide Password functionality
+        function setupPasswordToggle(inputField, toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
+                inputField.setAttribute('type', type);
+                
+                // Switch Eye SVG Icon
+                if (type === 'text') {
+                    toggleBtn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.057 10.057 0 012.356-4.264M9.88 4.88A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7-10.025 10.025 0 01-4.132 5.411m0 0L21 21M3 3l18 18"/></svg>`;
+                } else {
+                    toggleBtn.innerHTML = `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`;
+                }
+            });
+        }
+
+        setupPasswordToggle(passwordInput, togglePasswordBtn);
+        setupPasswordToggle(confirmPasswordInput, toggleConfirmPasswordBtn);
+
+        // Reveal password checklist requirements when user interacts or types
+        passwordInput.addEventListener('focus', function() {
+            passwordFeedbackWrapper.classList.add('visible');
+        });
+
+        passwordInput.addEventListener('input', function() {
+            passwordFeedbackWrapper.classList.add('visible');
+            evaluatePassword();
+        });
+
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+
+        function evaluatePassword() {
+            const val = passwordInput.value;
+            
+            const hasLength = val.length >= 8;
+            const hasUpper = /[A-Z]/.test(val);
+            const hasLower = /[a-z]/.test(val);
+            const hasNumber = /[0-9]/.test(val);
+            const hasSpecial = /[@$!%*?&#^()_\-+={}[\]:;"'<>,.]/.test(val);
+
+            updateRequirement(reqLength, hasLength);
+            updateRequirement(reqUpper, hasUpper);
+            updateRequirement(reqLower, hasLower);
+            updateRequirement(reqNumber, hasNumber);
+            updateRequirement(reqSpecial, hasSpecial);
+
+            const score = [hasLength, hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
+
+            if (val.length === 0) {
+                strengthBar.style.width = '0%';
+                strengthText.textContent = 'Password Strength';
+                strengthText.style.color = 'var(--text-muted)';
+            } else if (score <= 2) {
+                strengthBar.style.width = '33%';
+                strengthBar.style.backgroundColor = 'var(--accent-red)';
+                strengthText.textContent = 'Weak';
+                strengthText.style.color = 'var(--accent-red)';
+            } else if (score <= 4) {
+                strengthBar.style.width = '66%';
+                strengthBar.style.backgroundColor = 'var(--accent-yellow)';
+                strengthText.textContent = 'Moderate';
+                strengthText.style.color = 'var(--accent-yellow)';
+            } else {
+                strengthBar.style.width = '100%';
+                strengthBar.style.backgroundColor = 'var(--accent-green)';
+                strengthText.textContent = 'Strong';
+                strengthText.style.color = 'var(--accent-green)';
+            }
+
+            checkPasswordMatch();
+            validateForm();
+        }
+
+        function updateRequirement(element, isValid) {
+            if (isValid) {
+                element.classList.add('valid');
+                element.querySelector('.req-bullet').textContent = '✓';
+            } else {
+                element.classList.remove('valid');
+                element.querySelector('.req-bullet').textContent = '•';
+            }
+        }
+
+        function checkPasswordMatch() {
+            if (!confirmPasswordInput.value) {
+                matchHint.textContent = "Passwords must match";
+                matchHint.style.color = "var(--text-muted)";
+                return;
+            }
+
+            if (passwordInput.value === confirmPasswordInput.value) {
+                matchHint.textContent = "✓ Passwords match";
+                matchHint.style.color = "var(--accent-green)";
+            } else {
+                matchHint.textContent = "Passwords do not match";
+                matchHint.style.color = "var(--accent-red)";
+            }
+            validateForm();
+        }
+
+        function validateForm() {
+            const isFirstNameValid = /^[A-Za-z\s]{2,}$/.test(firstNameInput.value.trim());
+            const isLastNameValid = /^[A-Za-z\s]{2,}$/.test(lastNameInput.value.trim());
+            const isRoleSelected = roleSelect.value !== "";
+            const isClinicValid = roleSelect.value !== 'dentist' || clinicNameInput.value.trim().length > 0;
+
+            const pVal = passwordInput.value;
+            const isPasswordValid = pVal.length >= 8 &&
+                                    /[A-Z]/.test(pVal) &&
+                                    /[a-z]/.test(pVal) &&
+                                    /[0-9]/.test(pVal) &&
+                                    /[@$!%*?&#^()_\-+={}[\]:;"'<>,.]/.test(pVal);
+
+            const isMatch = passwordInput.value === confirmPasswordInput.value;
+            const isPhoneValid = phoneInput.value.length === 11 && phoneInput.value.startsWith('09');
+
+            submitBtn.disabled = !(isFirstNameValid && isLastNameValid && isRoleSelected && isClinicValid && isPasswordValid && isMatch && isPhoneValid);
+        }
+
+        function closeErrorModal() {
+            const modal = document.getElementById('errorModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('errorModal');
+            if (event.target === modal) {
+                closeErrorModal();
+            }
+        };
+
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            const namePattern = /^[A-Za-z\s]{2,}$/;
+            if (!namePattern.test(firstNameInput.value.trim()) || !namePattern.test(lastNameInput.value.trim())) {
+                e.preventDefault();
+                alert("First and last names must contain letters only.");
+                return;
+            }
+            if (phoneInput.value.length !== 11 || !phoneInput.value.startsWith('09')) {
+                e.preventDefault();
+                alert("Please enter a valid 11-digit mobile number starting with 09.");
+                return;
+            }
+            if (roleSelect.value === 'dentist' && !clinicNameInput.value.trim()) {
+                e.preventDefault();
+                alert("Please provide your Dental Clinic Name.");
+                return;
+            }
+            if (passwordInput.value !== confirmPasswordInput.value) {
+                e.preventDefault();
+                alert("Passwords do not match.");
+                return;
+            }
+        });
+    </script>
+</body>
+</html>

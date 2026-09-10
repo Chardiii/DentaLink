@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technician Dashboard - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #151C2C;
+            --bg-card-hover: #1C263B;
+            --bg-input: #0E1424;
+            --border-color: #243048;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #101626;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(66, 221, 242, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(29, 66, 138, 0.12) 0%, transparent 45%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .app-header {
+            background-color: rgba(11, 16, 30, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .logo-box { background: linear-gradient(135deg, var(--accent-cyan), #1d4ed8); border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
+
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 10px; border-radius: 20px; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
+
+        /* Notification Dropdown */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 7px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--accent-cyan); background: rgba(66, 221, 242, 0.05); }
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid var(--bg-main); }
+        .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header); }
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; }
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4; }
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
+        .notif-close:hover { color: var(--accent-red); }
+
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 34px; height: 34px; background: linear-gradient(135deg, rgba(66, 221, 242, 0.2), rgba(16, 185, 129, 0.2)); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+        .user-info p { margin: 0; font-size: 13px; font-weight: 600; }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); }
+        .btn-icon { padding: 7px; border-radius: 8px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
+        /* Dashboard Container */
+        .container { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
+
+        /* Production Pulse Bar */
+        .pulse-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .pulse-tile {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .pulse-info span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+        .pulse-info h3 { margin: 4px 0 0 0; font-size: 24px; font-weight: 700; color: var(--text-main); }
+        .pulse-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+
+        /* Workspace Header */
+        .workspace-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; }
+        .workspace-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+
+        /* Buttons & Filter Toggles */
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
+        .btn-outline { background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { border-color: var(--text-muted); background-color: rgba(255,255,255,0.02); }
+        .btn-toggle-completed.active-filter { background-color: rgba(16, 185, 129, 0.1); border-color: var(--accent-green); color: var(--accent-green); }
+
+        /* Kanban Layout */
+        .kanban-board {
+            display: flex;
+            gap: 16px;
+            overflow-x: auto;
+            padding-bottom: 16px;
+            align-items: flex-start;
+        }
+        .kanban-board::-webkit-scrollbar { height: 6px; }
+        .kanban-board::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .kanban-column {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            min-width: 290px;
+            max-width: 290px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .kanban-header {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--panel-header);
+        }
+
+        .kanban-title { font-size: 12px; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.5px; }
+        .kanban-count { background: rgba(66, 221, 242, 0.12); color: var(--accent-cyan); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+
+        .kanban-body {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 220px;
+            max-height: 72vh;
+            overflow-y: auto;
+        }
+        .kanban-body::-webkit-scrollbar { width: 4px; }
+        .kanban-body::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .empty-column {
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 36px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* Refined Kanban Cards */
+        .k-card {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .k-card:hover { border-color: var(--accent-cyan); box-shadow: 0 6px 18px rgba(0,0,0,0.3); transform: translateY(-1px); }
+
+        .k-card-header { display: flex; justify-content: space-between; align-items: center; }
+        .k-badge-cyan { background: rgba(66, 221, 242, 0.12); color: var(--accent-cyan); padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(66, 221, 242, 0.25); }
+        .k-due-chip { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); border: 1px solid rgba(245, 158, 11, 0.25); }
+
+        .k-card-title { color: var(--text-main); font-size: 14px; font-weight: 700; margin: 0; line-height: 1.3; }
+        .k-card-meta { color: var(--text-muted); font-size: 11px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+
+        .k-card-action-bar {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 8px;
+            align-items: center;
+        }
+
+        .select-dark {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            outline: none;
+            flex: 1;
+            font-weight: 600;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px top 50%;
+            background-size: 8px auto;
+        }
+        .select-dark:focus { border-color: var(--border-focus); }
+
+        .btn-card-save { background-color: var(--accent-cyan); color: var(--bg-main); padding: 6px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; border: none; cursor: pointer; transition: background 0.15s; }
+        .btn-card-save:hover { background-color: var(--accent-cyan-hover); }
+
+        .view-link-btn { font-size: 11px; color: var(--text-muted); text-decoration: none; text-align: center; display: block; margin-top: 2px; }
+        .view-link-btn:hover { color: var(--accent-cyan); text-decoration: underline; }
+
+        /* Completed Grid */
+        .completed-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+        /* JIT Material Logging Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 620px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { background-color: var(--panel-header); padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { margin: 0; font-size: 16px; color: var(--text-main); font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .modal-body { padding: 24px; overflow-y: auto; }
+        .modal-footer { background-color: var(--panel-header); padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; }
+        .close-btn:hover { color: var(--accent-red); }
+
+        .material-row { display: grid; grid-template-columns: 1fr 110px 30px; gap: 12px; align-items: end; margin-bottom: 12px; background: rgba(0,0,0,0.25); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .info-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .percent-wrapper { position: relative; display: flex; align-items: center; }
+        .percent-symbol { position: absolute; right: 12px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
+        .input-dark { width: 100%; padding: 8px 12px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; font-size: 13px; outline: none; }
+        .input-dark:focus { border-color: var(--accent-cyan); }
+
+        /* Sound Editor Slider Range */
+        .slider-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            outline: none;
+        }
+        .slider-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(66, 221, 242, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
+            </div>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Mrkzter Dental Laboratory</p>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="status-indicator">
+                <div class="status-dot"></div> Bench Active
+            </div>
+
+            <!-- Workspace Settings Button -->
+            <button class="notif-bell" onclick="openSettingsModal()" title="Sound & Workspace Preferences">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)" title="Notifications">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Bench Alerts
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Take Action →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No new notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="user-profile">
+                <div class="avatar">{{ profile.first_name[0] }}{{ profile.last_name[0] }}</div>
+                <div class="user-info">
+                    <p>{{ profile.display_name }}</p>
+                    <span>Technician Portal</span>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                <button type="submit" class="btn-icon" title="Logout">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+
+        {% set assigned_cases = cases | selectattr('status', 'in', ['assigned', 'pending', 'new']) | list %}
+        {% set in_progress_cases = cases | selectattr('status', 'in', ['in_progress', 'cad_designing', 'wax_up_or_try_in']) | list %}
+        {% set milling_cases = cases | selectattr('status', 'equalto', 'milling_or_printing') | list %}
+        {% set packing_cases = cases | selectattr('status', 'equalto', 'packing_and_curing') | list %}
+        {% set qc_cases = cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
+        {% set completed_cases = cases | selectattr('status', 'equalto', 'completed') | list %}
+        {% set total_active = assigned_cases|length + in_progress_cases|length + milling_cases|length + packing_cases|length + qc_cases|length %}
+
+        <div class="pulse-strip">
+            <div class="pulse-tile" style="border-left: 3px solid var(--accent-cyan);">
+                <div class="pulse-info">
+                    <span>Active Bench Workload</span>
+                    <h3>{{ total_active }}</h3>
+                </div>
+                <div class="pulse-icon" style="background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                </div>
+            </div>
+
+            <div class="pulse-tile" style="border-left: 3px solid var(--accent-yellow);">
+                <div class="pulse-info">
+                    <span>Newly Dispatched</span>
+                    <h3 style="color: var(--accent-yellow);">{{ assigned_cases|length }}</h3>
+                </div>
+                <div class="pulse-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+            </div>
+
+            <div class="pulse-tile" style="border-left: 3px solid var(--accent-green);">
+                <div class="pulse-info">
+                    <span>Units Finished</span>
+                    <h3>{{ completed_cases|length }}</h3>
+                </div>
+                <div class="pulse-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="workspace-header">
+            <h2 class="workspace-title" id="workspace-title-text">
+                <svg width="22" height="22" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                Fabrication Stages Pipeline
+            </h2>
+
+            <div class="workspace-actions">
+                <button class="btn btn-outline btn-toggle-completed" id="completed-toggle-btn" onclick="toggleCompleted()">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Completed Cases Archive ({{ completed_cases|length }})
+                </button>
+            </div>
+        </div>
+
+        <div class="kanban-board" id="kanban-pipeline">
+
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">0. Assigned / New</span>
+                    <span class="kanban-count">{{ assigned_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in assigned_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-meta">
+                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                            </div>
+                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <div class="k-card-action-bar">
+                                    <select name="status" class="select-dark status-dropdown">
+                                        <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="cad_designing">CAD Designing</option>
+                                        <option value="wax_up_or_try_in">Wax-up / Setup</option>
+                                        <option value="milling_or_printing">Milling / Printing</option>
+                                        <option value="packing_and_curing">Packing & Curing</option>
+                                        <option value="finishing_and_quality_check">Finishing & QC</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                    <button type="submit" class="btn-card-save">Start</button>
+                                </div>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No unstarted cases</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">1. Setup & CAD</span>
+                    <span class="kanban-count">{{ in_progress_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in in_progress_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-meta">
+                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                            </div>
+                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <div class="k-card-action-bar">
+                                    <select name="status" class="select-dark status-dropdown">
+                                        <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                        <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
+                                        <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
+                                        <option value="milling_or_printing">Milling / Printing</option>
+                                        <option value="packing_and_curing">Packing & Curing</option>
+                                        <option value="finishing_and_quality_check">Finishing & QC</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                    <button type="submit" class="btn-card-save">Save</button>
+                                </div>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No units in CAD / Setup</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">2. Milling / Printing</span>
+                    <span class="kanban-count">{{ milling_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in milling_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-meta">
+                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                            </div>
+                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <div class="k-card-action-bar">
+                                    <select name="status" class="select-dark status-dropdown">
+                                        <option value="milling_or_printing" selected>Milling / Printing</option>
+                                        <option value="packing_and_curing">Packing & Curing</option>
+                                        <option value="finishing_and_quality_check">Finishing & QC</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                    <button type="submit" class="btn-card-save">Save</button>
+                                </div>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No units in CAM / Milling</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">3. Packing & Curing</span>
+                    <span class="kanban-count">{{ packing_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in packing_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-meta">
+                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                            </div>
+                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <div class="k-card-action-bar">
+                                    <select name="status" class="select-dark status-dropdown">
+                                        <option value="packing_and_curing" selected>Packing & Curing</option>
+                                        <option value="finishing_and_quality_check">Finishing & QC</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                    <button type="submit" class="btn-card-save">Save</button>
+                                </div>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No units in Packing</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">4. Finishing & QC</span>
+                    <span class="kanban-count">{{ qc_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in qc_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-meta">
+                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                            </div>
+                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
+                                  data-case-id="{{ c.id }}"
+                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                                <div class="k-card-action-bar">
+                                    <select name="status" class="select-dark status-dropdown">
+                                        <option value="finishing_and_quality_check" selected>Finishing & QC</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                    <button type="submit" class="btn-card-save">Finish</button>
+                                </div>
+                            </form>
+                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">No units in Quality Check</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+
+        <div class="completed-grid" id="completed-grid">
+            {% for c in completed_cases %}
+                <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);">
+                    <div class="k-card-header">
+                        <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--accent-green);">Completed</span>
+                    </div>
+                    <div class="k-card-title">{{ c.patient_name }}</div>
+                    <div class="k-card-meta">
+                        <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                        <span>Delivered: {{ c.due_date or 'N/A' }}</span>
+                    </div>
+                    <a href="/technician/cases/{{ c.id }}" class="btn btn-outline" style="margin-top: 10px; font-size: 12px; color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">View Archived Case →</a>
+                </div>
+            {% else %}
+                <div class="empty-column" style="grid-column: 1 / -1; padding: 48px;">
+                    No completed cases archived yet.
+                </div>
+            {% endfor %}
+        </div>
+
+    </main>
+
+    <!-- MATERIAL CONSUMPTION MODAL -->
+    <div class="modal-overlay" id="materialModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    Log Raw Material Consumption
+                </h2>
+                <button type="button" class="close-btn" onclick="closeMaterialModal()">×</button>
+            </div>
+
+            <div class="modal-body">
+                <p id="modalInstructions" style="color: var(--text-muted); font-size: 13px; margin-top: 0; margin-bottom: 18px;"></p>
+                <div id="materialRowsContainer"></div>
+
+                <button type="button" id="addMaterialBtn" class="btn btn-outline" onclick="addMaterialRow()" style="margin-top: 12px; width: 100%; border-style: dashed; display: none;">
+                    + Log Additional Consumable from Stock
+                </button>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeMaterialModal()">Cancel</button>
+                <button type="button" class="btn btn-outline" onclick="skipLogging()">Skip Logging</button>
+                <button type="button" class="btn" style="background-color: var(--accent-cyan); color: var(--bg-main);" onclick="submitStatusWithMaterials()">Save & Advance Stage</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKSPACE SETTINGS MODAL (With Independent Technician Keys) -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-container" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Technician Preferences
+                </h2>
+                <button type="button" class="close-btn" onclick="closeSettingsModal()">×</button>
+            </div>
+
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Master Sound Toggle -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="color: var(--text-main); font-size: 13px; display: block;">Notification Sound Alerts</strong>
+                        <span style="font-size: 12px; color: var(--text-muted);">Play audio tone when cases move or alerts arrive</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer;">
+                        <input type="checkbox" id="settingSoundToggle" onchange="updateSoundSetting(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span id="soundSlider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); border-radius: 24px; transition: .25s;"></span>
+                        <span id="soundKnob" style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .25s;"></span>
+                    </label>
+                </div>
+
+                <!-- Tone Selector & Sound Editor -->
+                <div id="soundEditorGroup" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Tone Preset Selection -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sound Chime Theme</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="settingSoundTone" class="select-dark" style="flex: 1; padding: 8px 10px; font-size: 12px;" onchange="updateToneSetting(this.value)">
+                                <option value="chime">Modern Bell Chime (Default)</option>
+                                <option value="ping">Glass Crystal Ping</option>
+                                <option value="pop">Soft Digital Pop</option>
+                                <option value="alert">Double Dispatch Tone</option>
+                            </select>
+                            <button type="button" class="btn btn-outline" onclick="previewSoundTone()" title="Test Sound" style="padding: 6px 14px; gap: 6px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+                                </svg>
+                                Test
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Volume Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Volume Level</span>
+                            <span id="volumeVal" style="color: var(--accent-cyan);">70%</span>
+                        </div>
+                        <input type="range" id="settingVolume" class="slider-range" min="0.05" max="1.0" step="0.05" value="0.7" oninput="updateVolume(this.value)">
+                    </div>
+
+                    <!-- Pitch / Frequency Drag Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Pitch Tuning (Lower / Higher)</span>
+                            <span id="pitchVal" style="color: var(--accent-cyan);">1.0x (Standard)</span>
+                        </div>
+                        <input type="range" id="settingPitch" class="slider-range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updatePitch(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--panel-header); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button type="button" class="btn" style="background-color: var(--accent-cyan); color: var(--bg-main);" onclick="closeSettingsModal()">Save & Done</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dynamic-row-template" style="display: none;">
+        <div class="material-row">
+            <div>
+                <label class="info-label">Material Consumed</label>
+                <select class="select-dark material-select" name="modal_material[]">
+                    <option value="" disabled selected>Select from laboratory inventory...</option>
+                    <optgroup label="Acrylics & Resins">
+                        <option value="Vertex Acrylic Powder (Pink)">Vertex Acrylic Powder (Pink)</option>
+                        <option value="Vertex Monomer Liquid">Vertex Monomer Liquid</option>
+                        <option value="3D Printing Resin">3D Printing Resin</option>
+                    </optgroup>
+                    <optgroup label="Finishing & QC">
+                        <option value="VITA Ceramic Glaze Paste">VITA Ceramic Glaze Paste</option>
+                        <option value="VITA Akzent Stain Kit">VITA Akzent Stain Kit</option>
+                        <option value="Polishing Paste">Polishing Paste</option>
+                        <option value="Articulating Paper">Articulating Paper</option>
+                    </optgroup>
+                    <optgroup label="Processing Materials">
+                        <option value="Dental Stone">Dental Stone/Plaster</option>
+                        <option value="Separating Medium">Separating Medium</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div>
+                <label class="info-label">Portion (%)</label>
+                <div class="percent-wrapper">
+                    <input type="number" name="modal_percentage[]" class="input-dark" placeholder="25" min="1" max="100">
+                    <span class="percent-symbol">%</span>
+                </div>
+            </div>
+            <div style="padding-top: 16px;">
+                <button type="button" class="btn-icon" onclick="this.closest('.material-row').remove()" title="Remove">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // USER-SCOPED STORAGE KEY CONFIGURATION
+        // Ensures each account has independent settings on the same device
+        // ==========================================
+        const CURRENT_USER_ID = "{{ profile.id }}";
+        const KEY_SOUND_ENABLED = `dl_user_${CURRENT_USER_ID}_sound_enabled`;
+        const KEY_SOUND_TONE    = `dl_user_${CURRENT_USER_ID}_sound_tone`;
+        const KEY_SOUND_VOLUME  = `dl_user_${CURRENT_USER_ID}_sound_volume`;
+        const KEY_SOUND_PITCH   = `dl_user_${CURRENT_USER_ID}_sound_pitch`;
+        const KEY_ACTION_COUNT  = `dl_user_${CURRENT_USER_ID}_action_count`;
+
+        // ==========================================
+        // SYNTHESIZED WEB AUDIO ENGINE (USER-SCOPED)
+        // ==========================================
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(toneType) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                // User-scoped volume & pitch
+                const userVol = parseFloat(localStorage.getItem(KEY_SOUND_VOLUME) || '0.7');
+                const userPitch = parseFloat(localStorage.getItem(KEY_SOUND_PITCH) || '1.0');
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                switch (toneType) {
+                    case 'chime':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(1320 * userPitch, now + 0.12);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                        osc.start(now);
+                        osc.stop(now + 0.5);
+                        break;
+                    case 'ping':
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(1760 * userPitch, now);
+                        gain.gain.setValueAtTime(0.25 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    case 'pop':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(800 * userPitch, now + 0.08);
+                        gain.gain.setValueAtTime(0.4 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                        osc.start(now);
+                        osc.stop(now + 0.18);
+                        break;
+                    case 'alert':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(950 * userPitch, now);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.setValueAtTime(0.01, now + 0.08);
+                        gain.gain.setValueAtTime(0.3 * userVol, now + 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    default:
+                        this.playTone('chime');
+                }
+            }
+        };
+
+        function triggerNotificationSound() {
+            const soundEnabled = localStorage.getItem(KEY_SOUND_ENABLED) !== 'false';
+            if (!soundEnabled) return;
+            const selectedTone = localStorage.getItem(KEY_SOUND_TONE) || 'chime';
+            AudioEngine.playTone(selectedTone);
+        }
+
+        // ==========================================
+        // SETTINGS & AUDIO SLIDER CONTROLS
+        // ==========================================
+        function openSettingsModal() {
+            initSettingsValues();
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function initSettingsValues() {
+            const soundEnabled = localStorage.getItem(KEY_SOUND_ENABLED) !== 'false';
+            const selectedTone = localStorage.getItem(KEY_SOUND_TONE) || 'chime';
+            const volume = localStorage.getItem(KEY_SOUND_VOLUME) || '0.7';
+            const pitch = localStorage.getItem(KEY_SOUND_PITCH) || '1.0';
+
+            const checkbox = document.getElementById('settingSoundToggle');
+            const toneSelect = document.getElementById('settingSoundTone');
+            const volInput = document.getElementById('settingVolume');
+            const pitchInput = document.getElementById('settingPitch');
+            const editorGroup = document.getElementById('soundEditorGroup');
+
+            if (checkbox) checkbox.checked = soundEnabled;
+            if (toneSelect) toneSelect.value = selectedTone;
+            if (volInput) volInput.value = volume;
+            if (pitchInput) pitchInput.value = pitch;
+
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(volume) * 100) + '%';
+            document.getElementById('pitchVal').innerText = pitch + 'x' + (pitch === '1.0' ? ' (Standard)' : (pitch < 1 ? ' (Deeper)' : ' (Higher)'));
+
+            syncToggleStyle(soundEnabled);
+            if (editorGroup) editorGroup.style.opacity = soundEnabled ? '1' : '0.4';
+        }
+
+        function updateSoundSetting(isEnabled) {
+            localStorage.setItem(KEY_SOUND_ENABLED, isEnabled);
+            syncToggleStyle(isEnabled);
+            const editorGroup = document.getElementById('soundEditorGroup');
+            if (editorGroup) editorGroup.style.opacity = isEnabled ? '1' : '0.4';
+
+            if (isEnabled) {
+                AudioEngine.init();
+                AudioEngine.playTone(localStorage.getItem(KEY_SOUND_TONE) || 'chime');
+            }
+        }
+
+        function syncToggleStyle(isEnabled) {
+            const slider = document.getElementById('soundSlider');
+            const knob = document.getElementById('soundKnob');
+            if (slider && knob) {
+                slider.style.backgroundColor = isEnabled ? 'var(--accent-cyan)' : 'var(--border-color)';
+                knob.style.transform = isEnabled ? 'translateX(20px)' : 'translateX(0px)';
+            }
+        }
+
+        function updateToneSetting(newTone) {
+            localStorage.setItem(KEY_SOUND_TONE, newTone);
+            AudioEngine.playTone(newTone);
+        }
+
+        function updateVolume(val) {
+            localStorage.setItem(KEY_SOUND_VOLUME, val);
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(val) * 100) + '%';
+        }
+
+        function updatePitch(val) {
+            localStorage.setItem(KEY_SOUND_PITCH, val);
+            const num = parseFloat(val);
+            document.getElementById('pitchVal').innerText = val + 'x' + (num === 1.0 ? ' (Standard)' : (num < 1 ? ' (Deeper)' : ' (Higher)'));
+        }
+
+        function previewSoundTone() {
+            const tone = document.getElementById('settingSoundTone').value;
+            AudioEngine.playTone(tone);
+        }
+
+        // ==========================================
+        // ACTION DETECTION (DISPATCHES, MILLING, QC & NOTIFICATIONS)
+        // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            initSettingsValues();
+
+            const assignedCount = parseInt("{{ assigned_cases|length if assigned_cases else 0 }}", 10);
+            const millingCount = parseInt("{{ milling_cases|length if milling_cases else 0 }}", 10);
+            const qcCount = parseInt("{{ qc_cases|length if qc_cases else 0 }}", 10);
+            const notifCount = parseInt("{{ notifications|length if notifications else 0 }}", 10);
+
+            const totalActionCount = assignedCount + millingCount + qcCount + notifCount;
+            const lastActionCount = parseInt(localStorage.getItem(KEY_ACTION_COUNT) || '0', 10);
+
+            if (totalActionCount > lastActionCount && lastActionCount !== 0) {
+                triggerNotificationSound();
+            }
+
+            localStorage.setItem(KEY_ACTION_COUNT, totalActionCount);
+        });
+
+        // Notifications Popover Handlers
+        function toggleNotif(e) {
+            e.stopPropagation();
+            document.getElementById('notifDropdown').classList.toggle('show');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No bench alerts.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if (count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper') && !event.target.closest('#settingsModal') && !event.target.closest('#materialModal')) {
+                const dd = document.getElementById('notifDropdown');
+                if (dd) dd.classList.remove('show');
+            }
+            if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
+            if (event.target === document.getElementById('materialModal')) { closeMaterialModal(); }
+        }
+
+        let showingCompleted = false;
+        function toggleCompleted() {
+            showingCompleted = !showingCompleted;
+            const btn = document.getElementById('completed-toggle-btn');
+            const title = document.getElementById('workspace-title-text');
+            const pipeline = document.getElementById('kanban-pipeline');
+            const completedGrid = document.getElementById('completed-grid');
+
+            if (showingCompleted) {
+                btn.classList.add('active-filter');
+                title.innerHTML = `<svg width="22" height="22" fill="none" stroke="var(--accent-green)" viewBox="0 0 24 24" style="margin-right: 8px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Completed Cases Archive`;
+                pipeline.style.display = 'none';
+                completedGrid.style.display = 'grid';
+            } else {
+                btn.classList.remove('active-filter');
+                title.innerHTML = `<svg width="22" height="22" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24" style="margin-right: 8px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg> Fabrication Stages Pipeline`;
+                completedGrid.style.display = 'none';
+                pipeline.style.display = 'flex';
+            }
+        }
+
+        const materialModal = document.getElementById('materialModal');
+        const lockedContainer = document.getElementById('materialRowsContainer');
+        const modalInstructions = document.getElementById('modalInstructions');
+        const addMaterialBtn = document.getElementById('addMaterialBtn');
+        const rowTemplate = document.getElementById('dynamic-row-template').innerHTML;
+
+        let currentSubmittingForm = null;
+        const loggableStages = ["milling_or_printing", "packing_and_curing", "finishing_and_quality_check"];
+
+        document.querySelectorAll('.status-update-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const newStatus = this.querySelector('.status-dropdown').value;
+                const rawMaterials = this.dataset.materials; 
+
+                if (loggableStages.includes(newStatus)) {
+                    e.preventDefault(); 
+                    currentSubmittingForm = this; 
+
+                    const niceStatusName = newStatus.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    lockedContainer.innerHTML = '';
+
+                    if (newStatus === 'milling_or_printing') {
+                        modalInstructions.innerHTML = `Advancing to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. Prescribed materials for this order are listed below. Enter portion percentage utilized.`;
+                        addMaterialBtn.style.display = 'none';
+
+                        if (rawMaterials && rawMaterials.trim() !== '') {
+                            const materialsArray = rawMaterials.split(',');
+                            materialsArray.forEach(mat => {
+                                const formattedMat = mat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                const row = document.createElement('div');
+                                row.className = 'material-row';
+                                row.style.gridTemplateColumns = '1fr 110px'; 
+                                row.innerHTML = `
+                                    <div>
+                                        <label class="info-label">Prescribed Substrate</label>
+                                        <div style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                            <svg width="15" height="15" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            ${formattedMat}
+                                        </div>
+                                        <input type="hidden" name="modal_material[]" value="${mat}">
+                                    </div>
+                                    <div>
+                                        <label class="info-label">Used (%)</label>
+                                        <div class="percent-wrapper">
+                                            <input type="number" name="modal_percentage[]" class="input-dark" placeholder="15" min="1" max="100" required>
+                                            <span class="percent-symbol">%</span>
+                                        </div>
+                                    </div>
+                                `;
+                                lockedContainer.appendChild(row);
+                            });
+                        } else {
+                            lockedContainer.innerHTML = `<div style="padding: 14px; border: 1px dashed var(--border-color); border-radius: 8px; text-align: center; color: var(--text-muted); font-size: 12px;">No prescribed materials mapped to this case.</div>`;
+                        }
+                    } else {
+                        modalInstructions.innerHTML = `Advancing to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. Select lab consumables consumed from stock:`;
+                        addMaterialBtn.style.display = 'block';
+                        addMaterialRow();
+                    }
+                    materialModal.style.display = 'flex';
+                }
+            });
+        });
+
+        function addMaterialRow() {
+            lockedContainer.insertAdjacentHTML('beforeend', rowTemplate);
+        }
+
+        function closeMaterialModal() {
+            materialModal.style.display = 'none';
+            currentSubmittingForm = null;
+        }
+
+        function skipLogging() {
+            if (currentSubmittingForm) { currentSubmittingForm.submit(); }
+        }
+
+        function submitStatusWithMaterials() {
+            if (!currentSubmittingForm) return;
+
+            const materials = lockedContainer.querySelectorAll('input[name="modal_material[]"], select[name="modal_material[]"]');
+            const percentages = lockedContainer.querySelectorAll('input[name="modal_percentage[]"]');
+
+            let isValid = true;
+            percentages.forEach(input => {
+                if (!input.value || input.value <= 0) {
+                    isValid = false;
+                    input.style.borderColor = 'var(--accent-red)';
+                } else {
+                    input.style.borderColor = 'var(--border-color)';
+                }
+            });
+
+            materials.forEach(mat => {
+                if (mat.tagName === 'SELECT' && !mat.value) {
+                    isValid = false;
+                    mat.style.borderColor = 'var(--accent-red)';
+                }
+            });
+
+            if (!isValid && materials.length > 0) {
+                alert("Please specify a valid consumable and consumption percentage, or select 'Skip Logging'.");
+                return;
+            }
+
+            materials.forEach((mat, index) => {
+                if (mat.value && percentages[index].value) {
+                    const hiddenMat = document.createElement('input');
+                    hiddenMat.type = 'hidden';
+                    hiddenMat.name = 'logged_materials';
+                    hiddenMat.value = mat.value;
+
+                    const hiddenPct = document.createElement('input');
+                    hiddenPct.type = 'hidden';
+                    hiddenPct.name = 'logged_percentages';
+                    hiddenPct.value = percentages[index].value;
+
+                    currentSubmittingForm.appendChild(hiddenMat);
+                    currentSubmittingForm.appendChild(hiddenPct);
+                }
+            });
+
+            currentSubmittingForm.submit();
+        }
+
+        // ==========================================
+        // SMART AUTO-REFRESH (Every 30 seconds)
+        // ==========================================
+        const REFRESH_INTERVAL_MS = 30000;
+        setInterval(() => {
+            const isMaterialModalOpen = document.getElementById('materialModal')?.style.display === 'flex';
+            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
+            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
+
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
+
+            if (!isMaterialModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
+                window.location.reload();
+            }
+        }, REFRESH_INTERVAL_MS);
+    </script>
+</body>
+</html>

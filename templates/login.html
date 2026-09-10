@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #161B28;
+            --bg-input: #0B101E;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #2bbacb;
+            --accent-red: #EF4444;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --border-color: #262F44;
+            --border-focus: #42DDF2;
+            --panel-header: #131825;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(66, 221, 242, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(29, 66, 138, 0.15) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-size: cover;
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Split Login Container Card */
+        .login-split-card {
+            display: flex;
+            flex-direction: row;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 860px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        /* Left Branding Panel */
+        .brand-panel {
+            flex: 1;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border-right: 1px solid var(--border-color);
+            padding: 50px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-container {
+            background: #FFFFFF;
+            padding: 12px 24px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .mrkzter-logo {
+            height: 42px;
+            width: auto;
+            display: block;
+        }
+
+        .brand-panel .title-denta {
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0 0 6px 0;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .brand-panel .subtitle-lis {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin: 0 0 10px 0;
+        }
+
+        .brand-panel .subtitle-lab {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .brand-badge {
+            margin-top: 35px;
+            background: rgba(66, 221, 242, 0.08);
+            border: 1px solid rgba(66, 221, 242, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Right Form Panel */
+        .form-panel {
+            flex: 1.1;
+            padding: 50px 45px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .form-panel h2 {
+            margin: 0 0 6px 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .form-panel p.form-desc {
+            margin: 0 0 25px 0;
+            font-size: 12.5px;
+            color: var(--text-muted);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 11px;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-icon-left {
+            position: absolute;
+            left: 14px;
+            width: 18px;
+            height: 18px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .input-icon-right {
+            position: absolute;
+            right: 14px;
+            width: 18px;
+            height: 18px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .input-icon-right:hover {
+            color: var(--text-main);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 13px 40px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 13.5px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input::placeholder {
+            color: #4B5563;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 1px var(--border-focus);
+        }
+
+        .form-group input:focus + .input-icon-left {
+            color: var(--border-focus);
+        }
+
+        .form-row-checkbox {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12.5px;
+            margin-bottom: 20px;
+            color: var(--text-muted);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            accent-color: var(--accent-cyan);
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
+        .login-btn {
+            width: 100%;
+            background-color: var(--accent-cyan);
+            color: #0B101E;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .login-btn:hover {
+            background-color: var(--accent-cyan-hover);
+        }
+
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Auxiliary Links */
+        .links-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12.5px;
+            margin-bottom: 20px;
+        }
+
+        .links-container a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .links-container a:hover {
+            color: var(--accent-cyan);
+        }
+
+        .register-link {
+            color: var(--accent-cyan) !important;
+            font-weight: 600;
+        }
+
+        /* Card Footer */
+        .card-footer {
+            margin-top: 15px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .shield-icon {
+            width: 14px;
+            height: 14px;
+            color: var(--accent-cyan);
+            flex-shrink: 0;
+        }
+
+        /* Page Footer */
+        .page-footer {
+            margin-top: 25px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* Error Popup Modal */
+        .error-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(11, 16, 30, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .error-modal-container {
+            background-color: var(--bg-card);
+            border: 1px solid var(--accent-red);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+            animation: slideUp 0.3s ease-out forwards;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            text-align: center;
+            padding: 30px;
+        }
+        .error-icon-box {
+            width: 50px; height: 50px;
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--accent-red);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px auto;
+        }
+        .error-modal-title {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: var(--text-main);
+            font-weight: 700;
+        }
+        .error-modal-message {
+            margin: 0 0 25px 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .error-modal-btn {
+            background-color: var(--accent-cyan);
+            color: var(--bg-main);
+            padding: 11px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        .error-modal-btn:hover {
+            background-color: var(--accent-cyan-hover);
+        }
+
+        @media (max-width: 768px) {
+            .login-split-card {
+                flex-direction: column;
+            }
+            .brand-panel {
+                padding: 35px 25px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .form-panel {
+                padding: 35px 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-split-card">
+        <!-- Left Side Branding Panel -->
+        <div class="brand-panel">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="Mrkzter Logo" class="mrkzter-logo">
+            </div>
+            <h1 class="title-denta">DentaLink</h1>
+            <p class="subtitle-lis">Laboratory Information System</p>
+            <p class="subtitle-lab">Mrkzter Dental Laboratory</p>
+            <div class="brand-badge">Secure Portal Access</div>
+        </div>
+
+        <!-- Right Side Form Panel -->
+        <div class="form-panel">
+            <h2>Sign In</h2>
+            <p class="form-desc">Staff portal & clinical partner workspace</p>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email">Username / Email Address</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon-left" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <input type="email" id="email" name="email" placeholder="you@dentalink.com" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon-left" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        <!-- Eye Icon -->
+                        <svg class="input-icon-right" id="togglePassword" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="form-row-checkbox">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="remember"> Keep me signed in
+                    </label>
+                    <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="login-btn">
+                    <svg style="width: 16px; height: 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Sign in
+                </button>
+            </form>
+
+            <div class="links-container">
+                <a href="{{ url_for('register') }}" class="register-link">Register Account</a>
+                <a href="{{ url_for('home') }}">← Back to Home</a>
+            </div>
+
+            <div class="card-footer">
+                <svg class="shield-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-1.998A11.954 11.954 0 0110 1.944z" clip-rule="evenodd" />
+                </svg>
+                Authorized personnel & partner clinics only
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="error-modal-overlay" id="errorModal">
+                <div class="error-modal-container">
+                    <div class="error-icon-box">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 class="error-modal-title">Authentication Notice</h3>
+                    
+                    {% for category, message in messages %}
+                        <p class="error-modal-message">{{ message }}</p>
+                    {% endfor %}
+                    
+                    <button type="button" class="error-modal-btn" onclick="closeErrorModal()">Try Again</button>
+                </div>
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="page-footer">
+        © 2026 Mrkzter Dental Laboratory • All Rights Reserved
+    </div>
+
+    <script>
+        // Toggle Password Visibility
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        if (togglePassword && passwordInput) {
+            togglePassword.addEventListener('click', function () {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.style.color = type === 'text' ? 'var(--accent-cyan)' : 'var(--text-muted)';
+            });
+        }
+
+        function closeErrorModal() {
+            const modal = document.getElementById('errorModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

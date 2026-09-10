@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dentist Portal - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #0B101E;
+            --bg-card: #151C2C;
+            --bg-card-hover: #1C263B;
+            --bg-input: #0E1424;
+            --border-color: #243048;
+            --border-focus: #42DDF2;
+            --text-main: #F3F4F6;
+            --text-muted: #8E9BAE;
+            --accent-cyan: #42DDF2;
+            --accent-cyan-hover: #26c7dc;
+            --accent-green: #10B981;
+            --accent-yellow: #F59E0B;
+            --accent-red: #EF4444;
+            --panel-header: #101626;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            color-scheme: dark;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(66, 221, 242, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(29, 66, 138, 0.12) 0%, transparent 45%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .app-header {
+            background-color: rgba(11, 16, 30, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .logo-box { background: linear-gradient(135deg, var(--accent-cyan), #1d4ed8); border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+        .header-titles h1 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .version-badge { background-color: rgba(66, 221, 242, 0.15); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(66, 221, 242, 0.3); }
+        .header-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
+
+        .header-right { display: flex; align-items: center; gap: 14px; }
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 10px; border-radius: 20px; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
+
+        /* Notification Dropdown */
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 7px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center;}
+        .notif-bell:hover, .notif-bell.active { color: var(--text-main); border-color: var(--accent-cyan); background: rgba(66, 221, 242, 0.05); }
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid var(--bg-main); }
+        .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; justify-content: space-between; background: var(--panel-header); }
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: normal; }
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .notif-item-dd:hover { background: rgba(255,255,255,0.02); }
+        .notif-content-dd { flex: 1; font-size: 12px; color: var(--text-main); line-height: 1.4; }
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
+        .notif-close:hover { color: var(--accent-red); }
+
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 34px; height: 34px; background: linear-gradient(135deg, rgba(66, 221, 242, 0.2), rgba(16, 185, 129, 0.2)); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+        .user-info p { margin: 0; font-size: 13px; font-weight: 600; }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); }
+        .btn-icon { padding: 7px; border-radius: 8px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-icon:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); background: rgba(66, 221, 242, 0.05); }
+
+        /* Dashboard Container */
+        .container { max-width: 1400px; margin: 0 auto; padding: 28px 32px; }
+
+        /* Quick Metrics & Clinic Strip */
+        .metrics-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .metric-tile {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.2s;
+        }
+        .metric-tile:hover { transform: translateY(-2px); border-color: rgba(66, 221, 242, 0.3); }
+        .metric-tile-info span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+        .metric-tile-info h3 { margin: 4px 0 0 0; font-size: 24px; font-weight: 700; color: var(--text-main); }
+        .metric-tile-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+
+        /* Workspace Header */
+        .workspace-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; }
+        .workspace-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+
+        /* Category Tabs */
+        .category-tabs { display: flex; gap: 8px; margin-bottom: 24px; overflow-x: auto; padding-bottom: 6px; }
+        .category-tabs::-webkit-scrollbar { height: 4px; }
+        .category-tabs::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+
+        .tab-btn { background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; white-space: nowrap; }
+        .tab-btn:hover { border-color: var(--text-muted); color: var(--text-main); }
+        .tab-btn.active { background-color: rgba(66, 221, 242, 0.08); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .tab-badge { background-color: rgba(255,255,255,0.06); color: var(--text-main); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .tab-btn.active .tab-badge { background-color: var(--accent-cyan); color: var(--bg-main); }
+
+        /* Cases Grid */
+        .category-section { display: none; }
+        .category-section.active { display: block; animation: fadeIn 0.25s ease-out; }
+        .cases-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .empty-grid { grid-column: 1 / -1; text-align: center; padding: 60px 20px; background-color: var(--bg-card); border: 1px dashed var(--border-color); border-radius: 12px; color: var(--text-muted); font-size: 13px; }
+
+        /* Case Cards */
+        .k-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .k-card:hover { border-color: var(--accent-cyan); box-shadow: 0 8px 24px rgba(0,0,0,0.35); transform: translateY(-2px); }
+        .k-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .k-badge-cyan { background: rgba(66, 221, 242, 0.12); color: var(--accent-cyan); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(66, 221, 242, 0.25); }
+        .k-due-pill { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; }
+        .k-due-pill.warning { background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); border: 1px solid rgba(245, 158, 11, 0.3); }
+        .k-due-pill.danger { background: rgba(239, 68, 68, 0.12); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .k-due-pill.success { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+        .k-card-title { color: var(--text-main); font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .k-card-subtitle { color: var(--text-muted); font-size: 12px; margin-bottom: 14px; }
+        .k-card-teeth { font-size: 11px; color: var(--text-main); background: var(--bg-input); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+        .k-card-actions { display: flex; gap: 8px; margin-top: auto; }
+        .btn-action-primary { flex: 1; text-align: center; background: var(--accent-cyan); color: var(--bg-main); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none; border: none; cursor: pointer; transition: 0.2s; }
+        .btn-action-primary:hover { background: var(--accent-cyan-hover); }
+        .btn-action-secondary { flex: 1; text-align: center; background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; transition: 0.2s; }
+        .btn-action-secondary:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+        /* Prescription Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(11, 16, 30, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; width: 100%; max-width: 960px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.6); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; display: flex; flex-direction: column; }
+        .modal-container::-webkit-scrollbar { width: 6px; }
+        .modal-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+        .modal-header { background-color: var(--panel-header); padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+        .modal-title { margin: 0; font-size: 16px; color: var(--text-main); display: flex; align-items: center; gap: 10px; font-weight: 700; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 0; line-height: 1; }
+        .close-btn:hover { color: var(--accent-red); }
+        .modal-body { padding: 24px; }
+        .modal-footer { background-color: var(--panel-header); padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; position: sticky; bottom: 0; z-index: 10; }
+
+        /* Form Controls */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-weight: 700; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-dark, .select-dark, .textarea-dark { width: 100%; padding: 10px 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+        .input-dark:focus, .select-dark:focus, .textarea-dark:focus { border-color: var(--accent-cyan); box-shadow: 0 0 0 1px var(--accent-cyan); }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+        .select-dark { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238E9BAE%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 14px top 50%; background-size: 9px auto; }
+
+        /* Odontogram Card */
+        .interactive-arch-panel { background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .arch-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .arch-title { font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+        .arch-presets { display: flex; gap: 6px; }
+        .preset-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .preset-btn:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+
+        .dental-arch { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+        .arch-row { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+        .arch-label { font-size: 10px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px; }
+        .teeth-container { display: flex; align-items: center; gap: 4px; overflow-x: auto; max-width: 100%; padding: 4px; }
+        .arch-divider { width: 2px; height: 32px; background-color: var(--border-color); margin: 0 6px; }
+
+        .tooth-btn { background-color: #172133; color: var(--text-muted); border: 1px solid #2B3853; border-radius: 6px; min-width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.15s; padding: 0; }
+        .tooth-btn:hover { background-color: #263553; color: var(--text-main); border-color: var(--accent-cyan); }
+        .tooth-btn.selected { background-color: var(--accent-cyan); color: var(--bg-main); border-color: var(--accent-cyan); box-shadow: 0 0 10px rgba(66, 221, 242, 0.4); }
+
+        /* Global Settings Strip */
+        .global-settings-panel { background-color: rgba(66, 221, 242, 0.05); border: 1px solid rgba(66, 221, 242, 0.2); border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: none; }
+        .global-settings-title { font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+
+        /* Dynamic Tooth Details Table */
+        #tooth-details { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .dynamic-tooth-row { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; display: grid; grid-template-columns: 70px 1fr 1fr 1.5fr; gap: 12px; align-items: center; }
+        .dynamic-tooth-badge { background-color: var(--accent-cyan); color: var(--bg-main); font-size: 13px; font-weight: 800; padding: 6px; border-radius: 6px; text-align: center; }
+
+        /* Buttons */
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; transition: 0.2s; text-decoration: none; }
+        .btn-cyan { background-color: var(--accent-cyan); color: var(--bg-main); }
+        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background-color: rgba(255,255,255,0.03); border-color: var(--text-muted); }
+
+        /* Sound Editor Slider Range */
+        .slider-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            outline: none;
+        }
+        .slider-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(66, 221, 242, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--bg-main)" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C8 2 6 5 6 9C6 11 5.5 13 4 14C3.5 14.3 3 15.1 3 16C3 18.2 5.8 20 8 20C9.7 20 11.1 18.5 12 17C12.9 18.5 14.3 20 16 20C18.2 20 21 18.2 21 16C21 15.1 20.5 14.3 20 14C18.5 13 18 11 18 9C18 5 16 2 12 2Z"/>
+                </svg>
+            </div>
+            <div class="header-titles">
+                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                <p>Mrkzter Dental Laboratory</p>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="status-indicator">
+                <div class="status-dot"></div> Lab Connected
+            </div>
+
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)" title="Notifications">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Case Updates
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">View Details →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No unread case alerts.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- DENTIST WORKSPACE SETTINGS BUTTON -->
+            <button type="button" class="btn-icon" onclick="openSettingsModal()" title="Audio & Workspace Settings">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+
+            <div class="user-profile">
+                <div class="avatar">{{ profile.first_name[0] if profile.first_name else (profile.display_name[0] if profile.display_name else 'D') }}{{ profile.last_name[0] if profile.last_name else '' }}</div>
+                <div class="user-info">
+                    <p>Dr. {{ profile.last_name if profile.last_name else profile.display_name }}</p>
+                    <span>Lic. #{{ profile.professional_id }}</span>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('logout') }}" style="margin:0;">
+                <button type="submit" class="btn-icon" title="Logout" style="color: var(--accent-red);">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+
+        {% set action_cases = dental_cases | selectattr('status', 'equalto', 'needs_revision') | list %}
+        {% set pending_cases = dental_cases | selectattr('status', 'in', ['submitted', 'assigned']) | list %}
+        {% set prod_cases = dental_cases | selectattr('status', 'in', ['in_progress', 'cad_designing', 'wax_up_or_try_in', 'milling_or_printing', 'packing_and_curing']) | list %}
+        {% set qc_cases = dental_cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
+        {% set completed_cases = dental_cases | selectattr('status', 'equalto', 'completed') | list %}
+        {% set draft_cases = dental_cases | selectattr('status', 'equalto', 'draft') | list %}
+
+        <div class="metrics-strip">
+            <div class="metric-tile" style="border-left: 3px solid var(--accent-red);">
+                <div class="metric-tile-info">
+                    <span>Action Required</span>
+                    <h3 style="color: {% if action_cases|length > 0 %}var(--accent-red){% else %}var(--text-main){% endif %};">{{ action_cases|length }}</h3>
+                </div>
+                <div class="metric-tile-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-red);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+            </div>
+            <div class="metric-tile" style="border-left: 3px solid var(--accent-cyan);">
+                <div class="metric-tile-info">
+                    <span>Active In Lab</span>
+                    <h3>{{ prod_cases|length + pending_cases|length }}</h3>
+                </div>
+                <div class="metric-tile-icon" style="background: rgba(66, 221, 242, 0.1); color: var(--accent-cyan);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                </div>
+            </div>
+            <div class="metric-tile" style="border-left: 3px solid var(--accent-yellow);">
+                <div class="metric-tile-info">
+                    <span>Finishing & QC</span>
+                    <h3>{{ qc_cases|length }}</h3>
+                </div>
+                <div class="metric-tile-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+            <div class="metric-tile" style="border-left: 3px solid var(--accent-green);">
+                <div class="metric-tile-info">
+                    <span>Delivered / Done</span>
+                    <h3>{{ completed_cases|length }}</h3>
+                </div>
+                <div class="metric-tile-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="workspace-header">
+            <div>
+                <h2 class="workspace-title">
+                    <svg width="22" height="22" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                    Clinical Cases Management
+                </h2>
+            </div>
+
+            <button onclick="openModal()" class="btn btn-cyan">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                New Rx Prescription
+            </button>
+        </div>
+
+        <div class="category-tabs">
+            <button class="tab-btn active" onclick="showCategory(event, 'sec-action')">
+                Action Required <span class="tab-badge" style="{% if action_cases|length > 0 %}background: var(--accent-red); color: white;{% endif %}">{{ action_cases|length }}</span>
+            </button>
+            <button class="tab-btn" onclick="showCategory(event, 'sec-pending')">
+                Pending Intake <span class="tab-badge">{{ pending_cases|length }}</span>
+            </button>
+            <button class="tab-btn" onclick="showCategory(event, 'sec-prod')">
+                In Production <span class="tab-badge">{{ prod_cases|length }}</span>
+            </button>
+            <button class="tab-btn" onclick="showCategory(event, 'sec-qc')">
+                Finishing & QC <span class="tab-badge">{{ qc_cases|length }}</span>
+            </button>
+            <button class="tab-btn" onclick="showCategory(event, 'sec-completed')">
+                Completed <span class="tab-badge">{{ completed_cases|length }}</span>
+            </button>
+            <div style="width: 1px; height: 18px; background: var(--border-color); margin: 0 4px; align-self: center;"></div>
+            <button class="tab-btn" onclick="showCategory(event, 'sec-drafts')">
+                Drafts <span class="tab-badge">{{ draft_cases|length }}</span>
+            </button>
+        </div>
+
+        <div id="sec-action" class="category-section active">
+            <div class="cases-grid">
+                {% for c in action_cases %}
+                    <div class="k-card" style="border-left: 3px solid var(--accent-red);">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="k-due-pill danger">Action Required</span>
+                        </div>
+                        <div class="k-card-title">{{ c.patient_name }}</div>
+                        <div class="k-card-subtitle">Ref: {{ c.patient_reference or 'N/A' }} • {{ c.case_type | replace('_', ' ') | title }}</div>
+
+                        <div style="font-size: 12px; color: var(--text-main); margin-bottom: 15px; background: rgba(239, 68, 68, 0.08); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.25);">
+                            <strong style="color: var(--accent-red);">Laboratory Notice:</strong><br>{{ c.revision_notes }}
+                        </div>
+
+                        <div class="k-card-actions">
+                            <a href="{{ url_for('edit_dental_case', case_id=c.id) }}" class="btn-action-primary" style="background: var(--accent-red); color: white;">Revise & Resubmit →</a>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">All cases are proceeding normally. No clinical revisions required.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="sec-pending" class="category-section">
+            <div class="cases-grid">
+                {% for c in pending_cases %}
+                    <div class="k-card">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="k-due-pill warning">Due {{ c.due_date or 'TBD' }}</span>
+                        </div>
+                        <div class="k-card-title">{{ c.patient_name }}</div>
+                        <div class="k-card-subtitle">Ref: {{ c.patient_reference or 'N/A' }} • {{ c.case_type | replace('_', ' ') | title }}</div>
+
+                        {% if c.teeth %}
+                        <div class="k-card-teeth">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                            Teeth: {% for t in c.teeth %}{{ t.tooth_number }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="k-card-actions">
+                            <span style="font-size: 11px; color: var(--text-muted); padding: 6px 0;">Awaiting technician review</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">No pending intakes awaiting technician assignment.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="sec-prod" class="category-section">
+            <div class="cases-grid">
+                {% for c in prod_cases %}
+                    <div class="k-card">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="k-due-pill warning">Target: {{ c.due_date or 'TBD' }}</span>
+                        </div>
+                        <div class="k-card-title">{{ c.patient_name }}</div>
+                        <div class="k-card-subtitle">Tech: <strong style="color: var(--accent-cyan);">{{ c.profiles.display_name if c.profiles else 'Assigned' }}</strong></div>
+
+                        <div class="k-card-teeth" style="justify-content: space-between;">
+                            <span>Current Phase:</span>
+                            <strong style="color: var(--accent-cyan);">{{ c.status | replace('_', ' ') | title }}</strong>
+                        </div>
+
+                        <div class="k-card-actions">
+                            <a href="{{ url_for('edit_dental_case', case_id=c.id) }}" class="btn-action-secondary">Review Rx Record</a>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">No cases currently actively in production.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="sec-qc" class="category-section">
+            <div class="cases-grid">
+                {% for c in qc_cases %}
+                    <div class="k-card">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="k-due-pill success">Final Polish & QC</span>
+                        </div>
+                        <div class="k-card-title">{{ c.patient_name }}</div>
+                        <div class="k-card-subtitle">Ref: {{ c.patient_reference or 'N/A' }} • {{ c.case_type | replace('_', ' ') | title }}</div>
+
+                        {% if c.teeth %}
+                        <div class="k-card-teeth">
+                            Teeth: {% for t in c.teeth %}{{ t.tooth_number }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="k-card-actions">
+                            <span style="font-size: 11px; color: var(--accent-yellow); font-weight: 600;">Undergoing Optical QA</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">No units currently undergoing quality inspection.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="sec-completed" class="category-section">
+            <div class="cases-grid">
+                {% for c in completed_cases %}
+                    <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="k-due-pill success">Dispatched</span>
+                        </div>
+                        <div class="k-card-title">{{ c.patient_name }}</div>
+                        <div class="k-card-subtitle">Completed: {{ c.due_date or 'N/A' }}</div>
+
+                        <div class="k-card-actions">
+                            <a href="{{ url_for('edit_dental_case', case_id=c.id) }}" class="btn-action-secondary" style="border-color: var(--accent-green); color: var(--accent-green);">View Final Specs →</a>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">No completed case history recorded yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="sec-drafts" class="category-section">
+            <div class="cases-grid">
+                {% for case in draft_cases %}
+                    <div class="k-card" style="border-style: dashed;">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ case.case_number }}</span>
+                            <span style="font-size: 11px; color: var(--text-muted);">Unsubmitted Draft</span>
+                        </div>
+                        <div class="k-card-title">{{ case.patient_name }}</div>
+                        <div class="k-card-subtitle">{{ case.case_type | replace('_', ' ') | title }}</div>
+
+                        <div class="k-card-actions">
+                            <a href="{{ url_for('edit_dental_case', case_id=case.id) }}" class="btn-action-primary">Resume Prescription →</a>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">No saved case drafts found.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </main>
+
+    <!-- PRESCRIPTION ODONTOGRAM MODAL -->
+    <div class="modal-overlay" id="createCaseModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    New Lab Intake Prescription & Odontogram
+                </h2>
+                <button type="button" class="close-btn" onclick="closeModal()">×</button>
+            </div>
+
+            <form method="POST" action="{{ url_for('create_dental_case') }}" id="dental-case-form" enctype="multipart/form-data">
+                <div class="modal-body">
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="patient_name">Patient Identifier / Full Name *</label>
+                            <input type="text" id="patient_name" name="patient_name" class="input-dark" placeholder="e.g., J. Dela Cruz (ID: 9021)" required>
+                            <input type="hidden" name="patient_reference" id="patient_reference_hidden">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="due_date">Required Delivery Date *</label>
+                            <input type="date" id="due_date" name="due_date" class="input-dark" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label" for="case_type">General Prosthesis Category *</label>
+                        <select id="case_type" name="case_type" class="select-dark" required>
+                            <option value="" disabled selected>Select Primary Classification...</option>
+                            <option value="crown">Crown / Fixed Partial Bridge</option>
+                            <option value="veneer">Anterior Laminate Veneers</option>
+                            <option value="inlay">Inlay / Onlay</option>
+                            <option value="partial_denture">Removable Partial Denture</option>
+                            <option value="upper_full_denture">Upper Complete Denture</option>
+                            <option value="lower_full_denture">Lower Complete Denture</option>
+                            <option value="full_denture">Upper & Lower Complete Denture</option>
+                            <option value="other">Custom Appliance</option>
+                        </select>
+                    </div>
+
+                    <div class="interactive-arch-panel">
+                        <div class="arch-panel-header">
+                            <div class="arch-title">
+                                <svg width="16" height="16" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                Adult Dental Arch (FDI Two-Digit Chart)
+                            </div>
+                            <div class="arch-presets">
+                                <button type="button" class="preset-btn" onclick="selectPreset('upper')">Upper Arch</button>
+                                <button type="button" class="preset-btn" onclick="selectPreset('lower')">Lower Arch</button>
+                                <button type="button" class="preset-btn" onclick="selectPreset('full')">Full Mouth</button>
+                                <button type="button" class="preset-btn" onclick="clearAllTeeth()" style="color: var(--accent-red);">Clear</button>
+                            </div>
+                        </div>
+
+                        <div class="dental-arch">
+                            <div class="arch-row">
+                                <span class="arch-label">Maxillary (Upper) • Q1 (18–11) | Q2 (21–28)</span>
+                                <div class="teeth-container">
+                                    {% for t in [18,17,16,15,14,13,12,11] %}
+                                        <button type="button" class="tooth-btn" data-tooth="{{ t }}">{{ t }}</button>
+                                    {% endfor %}
+                                    <div class="arch-divider"></div>
+                                    {% for t in [21,22,23,24,25,26,27,28] %}
+                                        <button type="button" class="tooth-btn" data-tooth="{{ t }}">{{ t }}</button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="arch-row">
+                                <span class="arch-label">Mandibular (Lower) • Q4 (48–41) | Q3 (31–38)</span>
+                                <div class="teeth-container">
+                                    {% for t in [48,47,46,45,44,43,42,41] %}
+                                        <button type="button" class="tooth-btn" data-tooth="{{ t }}">{{ t }}</button>
+                                    {% endfor %}
+                                    <div class="arch-divider"></div>
+                                    {% for t in [31,32,33,34,35,36,37,38] %}
+                                        <button type="button" class="tooth-btn" data-tooth="{{ t }}">{{ t }}</button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="global-settings-panel" id="global-settings-panel">
+                        <div class="global-settings-title">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Batch Configuration (Applies to all selected teeth)
+                        </div>
+                        <div class="grid-2" style="margin-bottom: 0;">
+                            <select id="global-material" class="select-dark">
+                                <option value="" disabled selected>Batch Select Material...</option>
+                                <option value="zirconia">Zirconia Multilayer Disc</option>
+                                <option value="emax">IPS e.max / Lithium Disilicate</option>
+                                <option value="porcelain">Porcelain</option>
+                                <option value="pfm">PFM (Porcelain Fused to Metal)</option>
+                                <option value="pmma">PMMA Provisional Blank</option>
+                                <option value="metal">Cobalt-Chrome Cast Alloy</option>
+                                <option value="flexible_denture">Flexible Polyamide</option>
+                                <option value="acrylic">Heat-Cure Acrylic</option>
+                            </select>
+                            <select id="global-shade" class="select-dark">
+                                <option value="" disabled selected>Batch Select VITA Shade...</option>
+                                <option value="A1">VITA A1</option><option value="A2">VITA A2</option><option value="A3">VITA A3</option><option value="A3.5">VITA A3.5</option>
+                                <option value="B1">VITA B1</option><option value="B2">VITA B2</option>
+                                <option value="C1">VITA C1</option><option value="C2">VITA C2</option>
+                                <option value="D2">VITA D2</option><option value="BL1">Bleach BL1</option><option value="BL2">Bleach BL2</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="tooth-details"></div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label" for="instructions">Clinical Directives & Occlusal Notes</label>
+                        <textarea id="instructions" name="instructions" class="textarea-dark" rows="3" placeholder="Specify occlusal clearance, characterization, proximal contact tightness, or emergence profiles..."></textarea>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="stl_file">Intraoral Digital Impression (.STL)</label>
+                            <input type="file" id="stl_file" name="stl_file" accept=".stl" style="background: var(--bg-input); border: 1px dashed var(--border-color); padding: 10px; border-radius: 8px; font-size: 12px; color: var(--text-muted);">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="patient_smile">Clinical Photos / Shade References</label>
+                            <input type="file" id="patient_smile" name="patient_smile" accept=".jpg,.jpeg,.png,.webp" multiple style="background: var(--bg-input); border: 1px dashed var(--border-color); padding: 10px; border-radius: 8px; font-size: 12px; color: var(--text-muted);">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-outline" name="submit_action" value="draft" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">Save As Draft</button>
+                    <button type="submit" class="btn btn-cyan" name="submit_action" value="send" id="submit-btn">Dispatch to Lab</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DENTIST WORKSPACE PREFERENCES MODAL (Account-Isolated Sound Editor) -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-container" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:var(--text-main); font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Clinic Audio & Notification Settings
+                </h2>
+                <button type="button" class="close-btn" onclick="closeSettingsModal()">×</button>
+            </div>
+
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Master Sound Toggle -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="color: var(--text-main); font-size: 13px; display: block;">Case Progress Chimes</strong>
+                        <span style="font-size: 12px; color: var(--text-muted);">Play audio tone on Case Revisions, QC, and Delivery alerts</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer;">
+                        <input type="checkbox" id="settingSoundToggle" onchange="updateSoundSetting(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span id="soundSlider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); border-radius: 24px; transition: .25s;"></span>
+                        <span id="soundKnob" style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .25s;"></span>
+                    </label>
+                </div>
+
+                <!-- Tone Selector & Sound Editor -->
+                <div id="soundEditorGroup" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Tone Preset Selection -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sound Chime Theme</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="settingSoundTone" class="select-dark" style="flex: 1; padding: 8px 10px; font-size: 12px;" onchange="updateToneSetting(this.value)">
+                                <option value="chime">Modern Bell Chime (Default)</option>
+                                <option value="ping">Glass Crystal Ping</option>
+                                <option value="pop">Soft Digital Pop</option>
+                                <option value="alert">Double Dispatch Tone</option>
+                            </select>
+                            <button type="button" class="btn btn-outline" onclick="previewSoundTone()" title="Test Sound" style="padding: 6px 14px; gap: 6px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+                                </svg>
+                                Test
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Volume Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Volume Level</span>
+                            <span id="volumeVal" style="color: var(--accent-cyan);">70%</span>
+                        </div>
+                        <input type="range" id="settingVolume" class="slider-range" min="0.05" max="1.0" step="0.05" value="0.7" oninput="updateVolume(this.value)">
+                    </div>
+
+                    <!-- Pitch / Frequency Drag Slider -->
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Pitch Tuning (Lower / Higher)</span>
+                            <span id="pitchVal" style="color: var(--accent-cyan);">1.0x (Standard)</span>
+                        </div>
+                        <input type="range" id="settingPitch" class="slider-range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updatePitch(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--panel-header); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button type="button" class="btn btn-cyan" onclick="closeSettingsModal()">Save & Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // DENTIST ACCOUNT-SCOPED STORAGE KEYS
+        // Ensures settings are isolated to this specific dentist
+        // ==========================================
+        const CURRENT_USER_ID = "{{ profile.id }}";
+        const KEY_SOUND_ENABLED = `dl_user_${CURRENT_USER_ID}_sound_enabled`;
+        const KEY_SOUND_TONE    = `dl_user_${CURRENT_USER_ID}_sound_tone`;
+        const KEY_SOUND_VOLUME  = `dl_user_${CURRENT_USER_ID}_sound_volume`;
+        const KEY_SOUND_PITCH   = `dl_user_${CURRENT_USER_ID}_sound_pitch`;
+        const KEY_ACTION_COUNT  = `dl_user_${CURRENT_USER_ID}_action_count`;
+
+        // ==========================================
+        // DENTIST WEB AUDIO ENGINE (USER-SCOPED)
+        // ==========================================
+        const DentistAudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(toneType) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                // User-scoped volume and pitch
+                const userVol = parseFloat(localStorage.getItem(KEY_SOUND_VOLUME) || '0.7');
+                const userPitch = parseFloat(localStorage.getItem(KEY_SOUND_PITCH) || '1.0');
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                switch (toneType) {
+                    case 'chime':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(1320 * userPitch, now + 0.12);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                        osc.start(now);
+                        osc.stop(now + 0.5);
+                        break;
+                    case 'ping':
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(1760 * userPitch, now);
+                        gain.gain.setValueAtTime(0.25 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    case 'pop':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(800 * userPitch, now + 0.08);
+                        gain.gain.setValueAtTime(0.4 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                        osc.start(now);
+                        osc.stop(now + 0.18);
+                        break;
+                    case 'alert':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(950 * userPitch, now);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.setValueAtTime(0.01, now + 0.08);
+                        gain.gain.setValueAtTime(0.3 * userVol, now + 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                        break;
+                    default:
+                        this.playTone('chime');
+                }
+            }
+        };
+
+        function triggerDentistNotificationSound() {
+            const soundEnabled = localStorage.getItem(KEY_SOUND_ENABLED) !== 'false';
+            if (!soundEnabled) return;
+            const selectedTone = localStorage.getItem(KEY_SOUND_TONE) || 'chime';
+            DentistAudioEngine.playTone(selectedTone);
+        }
+
+        // ==========================================
+        // DENTIST SETTINGS & SLIDERS INTERACTION
+        // ==========================================
+        function openSettingsModal() {
+            initSettingsValues();
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function initSettingsValues() {
+            const soundEnabled = localStorage.getItem(KEY_SOUND_ENABLED) !== 'false';
+            const selectedTone = localStorage.getItem(KEY_SOUND_TONE) || 'chime';
+            const volume = localStorage.getItem(KEY_SOUND_VOLUME) || '0.7';
+            const pitch = localStorage.getItem(KEY_SOUND_PITCH) || '1.0';
+
+            const checkbox = document.getElementById('settingSoundToggle');
+            const toneSelect = document.getElementById('settingSoundTone');
+            const volInput = document.getElementById('settingVolume');
+            const pitchInput = document.getElementById('settingPitch');
+            const editorGroup = document.getElementById('soundEditorGroup');
+
+            if (checkbox) checkbox.checked = soundEnabled;
+            if (toneSelect) toneSelect.value = selectedTone;
+            if (volInput) volInput.value = volume;
+            if (pitchInput) pitchInput.value = pitch;
+
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(volume) * 100) + '%';
+            document.getElementById('pitchVal').innerText = pitch + 'x' + (pitch === '1.0' ? ' (Standard)' : (pitch < 1 ? ' (Deeper)' : ' (Higher)'));
+
+            syncToggleStyle(soundEnabled);
+            if (editorGroup) editorGroup.style.opacity = soundEnabled ? '1' : '0.4';
+        }
+
+        function updateSoundSetting(isEnabled) {
+            localStorage.setItem(KEY_SOUND_ENABLED, isEnabled);
+            syncToggleStyle(isEnabled);
+            const editorGroup = document.getElementById('soundEditorGroup');
+            if (editorGroup) editorGroup.style.opacity = isEnabled ? '1' : '0.4';
+
+            if (isEnabled) {
+                DentistAudioEngine.init();
+                DentistAudioEngine.playTone(localStorage.getItem(KEY_SOUND_TONE) || 'chime');
+            }
+        }
+
+        function syncToggleStyle(isEnabled) {
+            const slider = document.getElementById('soundSlider');
+            const knob = document.getElementById('soundKnob');
+            if (slider && knob) {
+                slider.style.backgroundColor = isEnabled ? 'var(--accent-cyan)' : 'var(--border-color)';
+                knob.style.transform = isEnabled ? 'translateX(20px)' : 'translateX(0px)';
+            }
+        }
+
+        function updateToneSetting(newTone) {
+            localStorage.setItem(KEY_SOUND_TONE, newTone);
+            DentistAudioEngine.playTone(newTone);
+        }
+
+        function updateVolume(val) {
+            localStorage.setItem(KEY_SOUND_VOLUME, val);
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(val) * 100) + '%';
+        }
+
+        function updatePitch(val) {
+            localStorage.setItem(KEY_SOUND_PITCH, val);
+            const num = parseFloat(val);
+            document.getElementById('pitchVal').innerText = val + 'x' + (num === 1.0 ? ' (Standard)' : (num < 1 ? ' (Deeper)' : ' (Higher)'));
+        }
+
+        function previewSoundTone() {
+            const tone = document.getElementById('settingSoundTone').value;
+            DentistAudioEngine.playTone(tone);
+        }
+
+        // ==========================================
+        // DENTIST ACTION SOUND DETECTOR
+        // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            initSettingsValues();
+
+            // Track events critical to the dentist:
+            // 1. Revision notices sent back by the lab
+            // 2. Units entering final Optical QA
+            // 3. Completed/dispatched restorations
+            // 4. Header bell alerts
+            const actionCount = parseInt("{{ action_cases|length if action_cases else 0 }}", 10);
+            const qcCount = parseInt("{{ qc_cases|length if qc_cases else 0 }}", 10);
+            const completedCount = parseInt("{{ completed_cases|length if completed_cases else 0 }}", 10);
+            const notifCount = parseInt("{{ notifications|length if notifications else 0 }}", 10);
+
+            const totalDentistActions = actionCount + qcCount + completedCount + notifCount;
+            const lastDentistActionCount = parseInt(localStorage.getItem(KEY_ACTION_COUNT) || '0', 10);
+
+            if (totalDentistActions > lastDentistActionCount && lastDentistActionCount !== 0) {
+                triggerDentistNotificationSound();
+            }
+
+            localStorage.setItem(KEY_ACTION_COUNT, totalDentistActions);
+        });
+
+        // ==========================================
+        // SMART AUTO-REFRESH (Every 30 seconds)
+        // ==========================================
+        const REFRESH_INTERVAL_MS = 30000;
+        setInterval(() => {
+            const isCreateModalOpen = document.getElementById('createCaseModal')?.style.display === 'flex';
+            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
+            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
+
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
+
+            if (!isCreateModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
+                window.location.reload();
+            }
+        }, REFRESH_INTERVAL_MS);
+
+        // UI Tabs
+        function showCategory(event, sectionId) {
+            document.querySelectorAll('.category-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const hasActionCases = {{ action_cases|length }} > 0;
+            if(!hasActionCases) {
+                const tabs = document.querySelectorAll('.tab-btn');
+                if(tabs.length > 1) { tabs[1].click(); }
+            }
+        });
+
+        function toggleNotif(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        function dismissNotif(btn, e) {
+            e.stopPropagation();
+            btn.closest('.notif-item-dd').remove();
+            updateNotifCount();
+        }
+
+        function clearAllNotifs() {
+            document.getElementById('notifList').innerHTML = '<li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No alerts.</li>';
+            updateNotifCount();
+        }
+
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                if (count > 0) { badge.innerText = count; } 
+                else { badge.style.display = 'none'; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.notif-wrapper') && !event.target.closest('#settingsModal')) {
+                const dd = document.getElementById('notifDropdown');
+                if (dd) dd.classList.remove('show');
+            }
+            const modal = document.getElementById('createCaseModal');
+            if (event.target === modal) { closeModal(); }
+            const setModal = document.getElementById('settingsModal');
+            if (event.target === setModal) { closeSettingsModal(); }
+        }
+
+        function openModal() {
+            document.getElementById('createCaseModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closeModal() {
+            document.getElementById('createCaseModal').style.display = 'none';
+            document.body.style.overflow = 'auto'; 
+        }
+
+        const selectedTeeth = new Set();
+        const toothButtons = document.querySelectorAll(".tooth-btn");
+        const caseType = document.getElementById("case_type");
+        const submitBtn = document.getElementById("submit-btn");
+        const globalSettingsPanel = document.getElementById("global-settings-panel");
+        const globalMaterial = document.getElementById("global-material");
+        const globalShade = document.getElementById("global-shade");
+
+        document.getElementById('patient_name').addEventListener('input', function() {
+            document.getElementById('patient_reference_hidden').value = this.value;
+        });
+
+        globalMaterial.addEventListener("change", function() {
+            const val = this.value;
+            document.querySelectorAll('select[name="material"]').forEach(s => s.value = val);
+        });
+
+        globalShade.addEventListener("change", function() {
+            const val = this.value;
+            document.querySelectorAll('select[name="shade"]').forEach(s => s.value = val);
+        });
+
+        function selectPreset(preset) {
+            clearAllTeeth();
+            if (preset === 'upper') {
+                selectTeeth(["18","17","16","15","14","13","12","11","21","22","23","24","25","26","27","28"]);
+            } else if (preset === 'lower') {
+                selectTeeth(["48","47","46","45","44","43","42","41","31","32","33","34","35","36","37","38"]);
+            } else if (preset === 'full') {
+                selectTeeth(["18","17","16","15","14","13","12","11","21","22","23","24","25","26","27","28","48","47","46","45","44","43","42","41","31","32","33","34","35","36","37","38"]);
+            }
+            updateSelection();
+        }
+
+        toothButtons.forEach(tooth => {
+            tooth.addEventListener("click", function(e) {
+                e.preventDefault(); 
+                const toothNumber = this.dataset.tooth;
+                if (selectedTeeth.has(toothNumber)) {
+                    selectedTeeth.delete(toothNumber);
+                    this.classList.remove("selected");
+                } else {
+                    selectedTeeth.add(toothNumber);
+                    this.classList.add("selected");
+                }
+                updateSelection();
+            });
+        });
+
+        function clearAllTeeth() {
+            selectedTeeth.clear();
+            toothButtons.forEach(t => t.classList.remove("selected"));
+            updateSelection();
+        }
+
+        function selectTeeth(teeth) {
+            teeth.forEach(num => {
+                selectedTeeth.add(num.toString());
+                const btn = document.querySelector(`.tooth-btn[data-tooth="${num}"]`);
+                if (btn) btn.classList.add("selected");
+            });
+        }
+
+        function updateSelection() {
+            if (selectedTeeth.size === 0) {
+                globalSettingsPanel.style.display = "none";
+            } else {
+                globalSettingsPanel.style.display = "block";
+            }
+            updateToothDetails();
+        }
+
+        function updateToothDetails() {
+            const container = document.getElementById("tooth-details");
+            container.innerHTML = "";
+            if (selectedTeeth.size === 0) return;
+
+            const sorted = Array.from(selectedTeeth).sort((a, b) => Number(a) - Number(b));
+
+            sorted.forEach(toothNumber => {
+                const detail = document.createElement("div");
+                detail.className = "dynamic-tooth-row";
+
+                const curMat = globalMaterial.value;
+                const curSha = globalShade.value;
+
+                detail.innerHTML = `
+                    <div class="dynamic-tooth-badge">#${toothNumber}</div>
+                    <input type="hidden" name="tooth_number" value="${toothNumber}">
+                    <input type="hidden" name="restoration_type" value="${caseType.value || 'Restoration'}">
+
+                    <div>
+                        <select name="material" class="select-dark" required>
+                            <option value="" disabled ${!curMat ? 'selected' : ''}>Material...</option>
+                            <option value="zirconia" ${curMat === 'zirconia' ? 'selected' : ''}>Zirconia Multi</option>
+                            <option value="emax" ${curMat === 'emax' ? 'selected' : ''}>IPS e.max</option>
+                            <option value="porcelain" ${curMat === 'porcelain' ? 'selected' : ''}>Porcelain</option>
+                            <option value="pfm" ${curMat === 'pfm' ? 'selected' : ''}>PFM</option>
+                            <option value="acrylic" ${curMat === 'acrylic' ? 'selected' : ''}>Acrylic</option>
+                            <option value="pmma" ${curMat === 'pmma' ? 'selected' : ''}>PMMA Temp</option>
+                            <option value="metal" ${curMat === 'metal' ? 'selected' : ''}>Co-Cr Cast</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <select name="shade" class="select-dark" required>
+                            <option value="" disabled ${!curSha ? 'selected' : ''}>VITA Shade...</option>
+                            <option value="A1" ${curSha === 'A1' ? 'selected' : ''}>A1</option>
+                            <option value="A2" ${curSha === 'A2' ? 'selected' : ''}>A2</option>
+                            <option value="A3" ${curSha === 'A3' ? 'selected' : ''}>A3</option>
+                            <option value="B1" ${curSha === 'B1' ? 'selected' : ''}>B1</option>
+                            <option value="C1" ${curSha === 'C1' ? 'selected' : ''}>C1</option>
+                            <option value="BL1" ${curSha === 'BL1' ? 'selected' : ''}>BL1</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <input type="text" name="tooth_notes" class="input-dark" placeholder="Individual margins / notes...">
+                    </div>
+                `;
+                container.appendChild(detail);
+            });
+        }
+
+        submitBtn.addEventListener("click", function(e) {
+            if (selectedTeeth.size === 0) { 
+                e.preventDefault(); 
+                alert("Please select at least one tooth on the odontogram."); 
+                return false; 
+            }
+            if (!confirm("Dispatch prescription order to Mrkzter Dental Laboratory?")) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
