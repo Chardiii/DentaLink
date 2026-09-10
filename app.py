@@ -39,15 +39,12 @@ supabase_admin: Client = create_client(
     SUPABASE_SERVICE_ROLE_KEY
 )
 def send_brevo_status_email(to_email, full_name, action_type):
-    """
-    Sends an account status email (Approved or Declined) via your Brevo SMTP relay.
-    """
     smtp_host = "smtp-relay.brevo.com"
     smtp_port = 587
     smtp_user = "b5b7a3001@smtp-brevo.com"
-    smtp_pass = os.getenv("BREVO_SMTP_PASS") # Keep your master key secure in your .env file
-    sender_email = "jiclao24@gmail.com"
-    app_url = os.getenv("APP_URL", "http://localhost:5000")
+    smtp_pass = os.getenv("BREVO_SMTP_PASS")
+    sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+    app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/") # Strips trailing slash to prevent double slashes
 
     if not smtp_pass or not to_email:
         print("⚠️ Brevo SMTP password or recipient email missing. Skipping notification.")
@@ -57,37 +54,9 @@ def send_brevo_status_email(to_email, full_name, action_type):
     subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
 
     if is_approved:
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; background-color: #0B101E; color: #F3F4F6; padding: 24px;">
-            <div style="max-width: 520px; margin: auto; background-color: #151C2C; padding: 28px; border-radius: 12px; border: 1px solid #243048;">
-                <h2 style="color: #42DDF2; margin-top: 0;">Account Approved</h2>
-                <p>Hello <strong>{full_name}</strong>,</p>
-                <p>Your registration request for the <strong>DentaLink Laboratory Information System</strong> has been approved by our administrator.</p>
-                <p>You can now log in to access your portal, submit prescriptions, and track lab production progress.</p>
-                <div style="margin: 24px 0;">
-                    <a href="{app_url}/login" style="background-color: #42DDF2; color: #0B101E; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">Log In to Your Portal &rarr;</a>
-                </div>
-                <p style="color: #8E9BAE; font-size: 12px; margin-top: 24px; border-top: 1px solid #243048; padding-top: 12px;">
-                    Mrkzter Dental Laboratory • Clinical Information Systems
-                </p>
-            </div>
-        </div>
-        """
+        html_content = render_template("email_approved.html", full_name=full_name, app_url=app_url)
     else:
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; background-color: #0B101E; color: #F3F4F6; padding: 24px;">
-            <div style="max-width: 520px; margin: auto; background-color: #151C2C; padding: 28px; border-radius: 12px; border: 1px solid #243048;">
-                <h2 style="color: #EF4444; margin-top: 0;">Application Notice</h2>
-                <p>Hello <strong>{full_name}</strong>,</p>
-                <p>Thank you for submitting your credentials to <strong>DentaLink LIS</strong>.</p>
-                <p>After reviewing the professional information provided, laboratory administration has declined your application at this time.</p>
-                <p>If you believe this is in error or need to update your license documentation, please contact our laboratory administration.</p>
-                <p style="color: #8E9BAE; font-size: 12px; margin-top: 24px; border-top: 1px solid #243048; padding-top: 12px;">
-                    Mrkzter Dental Laboratory • Verification Desk
-                </p>
-            </div>
-        </div>
-        """
+        html_content = render_template("email_rejected.html", full_name=full_name)
 
     try:
         msg = MIMEMultipart("alternative")
@@ -866,7 +835,7 @@ def approve_user(user_id):
         user_response = (
             supabase_admin
             .table("profiles")
-            .select("id, role, status")
+            .select("id, role, status, display_name, first_name")
             .eq("id", user_id)
             .execute()
         )
@@ -895,14 +864,37 @@ def approve_user(user_id):
             .execute()
 
         # =========================
-        # SEND APPROVAL EMAIL VIA SUPABASE/BREVO
+        # SEND APPROVAL EMAIL VIA BREVO SMTP
         # =========================
         try:
             auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
             if auth_user_res and getattr(auth_user_res, "user", None):
-                user_email = auth_user_res.user.email
-                # Triggers Supabase's built-in email sender, routed automatically through your Brevo SMTP
-                supabase_admin.auth.admin.invite_user_by_email(user_email)
+                recipient_email = auth_user_res.user.email
+                user_name = user.get("display_name") or user.get("first_name") or "Colleague"
+
+                # Brevo Configuration from Environment Variables
+                smtp_host = "smtp-relay.brevo.com"
+                smtp_port = 587
+                smtp_user = "b5b7a3001@smtp-brevo.com"
+                smtp_pass = os.getenv("BREVO_SMTP_PASS")
+                sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+                app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
+
+                if smtp_pass and recipient_email:
+                    subject = "✅ Welcome to DentaLink LIS - Account Approved"
+                    html_content = render_template("email_approved.html", full_name=user_name, app_url=app_url)
+
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = subject
+                    msg["From"] = f"DentaLink <{sender_email}>"
+                    msg["To"] = recipient_email
+                    msg.attach(MIMEText(html_content, "html"))
+
+                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                        server.starttls()
+                        server.login(smtp_user, smtp_pass)
+                        server.sendmail(sender_email, recipient_email, msg.as_string())
+                    print(f"✅ Approval email dispatched to {recipient_email}")
         except Exception as mail_err:
             print(f"Failed to trigger approval email: {str(mail_err)}")
 
@@ -956,7 +948,7 @@ def reject_user(user_id):
         user_response = (
             supabase_admin
             .table("profiles")
-            .select("id, role, status")
+            .select("id, role, status, display_name, first_name")
             .eq("id", user_id)
             .execute()
         )
@@ -984,8 +976,39 @@ def reject_user(user_id):
             .eq("id", user_id) \
             .execute()
 
-        # Rejections are handled automatically at login when status becomes 'rejected', 
-        # so no extra email dispatch function is required here.
+        # =========================
+        # SEND REJECTION EMAIL VIA BREVO SMTP
+        # =========================
+        try:
+            auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
+            if auth_user_res and getattr(auth_user_res, "user", None):
+                recipient_email = auth_user_res.user.email
+                user_name = user.get("display_name") or user.get("first_name") or "Colleague"
+
+                # Brevo Configuration from Environment Variables
+                smtp_host = "smtp-relay.brevo.com"
+                smtp_port = 587
+                smtp_user = "b5b7a3001@smtp-brevo.com"
+                smtp_pass = os.getenv("BREVO_SMTP_PASS")
+                sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+
+                if smtp_pass and recipient_email:
+                    subject = "Notice Regarding Your DentaLink LIS Account Application"
+                    html_content = render_template("email_rejected.html", full_name=user_name)
+
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = subject
+                    msg["From"] = f"DentaLink <{sender_email}>"
+                    msg["To"] = recipient_email
+                    msg.attach(MIMEText(html_content, "html"))
+
+                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                        server.starttls()
+                        server.login(smtp_user, smtp_pass)
+                        server.sendmail(sender_email, recipient_email, msg.as_string())
+                    print(f"✅ Rejection email dispatched to {recipient_email}")
+        except Exception as mail_err:
+            print(f"Failed to trigger rejection email: {str(mail_err)}")
 
         return redirect(url_for("admin_dashboard"))
 
