@@ -864,7 +864,7 @@ def approve_user(user_id):
             .execute()
 
         # =========================
-        # SEND APPROVAL EMAIL VIA BREVO SMTP
+        # SEND APPROVAL EMAIL VIA BREVO SMTP (WITH DEBUGGING)
         # =========================
         try:
             auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
@@ -872,7 +872,6 @@ def approve_user(user_id):
                 recipient_email = auth_user_res.user.email
                 user_name = user.get("display_name") or user.get("first_name") or "Colleague"
 
-                # Brevo Configuration from Environment Variables
                 smtp_host = "smtp-relay.brevo.com"
                 smtp_port = 587
                 smtp_user = "b5b7a3001@smtp-brevo.com"
@@ -880,7 +879,13 @@ def approve_user(user_id):
                 sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
                 app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
 
-                if smtp_pass and recipient_email:
+                print(f"📧 Attempting to send approval email to: {recipient_email} using sender: {sender_email}")
+
+                if not smtp_pass:
+                    print("❌ ERROR: BREVO_SMTP_PASS environment variable is missing or empty on Railway!")
+                elif not recipient_email:
+                    print("❌ ERROR: Recipient email address could not be retrieved from auth.users!")
+                else:
                     subject = "✅ Welcome to DentaLink LIS - Account Approved"
                     html_content = render_template("email_approved.html", full_name=user_name, app_url=app_url)
 
@@ -894,9 +899,11 @@ def approve_user(user_id):
                         server.starttls()
                         server.login(smtp_user, smtp_pass)
                         server.sendmail(sender_email, recipient_email, msg.as_string())
-                    print(f"✅ Approval email dispatched to {recipient_email}")
+                    print(f"✅ Successfully dispatched approval email to {recipient_email}")
+            else:
+                print("❌ ERROR: Could not find user object in auth.users for this ID.")
         except Exception as mail_err:
-            print(f"Failed to trigger approval email: {str(mail_err)}")
+            print(f"❌ CRITICAL EMAIL ERROR in approve_user: {str(mail_err)}")
 
         return redirect(url_for("admin_dashboard"))
 
@@ -977,7 +984,7 @@ def reject_user(user_id):
             .execute()
 
         # =========================
-        # SEND REJECTION EMAIL VIA BREVO SMTP
+        # SEND REJECTION EMAIL VIA BREVO SMTP (WITH DEBUGGING)
         # =========================
         try:
             auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
@@ -985,14 +992,19 @@ def reject_user(user_id):
                 recipient_email = auth_user_res.user.email
                 user_name = user.get("display_name") or user.get("first_name") or "Colleague"
 
-                # Brevo Configuration from Environment Variables
                 smtp_host = "smtp-relay.brevo.com"
                 smtp_port = 587
                 smtp_user = "b5b7a3001@smtp-brevo.com"
                 smtp_pass = os.getenv("BREVO_SMTP_PASS")
                 sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
 
-                if smtp_pass and recipient_email:
+                print(f"📧 Attempting to send rejection email to: {recipient_email} using sender: {sender_email}")
+
+                if not smtp_pass:
+                    print("❌ ERROR: BREVO_SMTP_PASS environment variable is missing or empty on Railway!")
+                elif not recipient_email:
+                    print("❌ ERROR: Recipient email address could not be retrieved from auth.users!")
+                else:
                     subject = "Notice Regarding Your DentaLink LIS Account Application"
                     html_content = render_template("email_rejected.html", full_name=user_name)
 
@@ -1006,9 +1018,11 @@ def reject_user(user_id):
                         server.starttls()
                         server.login(smtp_user, smtp_pass)
                         server.sendmail(sender_email, recipient_email, msg.as_string())
-                    print(f"✅ Rejection email dispatched to {recipient_email}")
+                    print(f"✅ Successfully dispatched rejection email to {recipient_email}")
+            else:
+                print("❌ ERROR: Could not find user object in auth.users for this ID.")
         except Exception as mail_err:
-            print(f"Failed to trigger rejection email: {str(mail_err)}")
+            print(f"❌ CRITICAL EMAIL ERROR in reject_user: {str(mail_err)}")
 
         return redirect(url_for("admin_dashboard"))
 
