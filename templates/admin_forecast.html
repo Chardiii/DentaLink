@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Analytics - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --accent-green: #10B981;
+            --accent-yellow: #D97706;
+            --accent-red: #EF4444;
+            --panel-header: #F0F9FF;
+            --sidebar-width: 260px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; line-height: 1.5; min-height: 100vh; }
+        
+        /* Sidebar Layout */
+        .app-sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-width); height: 100vh; background-color: #FFFFFF; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; z-index: 100; padding: 24px 16px; box-shadow: 4px 0 20px rgba(15, 23, 42, 0.03); }
+        .sidebar-top { display: flex; flex-direction: column; gap: 24px; }
+        .sidebar-brand { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+        .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
+        .sidebar-titles h1 { margin: 0; font-size: 16px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 6px; }
+        .version-badge { background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 9px; padding: 2px 5px; border-radius: 12px; border: 1px solid rgba(2, 132, 199, 0.25); }
+        .sidebar-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
+        
+        .sidebar-nav { display: flex; flex-direction: column; gap: 6px; }
+        .nav-pill { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 8px; border: 1px solid transparent; transition: all 0.2s; background: transparent; cursor: pointer; font-family: inherit; width: 100%; text-align: left; }
+        .nav-pill span.nav-content { display: flex; align-items: center; gap: 10px; }
+        .nav-pill:hover { color: #0F172A; background: #F8FAFC; border-color: var(--border-color); }
+        .nav-pill.active { background-color: rgba(2, 132, 199, 0.08); color: var(--accent-cyan); border-color: rgba(2, 132, 199, 0.25); }
+        
+        .pill-badge { background-color: var(--accent-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+        .pill-badge.yellow { background-color: var(--accent-yellow); color: #FFFFFF; }
+
+        .sidebar-footer { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 6px 10px; border-radius: 20px; justify-content: center; }
+        .status-dot { width: 6px; height: 6px; background-color: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
+
+        /* Top Utility Bar for Notifications */
+        .top-utility-bar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; position: relative; }
+        .notif-wrapper { position: relative; }
+        .notif-bell { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.02); }
+        .notif-bell:hover, .notif-bell.active { color: #0F172A; border-color: var(--accent-cyan); background: rgba(2, 132, 199, 0.05); }
+        .notif-badge { background: var(--accent-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: bold; }
+        .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
+        .notif-dropdown.show { display: flex; }
+        .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: #0F172A; display: flex; justify-content: space-between; background: var(--panel-header); }
+        .notif-clear-all { color: var(--text-muted); cursor: pointer; font-size: 11px; }
+        .notif-clear-all:hover { color: var(--accent-cyan); }
+        .notif-list-dd { max-height: 300px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .notif-item-dd:hover { background: #F8FAFC; }
+        .notif-content-dd { flex: 1; font-size: 12px; color: #334155; line-height: 1.4; }
+        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
+        .notif-close:hover { color: var(--accent-red); }
+
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 28px 36px; max-width: calc(1600px + var(--sidebar-width)); }
+        
+        /* Executive Header Banner */
+        .analytics-header { background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color: white; border-radius: 16px; padding: 24px 32px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.1); flex-wrap: wrap; gap: 16px; }
+        .analytics-header h2 { margin: 0 0 6px 0; font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .analytics-header p { margin: 0; font-size: 13px; color: #94A3B8; }
+        .live-pulse-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; color: #34D399; }
+        .pulse-dot { width: 6px; height: 6px; background-color: #34D399; border-radius: 50%; box-shadow: 0 0 8px #34D399; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
+
+        /* Panels & Cards */
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04); margin-bottom: 24px; }
+        .forecast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
+        
+        .forecast-card { background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .forecast-card:hover { transform: translateY(-2px); border-color: var(--accent-cyan); box-shadow: 0 8px 20px rgba(2, 132, 199, 0.06); }
+        
+        .f-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .f-item-name { font-size: 15px; font-weight: 700; color: #0F172A; margin: 0 0 4px 0; }
+        .f-days-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-safe { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.25); }
+        .badge-warning { background: rgba(217, 119, 6, 0.1); color: var(--accent-yellow); border: 1px solid rgba(217, 119, 6, 0.25); }
+        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.25); }
+
+        /* Pipeline & Metrics Meta Row */
+        .f-meta-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+        .f-stat-label { color: var(--text-muted); font-size: 10px; text-transform: uppercase; font-weight: 700; display: block; }
+        .f-stat-val { color: #0F172A; font-weight: 700; }
+
+        /* Animated Progress Bar */
+        .progress-container { width: 100%; background: #E2E8F0; border-radius: 6px; height: 8px; overflow: hidden; margin-top: 4px; }
+        .progress-bar { height: 100%; border-radius: 6px; transition: width 0.6s ease-in-out; }
+        
+        .f-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: 500; }
+        
+        /* Reorder Alert Banner */
+        .reorder-alert { background: rgba(239, 68, 68, 0.05); border: 1px dashed var(--accent-red); padding: 10px 12px; border-radius: 8px; font-size: 12px; color: var(--accent-red); font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .btn-restock { background: var(--accent-cyan); color: #FFFFFF; padding: 5px 12px; border-radius: 6px; text-decoration: none; font-size: 11px; font-weight: 700; transition: background 0.2s; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-restock:hover { background: var(--accent-cyan-hover); }
+
+        /* Tables & Modals */
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dark-table th { text-align: left; padding: 12px 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); background-color: var(--panel-header); }
+        .dark-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); vertical-align: middle; color: #334155; }
+        .dark-table tr:hover td { background-color: #F8FAFC; }
+        .select-dark { background-color: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-main); padding: 6px 8px; border-radius: 6px; font-size: 11px; outline: none; font-family: inherit; }
+        .tag { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); border: 1px solid rgba(2, 132, 199, 0.25); }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .modal-container { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; width: 100%; max-width: 920px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { background-color: var(--panel-header); padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 24px; overflow-y: auto; }
+        .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; }
+        .close-btn:hover { color: var(--accent-red); }
+        .slider-range { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 5px; background: #E2E8F0; border: 1px solid var(--border-color); outline: none; }
+        .slider-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent-cyan); cursor: pointer; box-shadow: 0 0 6px rgba(2, 132, 199, 0.4); }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="app-sidebar">
+        <div class="sidebar-top">
+            <div class="sidebar-brand">
+                <div class="logo-box">
+                    <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="DentaLink Logo">
+                </div>
+                <div class="sidebar-titles">
+                    <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
+                    <p>Mrkzter Dental Lab</p>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Admin Command
+                    </span>
+                </a>
+                
+                <button type="button" class="nav-pill" onclick="openIncomingModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        Incoming Cases
+                    </span>
+                    <span class="pill-badge">{{ unassigned_cases|length if unassigned_cases else 0 }}</span>
+                </button>
+
+                <button type="button" class="nav-pill" onclick="openRestockModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Restock Requests
+                    </span>
+                    <span class="pill-badge yellow">{{ restock_requests|length if restock_requests else 0 }}</span>
+                </button>
+
+                <a href="{{ url_for('admin_inventory') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Inventory
+                    </span>
+                </a>
+
+                <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Audit Logs
+                    </span>
+                </a>
+
+                <a href="{{ url_for('admin_forecast_analytics') }}" class="nav-pill active">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                        Forecast Analytics
+                    </span>
+                </a>
+
+                <button type="button" class="nav-pill" onclick="openSettingsModal()">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        System Settings
+                    </span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator">
+                <div class="status-dot"></div> System Active
+            </div>
+        </div>
+    </aside>
+
+    <main class="dashboard-container">
+        
+        <!-- TOP NOTIFICATION BAR -->
+        <div class="top-utility-bar">
+            <div class="notif-wrapper">
+                <button class="notif-bell" id="bell-icon" onclick="toggleNotif(event)">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Notifications
+                    {% if notifications and notifications|length > 0 %}
+                        <span class="notif-badge" id="notif-count">{{ notifications|length }}</span>
+                    {% endif %}
+                </button>
+
+                <div class="notif-dropdown" id="notifDropdown">
+                    <div class="notif-header">
+                        Recent Notifications
+                        <span class="notif-clear-all" onclick="clearAllNotifs()">Clear</span>
+                    </div>
+                    <ul class="notif-list-dd" id="notifList">
+                        {% for notif in notifications %}
+                            <li class="notif-item-dd">
+                                <div class="notif-content-dd">
+                                    {{ notif.message }}
+                                    {% if notif.link %}
+                                        <br><a href="{{ notif.link }}" style="color: var(--accent-cyan); text-decoration: none; font-weight: bold;">Review →</a>
+                                    {% endif %}
+                                    <span class="notif-time-dd">{{ notif.created_at[:10] }}</span>
+                                </div>
+                                <button class="notif-close" onclick="dismissNotif(this, event)">×</button>
+                            </li>
+                        {% else %}
+                            <li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No unread notifications.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Professional Header Banner -->
+        <div class="analytics-header">
+            <div>
+                <h2>
+                    <svg width="24" height="24" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                    Predictive Inventory Intelligence & Pipeline Analytics
+                </h2>
+                <p>Real-time machine learning stock depletion forecasting synthesizing historical burn velocities, active Kanban case pressure, and supplier lead times.</p>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <a href="{{ url_for('admin_forecast_report_preview') }}" class="btn-restock" style="background: #0284C7; padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    View Forecast Report
+                </a>
+                <div class="live-pulse-badge">
+                    <div class="pulse-dot"></div> Live Telemetry Active
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="forecast-grid">
+                {% for p in predictions %}
+                    <div class="forecast-card">
+                        <div class="f-card-top">
+                            <div>
+                                <h4 class="f-item-name">{{ p.item_name }}</h4>
+                                <span style="font-size: 11px; color: var(--text-muted);">Current On-Hand: <strong>{{ p.current_qty }} units</strong></span>
+                            </div>
+                            {% if p.estimated_days_left <= 3 %}
+                                <span class="f-days-badge badge-danger">⚠️ {{ p.estimated_days_left }} Days Left</span>
+                            {% elif p.estimated_days_left <= 7 %}
+                                <span class="f-days-badge badge-warning">⚡ {{ p.estimated_days_left }} Days Left</span>
+                            {% else %}
+                                <span class="f-days-badge badge-safe">✓ {{ p.estimated_days_left }} Days Left</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Pipeline & Burn Rate Metrics Box -->
+                        <div class="f-meta-stats">
+                            <div>
+                                <span class="f-stat-label">Consumption Rate</span>
+                                <span class="f-stat-val">{{ p.daily_burn_rate }} units / day</span>
+                            </div>
+                            <div>
+                                <span class="f-stat-label">Active Pipeline Load</span>
+                                <span class="f-stat-val" style="color: var(--accent-cyan);">{{ p.linked_cases_count }} Cases in Flight</span>
+                            </div>
+                        </div>
+
+                        <!-- Animated Progress Bar -->
+                        <div>
+                            <div class="f-meta">
+                                <span>Depletion Runway</span>
+                                <span>Stockout Date: <strong>{{ p.projected_stockout_date }}</strong></span>
+                            </div>
+                            <div class="progress-container">
+                                <div class="progress-bar" style="width: {{ p.health_percentage }}%; background-color: {% if p.estimated_days_left <= 3 %}var(--accent-red){% elif p.estimated_days_left <= 7 %}var(--accent-yellow){% else %}var(--accent-green){% endif %};"></div>
+                            </div>
+                        </div>
+
+                        <!-- Supplier Lead-Time & Reorder Action Banner with Confirmation Trigger -->
+                        {% if p.needs_urgent_reorder %}
+                            <div class="reorder-alert">
+                                <span>🚨 Reorder required immediately (Lead time: {{ p.lead_time_days }}d)</span>
+                                <button type="button" class="btn-restock" onclick="openRestockConfirm('{{ p.item_id }}', '{{ p.item_name }}')">Restock +10 →</button>
+                            </div>
+                        {% else %}
+                            <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <span>Supplier Lead Time: <strong>{{ p.lead_time_days }} days</strong></span>
+                                <span style="color: var(--accent-green); font-weight: 600;">● Stock Stable</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">No inventory records available for forecasting analytics.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+
+    <!-- INCOMING CASES MODAL -->
+    <div class="modal-overlay" id="incomingModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:#0F172A; font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    Incoming Unassigned Cases ({{ unassigned_cases|length if unassigned_cases else 0 }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeIncomingModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if unassigned_cases %}
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Patient</th>
+                                    <th>Classification</th>
+                                    <th>Delivery Target</th>
+                                    <th>Assign Technician</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for case in unassigned_cases %}
+                                    <tr>
+                                        <td><span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span></td>
+                                        <td><strong>{{ case.patient_name }}</strong></td>
+                                        <td><span class="tag">{{ case.case_type | replace('_', ' ') | title }}</span></td>
+                                        <td><span style="color: var(--accent-yellow); font-weight: 600;">{{ case.due_date or 'Not Set' }}</span></td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('admin_assign_case', case_id=case.id) }}" style="display: flex; gap: 8px; margin: 0;">
+                                                <select name="technician_id" class="select-dark" required>
+                                                    <option value="">Select Tech...</option>
+                                                    {% for tech in technicians %}
+                                                        <option value="{{ tech.id }}">{{ tech.first_name }} ({{ tech.active_workload }} active)</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="submit" class="btn-restock" style="padding: 5px 12px; font-size: 11px;">Dispatch</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px;">No incoming cases awaiting technician dispatch.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- RESTOCK REQUESTS MODAL -->
+    <div class="modal-overlay" id="restockModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:#0F172A; font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    Technician Supply Restock Alerts ({{ restock_requests|length if restock_requests else 0 }})
+                </h2>
+                <button type="button" class="close-btn" onclick="closeRestockModal()">×</button>
+            </div>
+            <div class="modal-body">
+                {% if restock_requests %}
+                    <div style="overflow-x: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Technician</th>
+                                    <th>Item Flagged</th>
+                                    <th>Associated Order</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in restock_requests %}
+                                    <tr>
+                                        <td><small style="color: var(--text-muted);">{{ req.created_at[:19].replace('T', ' ') }}</small></td>
+                                        <td><strong>{{ req.profiles.display_name if req.profiles else 'Bench Tech' }}</strong></td>
+                                        <td><span style="color: var(--accent-yellow); font-weight: 700;">{{ req.item_name }}</span></td>
+                                        <td><span class="tag">#{{ req.dental_cases.case_number if req.dental_cases else 'N/A' }}</span></td>
+                                        <td>
+                                            <a href="{{ url_for('admin_inventory') }}" class="btn-restock" style="padding: 4px 10px; font-size: 11px;">Restock Supply →</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 48px; color: var(--text-muted); font-size: 13px;">No bench material shortage alerts pending.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKSPACE SETTINGS MODAL (With Sound Editor Controls) -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-container" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 style="font-size: 15px; margin:0; color:#0F172A; font-weight: 700; display:flex; align-items:center; gap:8px;">
+                    Workspace Preferences
+                </h2>
+                <button type="button" class="close-btn" onclick="closeSettingsModal()">×</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <strong style="color: #0F172A; font-size: 13px; display: block;">Notification Sound Alerts</strong>
+                        <span style="font-size: 12px; color: var(--text-muted);">Play audio tone on system events</span>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer;">
+                        <input type="checkbox" id="settingSoundToggle" onchange="updateSoundSetting(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span id="soundSlider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); border-radius: 24px; transition: .25s;"></span>
+                        <span id="soundKnob" style="position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .25s;"></span>
+                    </label>
+                </div>
+
+                <div id="soundEditorGroup" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sound Chime Theme</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="settingSoundTone" class="select-dark" style="flex: 1; padding: 8px 10px; font-size: 12px;" onchange="updateToneSetting(this.value)">
+                                <option value="chime">Modern Bell Chime (Default)</option>
+                                <option value="ping">Glass Crystal Ping</option>
+                                <option value="pop">Soft Digital Pop</option>
+                                <option value="alert">Double Dispatch Tone</option>
+                            </select>
+                            <button type="button" class="btn-restock" onclick="previewSoundTone()" style="background: #FFFFFF; color: var(--text-muted); border: 1px solid var(--border-color); padding: 6px 14px;">Test</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Volume Level</span>
+                            <span id="volumeVal" style="color: var(--accent-cyan);">70%</span>
+                        </div>
+                        <input type="range" id="settingVolume" class="slider-range" min="0.05" max="1.0" step="0.05" value="0.7" oninput="updateVolume(this.value)">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                            <span>Pitch Tuning</span>
+                            <span id="pitchVal" style="color: var(--accent-cyan);">1.0x (Standard)</span>
+                        </div>
+                        <input type="range" id="settingPitch" class="slider-range" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updatePitch(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--panel-header); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button type="button" class="btn-restock" onclick="closeSettingsModal()">Save & Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESTOCK CONFIRMATION MODAL -->
+    <div class="modal-overlay" id="restockConfirmModal">
+        <div class="modal-container" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 style="font-size: 15px; margin: 0; color: #0F172A; font-weight: 700;">Confirm Inventory Restock</h3>
+                <button type="button" class="close-btn" onclick="closeRestockConfirm()">×</button>
+            </div>
+            <div class="modal-body" style="font-size: 13px; color: #334155;">
+                <p style="margin: 0 0 16px 0;">Are you sure you want to authorize an immediate restock of <strong>+10 units</strong> for <span id="confirmItemName" style="color: var(--accent-cyan); font-weight: 700;"></span>?</p>
+                <p style="margin: 0; font-size: 11px; color: var(--text-muted);">This action will instantly update on-hand stock and write an entry to your audit logs.</p>
+            </div>
+            <div style="background: var(--panel-header); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn-restock" style="background: #E2E8F0; color: var(--text-main);" onclick="closeRestockConfirm()">Cancel</button>
+                <form id="confirmRestockForm" method="POST" style="margin:0;">
+                    <button type="submit" class="btn-restock">Yes, Authorize Restock</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Audio Engine for System Settings
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') { this.ctx.resume(); }
+            },
+            playTone(toneType) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const userVol = parseFloat(localStorage.getItem('dl_sound_volume') || '0.7');
+                const userPitch = parseFloat(localStorage.getItem('dl_sound_pitch') || '1.0');
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                switch (toneType) {
+                    case 'chime':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(1320 * userPitch, now + 0.12);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                        osc.start(now); osc.stop(now + 0.5);
+                        break;
+                    case 'ping':
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(1760 * userPitch, now);
+                        gain.gain.setValueAtTime(0.25 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now); osc.stop(now + 0.35);
+                        break;
+                    case 'pop':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400 * userPitch, now);
+                        osc.frequency.exponentialRampToValueAtTime(800 * userPitch, now + 0.08);
+                        gain.gain.setValueAtTime(0.4 * userVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                        osc.start(now); osc.stop(now + 0.18);
+                        break;
+                    case 'alert':
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(950 * userPitch, now);
+                        gain.gain.setValueAtTime(0.3 * userVol, now);
+                        gain.gain.setValueAtTime(0.01, now + 0.08);
+                        gain.gain.setValueAtTime(0.3 * userVol, now + 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                        osc.start(now); osc.stop(now + 0.35);
+                        break;
+                    default: this.playTone('chime');
+                }
+            }
+        };
+
+        // Modal Handlers
+        function openIncomingModal() { document.getElementById('incomingModal').style.display = 'flex'; }
+        function closeIncomingModal() { document.getElementById('incomingModal').style.display = 'none'; }
+
+        function openRestockModal() { document.getElementById('restockModal').style.display = 'flex'; }
+        function closeRestockModal() { document.getElementById('restockModal').style.display = 'none'; }
+
+        function openSettingsModal() { initSettingsValues(); document.getElementById('settingsModal').style.display = 'flex'; }
+        function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
+
+        function openRestockConfirm(itemId, itemName) {
+            document.getElementById('confirmItemName').innerText = itemName;
+            document.getElementById('confirmRestockForm').action = "/admin/forecast/quick-restock/" + itemId;
+            document.getElementById('restockConfirmModal').style.display = 'flex';
+        }
+        function closeRestockConfirm() { document.getElementById('restockConfirmModal').style.display = 'none'; }
+
+        // Settings Controls
+        function initSettingsValues() {
+            const soundEnabled = localStorage.getItem('dl_sound_enabled') !== 'false';
+            const selectedTone = localStorage.getItem('dl_sound_tone') || 'chime';
+            const volume = localStorage.getItem('dl_sound_volume') || '0.7';
+            const pitch = localStorage.getItem('dl_sound_pitch') || '1.0';
+
+            document.getElementById('settingSoundToggle').checked = soundEnabled;
+            document.getElementById('settingSoundTone').value = selectedTone;
+            document.getElementById('settingVolume').value = volume;
+            document.getElementById('settingPitch').value = pitch;
+            document.getElementById('volumeVal').innerText = Math.round(parseFloat(volume) * 100) + '%';
+            document.getElementById('pitchVal').innerText = pitch + 'x';
+            syncToggleStyle(soundEnabled);
+            document.getElementById('soundEditorGroup').style.opacity = soundEnabled ? '1' : '0.4';
+        }
+
+        function updateSoundSetting(isEnabled) {
+            localStorage.setItem('dl_sound_enabled', isEnabled);
+            syncToggleStyle(isEnabled);
+            document.getElementById('soundEditorGroup').style.opacity = isEnabled ? '1' : '0.4';
+            if (isEnabled) { AudioEngine.init(); AudioEngine.playTone(localStorage.getItem('dl_sound_tone') || 'chime'); }
+        }
+
+        function syncToggleStyle(isEnabled) {
+            const slider = document.getElementById('soundSlider');
+            const knob = document.getElementById('soundKnob');
+            if (slider && knob) {
+                slider.style.backgroundColor = isEnabled ? 'var(--accent-cyan)' : 'var(--border-color)';
+                knob.style.transform = isEnabled ? 'translateX(20px)' : 'translateX(0px)';
+            }
+        }
+
+        function updateToneSetting(newTone) { localStorage.setItem('dl_sound_tone', newTone); AudioEngine.playTone(newTone); }
+        function updateVolume(val) { localStorage.setItem('dl_sound_volume', val); document.getElementById('volumeVal').innerText = Math.round(parseFloat(val) * 100) + '%'; }
+        function updatePitch(val) { localStorage.setItem('dl_sound_pitch', val); document.getElementById('pitchVal').innerText = val + 'x'; }
+        function previewSoundTone() { AudioEngine.playTone(document.getElementById('settingSoundTone').value); }
+
+        // Notification helpers
+        function toggleNotif(e) { e.stopPropagation(); document.getElementById('notifDropdown').classList.toggle('show'); }
+        function dismissNotif(btn, e) { e.stopPropagation(); btn.closest('.notif-item-dd').remove(); updateNotifCount(); }
+        function clearAllNotifs() { document.getElementById('notifList').innerHTML = '<li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">No unread notifications.</li>'; updateNotifCount(); }
+        function updateNotifCount() {
+            const count = document.querySelectorAll('.notif-item-dd').length;
+            const badge = document.getElementById('notif-count');
+            if (badge) { if (count > 0) { badge.innerText = count; } else { badge.style.display = 'none'; } }
+        }
+
+        window.onclick = function(event) {
+            if (event.target === document.getElementById('incomingModal')) { closeIncomingModal(); }
+            if (event.target === document.getElementById('restockModal')) { closeRestockModal(); }
+            if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
+            if (event.target === document.getElementById('restockConfirmModal')) { closeRestockConfirm(); }
+            if (!event.target.closest('.notif-wrapper')) {
+                const dd = document.getElementById('notifDropdown');
+                if (dd) dd.classList.remove('show');
+            }
+        }
+
+        // Smart Auto-Refresh (30s)
+        const REFRESH_INTERVAL_MS = 30000;
+        setInterval(() => {
+            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
+            const isModalOpen = document.getElementById('incomingModal')?.style.display === 'flex' || 
+                                document.getElementById('restockModal')?.style.display === 'flex' || 
+                                document.getElementById('settingsModal')?.style.display === 'flex' ||
+                                document.getElementById('restockConfirmModal')?.style.display === 'flex';
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
+
+            if (!isNotifOpen && !isModalOpen && !isUserTyping) {
+                window.location.reload();
+            }
+        }, REFRESH_INTERVAL_MS);
+    </script>
+</body>
+</html>

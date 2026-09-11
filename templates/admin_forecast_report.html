@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Forecast Audit Report - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-green: #10B981;
+            --accent-red: #EF4444;
+            --panel-header: #F0F9FF;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; padding: 40px; }
+        .report-container { max-width: 1000px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+        .report-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 20px; margin-bottom: 24px; }
+        .report-title h1 { margin: 0 0 4px 0; font-size: 20px; color: #0F172A; }
+        .report-title p { margin: 0; font-size: 12px; color: var(--text-muted); }
+        
+        .dark-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+        .dark-table th { text-align: left; padding: 12px 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; background-color: var(--panel-header); border-bottom: 1px solid var(--border-color); }
+        .dark-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); color: #334155; }
+        .dark-table tr:hover td { background-color: #F8FAFC; }
+        
+        .tag-status { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .tag-urgent { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.25); }
+        .tag-stable { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.25); }
+
+        .btn-group { display: flex; gap: 12px; justify-content: flex-end; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; border: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-cyan { background-color: var(--accent-cyan); color: #FFFFFF; }
+        .btn-outline { background-color: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn-outline:hover { color: #0F172A; background: #F8FAFC; }
+    </style>
+</head>
+<body>
+
+    <div class="report-container">
+        <div class="report-header">
+            <div class="report-title">
+                <h1>DentaLink LIS - Executive Inventory Forecast Report</h1>
+                <p>Generated via Machine Learning Telemetry Engine • Mrkzter Dental Lab</p>
+            </div>
+            <div>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Status: Verified Audit</span>
+            </div>
+        </div>
+
+        <table class="dark-table">
+            <thead>
+                <tr>
+                    <th>Material Name</th>
+                    <th>Current Stock</th>
+                    <th>Burn Rate</th>
+                    <th>Runway (Days)</th>
+                    <th>Projected Stockout</th>
+                    <th>Supply Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in predictions %}
+                    <tr>
+                        <td><strong>{{ p.item_name }}</strong></td>
+                        <td>{{ p.current_qty }} units</td>
+                        <td>{{ p.daily_burn_rate }} / day</td>
+                        <td><strong>{{ p.estimated_days_left }} days</strong></td>
+                        <td><span style="color: var(--accent-cyan);">{{ p.projected_stockout_date }}</span></td>
+                        <td>
+                            {% if p.estimated_days_left <= 7 %}
+                                <span class="tag-status tag-urgent">URGENT REORDER</span>
+                            {% else %}
+                                <span class="tag-status tag-stable">STABLE</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="btn-group">
+            <a href="{{ url_for('admin_forecast_analytics') }}" class="btn btn-outline">← Back to Dashboard</a>
+            <button onclick="window.print()" class="btn btn-outline">🖨️ Print / Save PDF</button>
+            <a href="{{ url_for('admin_forecast_export_csv') }}" class="btn btn-cyan">📥 Download Raw CSV</a>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -2667,7 +2667,172 @@ def inventory_forecast():
     # 3. Pass predictions to your admin inventory HTML page
     return render_template('admin_inventory.html', predictions=predictions, inventory=Inventory.query.all(), profile=...)
 
+@app.route("/admin/forecast-analytics")
+def admin_forecast_analytics():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
 
+    try:
+        # 1. Verify admin access & profile
+        profile_res = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
+        profiles = profile_res.data or []
+        if not profiles or profiles[0].get("role") != "admin" or profiles[0].get("status") != "approved":
+            return "Access denied.", 403
+
+        profile = profiles[0]
+
+        # 2. Fetch inventory items and historical logs
+        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
+        inventory_items = inv_res.data or []
+
+        logs_res = supabase_admin.table("inventory_logs").select("*").execute()
+        historical_logs = logs_res.data or []
+
+        # 3. Fetch active Kanban cases (Pipeline-Awareness)
+        active_statuses = [
+            "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
+            "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
+        ]
+        cases_res = (
+            supabase_admin.table("dental_cases")
+            .select("*")
+            .in_("status", active_statuses)
+            .execute()
+        )
+        active_cases = cases_res.data or []
+
+        # 4. Run ML Forecaster
+        from ml_models.forecaster import InventoryForecaster
+        forecaster = InventoryForecaster(inventory_items, historical_logs)
+        predictions = forecaster.predict_stockouts(active_cases=active_cases)
+
+        # 5. Automated Database Notification Trigger for Urgent Shortages
+        for p in predictions:
+            if p['needs_urgent_reorder']:
+                msg = f"Critical Stock Alert: '{p['item_name']}' is projected to run out in {p['estimated_days_left']} days (Lead time: {p['lead_time_days']}d)."
+                
+                # Check if a similar notification already exists recently to avoid spamming
+                existing_notif = (
+                    supabase_admin.table("notifications")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .ilike("message", f"%{p['item_name']}%")
+                    .execute()
+                )
+                
+                if not existing_notif.data:
+                    supabase_admin.table("notifications").insert({
+                        "user_id": user_id,
+                        "message": msg,
+                        "link": url_for("admin_forecast_analytics")
+                    }).execute()
+
+        # 6. Fetch layout data
+        notif_res = supabase_admin.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
+        notifications = notif_res.data or []
+
+        restock_res = supabase_admin.table("material_requests").select("*, profiles(display_name), dental_cases(case_number)").order("created_at", desc=True).execute()
+        restock_requests = restock_res.data or []
+
+        unassigned_res = supabase_admin.table("dental_cases").select("*").eq("status", "submitted").order("created_at", desc=True).execute()
+        unassigned_cases = unassigned_res.data or []
+
+        return render_template(
+            "admin_forecast.html",
+            profile=profile,
+            predictions=predictions,
+            active_cases_count=len(active_cases),
+            notifications=notifications,
+            restock_requests=restock_requests,
+            unassigned_cases=unassigned_cases
+        )
+    except Exception as e:
+        return f"Forecast Analytics error: {str(e)}", 500
+
+import csv
+from flask import make_response
+
+@app.route("/admin/forecast/quick-restock/<string:item_id>", methods=["POST"])
+def admin_quick_restock(item_id):
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+    try:
+        # Fetch current item quantity
+        item_res = supabase_admin.table("inventory").select("*").eq("id", item_id).execute()
+        if not item_res.data:
+            return "Item not found", 404
+        
+        item = item_res.data[0]
+        item_name = item.get("item_name", "Item")
+        current_qty = item.get("quantity", 0)
+        restock_qty = 10.0  # Standard automated restock batch increment
+
+        # Update inventory stock in Supabase
+        new_qty = current_qty + restock_qty
+        supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
+
+        # Log the restock action matching your audit log schema columns
+        supabase_admin.table("inventory_logs").insert({
+            "inventory_id": item_id,
+            "quantity_changed": restock_qty,
+            "action_type": "Restock",
+            "notes": f"Automated forecast quick-restock of +{rest_qty if 'rest_qty' in locals() else 10}",
+            "user_id": user_id
+        }).execute()
+
+        return redirect(url_for("admin_forecast_analytics"))
+    except Exception as e:
+        return f"Quick restock error: {str(e)}", 500
+
+@app.route("/admin/forecast/export-csv")
+def admin_forecast_export_csv():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+    try:
+        # Re-run forecaster data to generate export payload
+        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
+        inventory_items = inv_res.data or []
+        logs_res = supabase_admin.table("inventory_logs").select("*").execute()
+        historical_logs = logs_res.data or []
+
+        from ml_models.forecaster import InventoryForecaster
+        forecaster = InventoryForecaster(inventory_items, historical_logs)
+        predictions = forecaster.predict_stockouts()
+
+        # Build CSV response
+        csv_data = "Item Name,Current Quantity,Daily Burn Rate,Estimated Days Left,Projected Stockout Date,Reorder Status\n"
+        for p in predictions:
+            status = "URGENT REORDER" if p['estimated_days_left'] <= 7 else "Stable"
+            csv_data += f"\"{p['item_name']}\",{p['current_qty']},{p['daily_burn_rate']},{p['estimated_days_left'],},{p['projected_stockout_date']},{status}\n"
+
+        response = make_response(csv_data)
+        response.headers["Content-Disposition"] = "attachment; filename=dentalink_forecast_report.csv"
+        response.headers["Content-Type"] = "text/csv"
+        return response
+    except Exception as e:
+        return f"Export error: {str(e)}", 500
+@app.route("/admin/forecast/report-preview")
+def admin_forecast_report_preview():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+    try:
+        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
+        inventory_items = inv_res.data or []
+        logs_res = supabase_admin.table("inventory_logs").select("*").execute()
+        historical_logs = logs_res.data or []
+
+        from ml_models.forecaster import InventoryForecaster
+        forecaster = InventoryForecaster(inventory_items, historical_logs)
+        predictions = forecaster.predict_stockouts()
+
+        # Render a dedicated professional report preview template
+        return render_template("admin_forecast_report.html", predictions=predictions)
+    except Exception as e:
+        return f"Report preview error: {str(e)}", 500
 # =========================
 # START FLASK
 # =========================
