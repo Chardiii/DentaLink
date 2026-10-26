@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup &amp; Recovery - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --accent-red: #B91C1C;
+            --sidebar-width: 260px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background-color: var(--bg-main);
+            background-image:
+                radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+        }
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 40px; max-width: 1050px; }
+        h1 { margin: 0 0 8px; font-size: 28px; }
+        .lead { margin: 0 0 24px; color: var(--text-muted); }
+        .card {
+            margin: 18px 0;
+            padding: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+        .card h2 { margin: 0 0 8px; font-size: 19px; }
+        .card p, .card li { color: var(--text-muted); line-height: 1.6; }
+        .button {
+            display: inline-block;
+            padding: 11px 16px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent-cyan);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .button:hover { background: var(--accent-cyan-hover); }
+        .warning {
+            padding: 14px 16px;
+            border: 1px solid #FECACA;
+            border-radius: 8px;
+            background: #FEF2F2;
+            color: var(--accent-red);
+        }
+        .flash { padding: 12px 16px; border-radius: 8px; margin: 12px 0; }
+        .flash.success { background: #ECFDF5; color: #047857; }
+        .flash.error { background: #FEF2F2; color: var(--accent-red); }
+        input[type="file"] { display: block; margin: 16px 0; }
+        @media (max-width: 1024px) {
+            .dashboard-container { margin-left: 0; padding: 24px; }
+        }
+        @media (max-width: 600px) {
+            .dashboard-container { padding: 20px 16px; }
+        }
+    </style>
+</head>
+<body>
+    {% set active_admin_page = 'backup' %}
+    {% include "partials/admin_sidebar.html" %}
+
+    <main class="dashboard-container">
+        <h1>System Backup &amp; Recovery</h1>
+        <p class="lead">Create a manual backup archive or restore app data from a previously downloaded archive.</p>
+
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+
+        <section class="card">
+            <h2>Create a backup</h2>
+            <p>
+                The ZIP includes DentaLink application database records, files in the
+                <strong>dental-case-files</strong> storage bucket, and non-secret configuration values.
+                Your browser downloads the archive; choose the Downloads folder if prompted.
+            </p>
+            <p>This is manual only. It does not run automatically at noon.</p>
+            <form method="POST" action="{{ url_for('admin_backup_download') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="button" type="submit">Create &amp; Download Backup</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Restore app data</h2>
+            <p>
+                Select a DentaLink backup ZIP. Restore merges records into the existing Supabase
+                schema and overwrites matching records; it does not delete records that are absent
+                from the archive.
+            </p>
+            <form method="POST" action="{{ url_for('admin_backup_restore') }}" enctype="multipart/form-data"
+                  onsubmit="return confirm('Restore records and files from this backup? Matching current data may be overwritten.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="file" name="backup_file" accept=".zip,application/zip" required>
+                <button class="button" type="submit">Restore from Backup</button>
+            </form>
+        </section>
+
+        <p class="warning">
+            Backups may contain sensitive dental and patient data. The ZIP is not encrypted, so
+            store it only on a trusted, protected device.
+            Database schema, Supabase Auth accounts, and secret credentials are not included.
+            Keep a separate full Supabase backup for disaster recovery.
+        </p>
+    </main>
+</body>
+</html>

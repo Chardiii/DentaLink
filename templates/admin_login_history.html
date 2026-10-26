@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login History - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-red: #B91C1C;
+            --accent-green: #047857;
+            --accent-yellow: #B45309;
+            --sidebar-width: 260px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background-color: var(--bg-main);
+            background-image:
+                radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%),
+                radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+        }
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 40px; }
+        h1 { margin: 0 0 8px; font-size: 28px; }
+        .lead { margin: 0 0 24px; color: var(--text-muted); }
+        .card {
+            padding: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+        .summary { margin: 0 0 18px; color: var(--text-muted); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 760px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: top; }
+        th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+        td { font-size: 13px; }
+        .event { font-weight: 700; text-transform: capitalize; }
+        .event-success { color: var(--accent-green); }
+        .event-failed { color: var(--accent-red); }
+        .event-blocked { color: var(--accent-yellow); }
+        .event-logout { color: var(--text-muted); }
+        .empty { padding: 28px 12px; text-align: center; color: var(--text-muted); }
+        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+        .pagination a { color: var(--accent-cyan); font-weight: 600; text-decoration: none; }
+        .pagination .disabled { color: #94A3B8; }
+        @media (max-width: 1024px) {
+            .dashboard-container { margin-left: 0; padding: 24px; }
+        }
+        @media (max-width: 600px) {
+            .dashboard-container { padding: 20px 16px; }
+        }
+    </style>
+</head>
+<body>
+    {% set active_admin_page = 'login_history' %}
+    {% include "partials/admin_sidebar.html" %}
+
+    <main class="dashboard-container">
+        <h1>User Login History</h1>
+        <p class="lead">Review successful sign-ins, failed credentials, blocked logins, and sign-outs.</p>
+
+        <section class="card">
+            <p class="summary">{{ total_count }} recorded events · showing up to 100 per page</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date &amp; time (UTC)</th>
+                            <th>Email</th>
+                            <th>Event</th>
+                            <th>Details</th>
+                            <th>IP address</th>
+                            <th>Browser / device</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                            <tr>
+                                <td>{{ event.created_at or "—" }}</td>
+                                <td>{{ event.email or "Unknown" }}</td>
+                                <td class="event event-{{ event.event_type }}">{{ event.event_type }}</td>
+                                <td>{{ event.reason or "—" }}</td>
+                                <td>{{ event.ip_address or "—" }}</td>
+                                <td>{{ event.user_agent or "—" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td class="empty" colspan="6">No login events have been recorded.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                {% if page > 1 %}
+                    <a href="{{ url_for('admin_login_history', page=page - 1) }}">← Newer</a>
+                {% else %}
+                    <span class="disabled">← Newer</span>
+                {% endif %}
+                <span>Page {{ page }} of {{ page_count }}</span>
+                {% if page < page_count %}
+                    <a href="{{ url_for('admin_login_history', page=page + 1) }}">Older →</a>
+                {% else %}
+                    <span class="disabled">Older →</span>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

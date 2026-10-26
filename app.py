@@ -1,6 +1,11 @@
 import os
+import json
+import secrets
+import tempfile
+import uuid
+import zipfile
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
@@ -38,8 +43,22 @@ supabase_admin: Client = create_client(
     SUPABASE_SERVICE_ROLE_KEY
 )
 
+BACKUP_TABLES = (
+    "profiles",
+    "dental_cases",
+    "case_teeth",
+    "case_status_history",
+    "case_files",
+    "inventory",
+    "inventory_logs",
+    "material_requests",
+    "notifications",
+    "login_history",
+)
+BACKUP_STORAGE_BUCKETS = ("dental-case-files",)
+LOGIN_HISTORY_PAGE_SIZE = 100
+
 import urllib.request
-import json
 import threading
 
 def send_email_in_background(recipient_email, user_name, action_type):
@@ -364,6 +383,366 @@ def admin_dashboard():
 
     except Exception as e:
         return f"Admin dashboard error: {str(e)}", 500
+
+
+def _approved_admin_profile(user_id):
+    profiles = (
+        supabase_admin.table("profiles")
+        .select("id, display_name, role, status")
+        .eq("id", user_id)
+        .execute()
+        .data
+        or []
+    )
+    if not profiles:
+        return None
+
+    profile = profiles[0]
+    if profile.get("role") != "admin" or profile.get("status") != "approved":
+        return None
+    return profile
+
+
+def _backup_csrf_token():
+    token = session.get("backup_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["backup_csrf_token"] = token
+    return token
+
+
+def _valid_backup_csrf_token():
+    token = session.get("backup_csrf_token")
+    submitted = request.form.get("csrf_token", "")
+    return bool(token and submitted and secrets.compare_digest(token, submitted))
+
+
+def _record_login_event(event_type, email, user_id=None, reason=None):
+    try:
+        supabase_admin.table("login_history").insert({
+            "user_id": user_id,
+            "email": (email or "").strip().lower()[:320] or None,
+            "event_type": event_type,
+            "reason": reason,
+            "session_id": session.get("login_session_id"),
+            "ip_address": request.remote_addr,
+            "user_agent": request.headers.get("User-Agent", "")[:512] or None,
+        }).execute()
+    except Exception:
+        app.logger.exception("Unable to record login history event")
+
+
+def _backup_table_rows(table_name):
+    rows = []
+    offset = 0
+    page_size = 1000
+    while True:
+        page = (
+            supabase_admin.table(table_name)
+            .select("*")
+            .range(offset, offset + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        rows.extend(page)
+        if len(page) < page_size:
+            return rows
+        offset += page_size
+
+
+def _storage_objects(bucket, folder=""):
+    offset = 0
+    page_size = 100
+    while True:
+        entries = bucket.list(
+            folder,
+            {"limit": page_size, "offset": offset, "sortBy": {"column": "name", "order": "asc"}},
+        )
+        for entry in entries:
+            name = entry.get("name")
+            if not name:
+                continue
+            object_path = f"{folder}/{name}" if folder else name
+            if entry.get("id") is None:
+                yield from _storage_objects(bucket, object_path)
+            else:
+                yield object_path, entry
+        if len(entries) < page_size:
+            return
+        offset += page_size
+
+
+def _safe_archive_path(path):
+    return (
+        isinstance(path, str)
+        and path
+        and not path.startswith("/")
+        and "\\" not in path
+        and not any(ord(character) < 32 for character in path)
+        and all(part not in ("", ".", "..") for part in path.split("/"))
+    )
+
+
+@app.route("/admin/backup")
+def admin_backup():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        profile = _approved_admin_profile(user_id)
+        if not profile:
+            return "Access denied.", 403
+        return render_template(
+            "admin_backup.html",
+            profile=profile,
+            csrf_token=_backup_csrf_token(),
+        )
+    except Exception:
+        app.logger.exception("Unable to open the admin backup page")
+        return "Unable to load backup page.", 500
+
+
+@app.route("/admin/backup/download", methods=["POST"])
+def admin_backup_download():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        if not _approved_admin_profile(user_id):
+            return "Access denied.", 403
+        if not _valid_backup_csrf_token():
+            return "Invalid backup request. Reload the page and try again.", 400
+
+        backup_file = tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024)
+        created_at = datetime.utcnow().isoformat() + "Z"
+        storage_manifest = []
+        with zipfile.ZipFile(
+            backup_file,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=1,
+        ) as archive:
+            for table_name in BACKUP_TABLES:
+                rows = _backup_table_rows(table_name)
+                archive.writestr(
+                    f"database/{table_name}.json",
+                    json.dumps(rows, ensure_ascii=False, default=str),
+                )
+
+            for bucket_name in BACKUP_STORAGE_BUCKETS:
+                bucket = supabase_admin.storage.from_(bucket_name)
+                for object_path, metadata in _storage_objects(bucket):
+                    if not _safe_archive_path(object_path):
+                        raise ValueError(f"Unsafe storage object path in {bucket_name}")
+                    archive_path = f"storage/{bucket_name}/{object_path}"
+                    archive.writestr(archive_path, bucket.download(object_path))
+                    object_metadata = metadata.get("metadata") or {}
+                    storage_manifest.append({
+                        "bucket": bucket_name,
+                        "path": object_path,
+                        "content_type": object_metadata.get("mimetype")
+                        or object_metadata.get("contentType")
+                        or "application/octet-stream",
+                    })
+
+            manifest = {
+                "format": "dentalink-app-backup",
+                "version": 1,
+                "created_at": created_at,
+                "database_tables": list(BACKUP_TABLES),
+                "storage_objects": storage_manifest,
+                "configuration": {
+                    "values": {
+                        "APP_URL": APP_URL,
+                        "SUPABASE_URL": SUPABASE_URL,
+                    },
+                    "redacted": [
+                        "FLASK_SECRET_KEY",
+                        "SUPABASE_PUBLISHABLE_KEY",
+                        "SUPABASE_SERVICE_ROLE_KEY",
+                        "BREVO_SMTP_PASS",
+                    ],
+                },
+                "encrypted": False,
+                "limitations": [
+                    "This archive does not include database schema or Supabase Auth accounts.",
+                    "Restore merges records into the existing schema and does not delete newer records.",
+                ],
+            }
+            archive.writestr(
+                "manifest.json",
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+            )
+
+        backup_file.seek(0)
+        filename = f"dentalink-backup-{datetime.utcnow():%Y%m%d-%H%M%S}.zip"
+        response = send_file(
+            backup_file,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=filename,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except Exception:
+        app.logger.exception("Unable to create an admin backup")
+        return "Backup failed. Check the server logs for details.", 500
+
+
+@app.route("/admin/backup/restore", methods=["POST"])
+def admin_backup_restore():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        if not _approved_admin_profile(user_id):
+            return "Access denied.", 403
+        if not _valid_backup_csrf_token():
+            return "Invalid backup request. Reload the page and try again.", 400
+
+        upload = request.files.get("backup_file")
+        if not upload or not upload.filename:
+            flash("Choose a DentaLink backup ZIP to restore.", "error")
+            return redirect(url_for("admin_backup"))
+
+        with zipfile.ZipFile(upload.stream) as archive:
+            names = archive.namelist()
+            if len(names) != len(set(names)) or archive.testzip():
+                raise ValueError("Backup archive is corrupt or contains duplicate files.")
+            manifest = json.loads(archive.read("manifest.json"))
+            manifest_tables = manifest.get("database_tables") if isinstance(manifest, dict) else None
+            legacy_tables = [table for table in BACKUP_TABLES if table != "login_history"]
+            if (
+                not isinstance(manifest, dict)
+                or manifest.get("format") != "dentalink-app-backup"
+                or manifest.get("version") != 1
+                or manifest_tables not in (list(BACKUP_TABLES), legacy_tables)
+            ):
+                raise ValueError("Unsupported or incomplete DentaLink backup.")
+
+            database_rows = {}
+            for table_name in manifest_tables:
+                archive_path = f"database/{table_name}.json"
+                if archive_path not in names:
+                    raise ValueError(f"Backup is missing {archive_path}.")
+                rows = json.loads(archive.read(archive_path))
+                if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+                    raise ValueError(f"Invalid data in {archive_path}.")
+                database_rows[table_name] = rows
+            if "login_history" not in database_rows:
+                database_rows["login_history"] = []
+
+            storage_objects = manifest.get("storage_objects")
+            if not isinstance(storage_objects, list):
+                raise ValueError("Invalid storage manifest.")
+            expected_storage_paths = set()
+            for item in storage_objects:
+                if not isinstance(item, dict):
+                    raise ValueError("Invalid storage manifest entry.")
+                bucket_name = item.get("bucket")
+                object_path = item.get("path")
+                content_type = item.get("content_type")
+                if (
+                    bucket_name not in BACKUP_STORAGE_BUCKETS
+                    or not _safe_archive_path(object_path)
+                    or (
+                        content_type is not None
+                        and (
+                            not isinstance(content_type, str)
+                            or "\r" in content_type
+                            or "\n" in content_type
+                        )
+                    )
+                ):
+                    raise ValueError("Backup contains an invalid storage path.")
+                archive_path = f"storage/{bucket_name}/{object_path}"
+                if archive_path not in names or archive_path in expected_storage_paths:
+                    raise ValueError("Backup storage listing does not match its files.")
+                expected_storage_paths.add(archive_path)
+
+            allowed_paths = {
+                "manifest.json",
+                *(f"database/{table}.json" for table in manifest_tables),
+                *expected_storage_paths,
+            }
+            if set(names) != allowed_paths:
+                raise ValueError("Backup contains unexpected files.")
+
+            for table_name in BACKUP_TABLES:
+                rows = database_rows[table_name]
+                for start in range(0, len(rows), 500):
+                    supabase_admin.table(table_name).upsert(rows[start:start + 500]).execute()
+
+            for item in storage_objects:
+                archive_path = f"storage/{item['bucket']}/{item['path']}"
+                supabase_admin.storage.from_(item["bucket"]).upload(
+                    item["path"],
+                    archive.read(archive_path),
+                    {
+                        "upsert": "true",
+                        "content-type": item.get("content_type") or "application/octet-stream",
+                    },
+                )
+
+        flash(
+            "Backup data restored. Existing records were merged; records absent from the backup were not deleted.",
+            "success",
+        )
+        return redirect(url_for("admin_backup"))
+    except (zipfile.BadZipFile, KeyError, json.JSONDecodeError, ValueError) as error:
+        flash(f"Backup could not be restored: {error}", "error")
+        return redirect(url_for("admin_backup"))
+    except Exception:
+        app.logger.exception("Unable to restore an admin backup")
+        flash(
+            "Restore failed and may have applied some changes. Check server logs before retrying.",
+            "error",
+        )
+        return redirect(url_for("admin_backup"))
+
+
+@app.route("/admin/login-history")
+def admin_login_history():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    try:
+        profile = _approved_admin_profile(user_id)
+        if not profile:
+            return "Access denied.", 403
+
+        try:
+            page = max(1, int(request.args.get("page", "1")))
+        except ValueError:
+            page = 1
+        start = (page - 1) * LOGIN_HISTORY_PAGE_SIZE
+        result = (
+            supabase_admin.table("login_history")
+            .select("*", count="exact")
+            .order("created_at", desc=True)
+            .range(start, start + LOGIN_HISTORY_PAGE_SIZE - 1)
+            .execute()
+        )
+        total_count = result.count or 0
+        page_count = max(1, (total_count + LOGIN_HISTORY_PAGE_SIZE - 1) // LOGIN_HISTORY_PAGE_SIZE)
+        return render_template(
+            "admin_login_history.html",
+            profile=profile,
+            events=result.data or [],
+            page=page,
+            page_count=page_count,
+            total_count=total_count,
+        )
+    except Exception:
+        app.logger.exception("Unable to load admin login history")
+        return "Unable to load login history. Check the server logs for details.", 500
+
+
 # =========================
 # TECHNICIAN: UPDATE CASE STAGE
 # =========================
@@ -1341,8 +1720,12 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"].strip().lower()
-        password = request.form["password"]
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        if not email or not password:
+            _record_login_event("failed", email, reason="missing_credentials")
+            flash("Email and password are required.", "error")
+            return render_template("login.html"), 400
 
         try:
             # =========================
@@ -1354,11 +1737,11 @@ def login():
             })
 
             if not response.user:
+                _record_login_event("failed", email, reason="invalid_credentials")
                 flash("Login failed. Please check your credentials.", "error")
                 return render_template("login.html")
 
             user_id = response.user.id
-            session["user_id"] = user_id
 
             # =========================
             # GET USER PROFILE
@@ -1374,7 +1757,7 @@ def login():
             profiles = profile_response.data or []
 
             if not profiles:
-                session.clear()
+                _record_login_event("blocked", email, user_id, "profile_not_found")
                 flash("User profile not found in the system.", "error")
                 return render_template("login.html")
 
@@ -1384,15 +1767,29 @@ def login():
             # CHECK ACCOUNT STATUS
             # =========================
             if profile["status"] == "pending":
+                _record_login_event("blocked", email, user_id, "account_pending")
                 return render_template("account_pending.html")
 
             if profile["status"] == "rejected":
+                _record_login_event("blocked", email, user_id, "account_rejected")
                 flash("Your account application was rejected.", "error")
                 return render_template("login.html")
 
             if profile["status"] != "approved":
+                _record_login_event("blocked", email, user_id, "account_not_approved")
                 flash("Your account is not yet approved by the administrator.", "error")
                 return render_template("login.html")
+
+            if profile.get("role") not in ("admin", "dentist", "technician"):
+                _record_login_event("blocked", email, user_id, "invalid_account_role")
+                flash("Invalid account role assigned.", "error")
+                return render_template("login.html")
+
+            session.clear()
+            session["user_id"] = user_id
+            session["login_session_id"] = str(uuid.uuid4())
+            session["login_email"] = email
+            _record_login_event("success", email, user_id)
 
             # =========================
             # UPDATE LAST SEEN TIMESTAMP
@@ -1415,13 +1812,16 @@ def login():
             if profile["role"] == "technician":
                 return redirect(url_for("technician_dashboard"))
 
-            session.clear()
-            flash("Invalid account role assigned.", "error")
-            return render_template("login.html")
-
         except Exception as e:
             # Catch wrong password, invalid email format, or connection drops from Supabase
             error_message = str(e)
+            _record_login_event(
+                "failed",
+                email,
+                reason="invalid_credentials"
+                if "Invalid login credentials" in error_message or "invalid_grant" in error_message
+                else "authentication_error",
+            )
             if "Invalid login credentials" in error_message or "invalid_grant" in error_message:
                 flash("Incorrect email or password. Please try again.", "error")
             else:
@@ -1648,6 +2048,10 @@ def reset_password():
 
 @app.route("/logout", methods=["GET", "POST"])
 def logout():
+
+    user_id = session.get("user_id")
+    if user_id:
+        _record_login_event("logout", session.get("login_email"), user_id)
 
     try:
 
