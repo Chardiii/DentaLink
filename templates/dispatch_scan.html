@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if case %}Case #{{ case.case_number }}{% else %}Delivery label{% endif %} | DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F1F5F9;
+            --bg-card: #FFFFFF;
+            --ink: #0F172A;
+            --text-main: #334155;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --accent-green: #10B981;
+            --accent-yellow: #D97706;
+            --accent-red: #EF4444;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg-main);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .topbar { background: var(--bg-card); border-bottom: 1px solid var(--border-color); padding: 12px 16px; }
+        .topbar-inner { max-width: 560px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 700; text-decoration: none; }
+        .brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; }
+        .who { font-size: 12px; color: var(--text-muted); text-align: right; }
+
+        main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 16px; }
+
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 18px; display: grid; gap: 14px; }
+
+        .case-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+        .case-number { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+        .case-sub { font-size: 13px; color: var(--text-muted); }
+
+        .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+        .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+        .pill.ready { color: var(--accent-cyan); background: rgba(2, 132, 199, 0.1); }
+        .pill.transit { color: var(--accent-yellow); background: rgba(217, 119, 6, 0.1); }
+        .pill.delivered { color: #047857; background: rgba(16, 185, 129, 0.12); }
+        .pill.other { color: var(--text-muted); background: var(--bg-main); }
+
+        .details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin: 0; }
+        .details div { display: grid; gap: 2px; min-width: 0; }
+        .details dt { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+        .details dd { margin: 0; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+
+        .units-wrap { overflow-x: auto; }
+        .units { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .units th { text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 8px 6px 0; border-bottom: 1px solid var(--border-color); }
+        .units td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border-color); color: var(--ink); }
+        .units tr:last-child td { border-bottom: 0; }
+
+        h2 { margin: 0; font-size: 16px; color: var(--ink); }
+        .muted { color: var(--text-muted); font-size: 13px; margin: 0; }
+
+        form { display: grid; gap: 10px; margin: 0; }
+        label { font-size: 13px; font-weight: 600; color: var(--ink); }
+        input[type="text"] { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 16px; font-family: inherit; color: var(--ink); background: #FFFFFF; }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
+        .btn { display: inline-flex; justify-content: center; align-items: center; gap: 8px; width: 100%; padding: 14px 16px; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; text-decoration: none; }
+        .btn-cyan { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-cyan:hover { background: var(--accent-cyan-hover); }
+        .btn-green { background: var(--accent-green); color: #FFFFFF; }
+        .btn-green:hover { background: #059669; }
+        .btn-outline { background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn:focus-visible, .brand:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+
+        .flash { padding: 12px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+        .flash.success { background: rgba(16, 185, 129, 0.12); color: #047857; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .flash.error { background: rgba(239, 68, 68, 0.08); color: #B91C1C; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        .notice { border-left: 4px solid var(--accent-yellow); }
+        .notice.danger { border-left-color: var(--accent-red); }
+        .notice.done { border-left-color: var(--accent-green); }
+
+        .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+        .timeline li { display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 14px; position: relative; }
+        .timeline li:last-child { padding-bottom: 0; }
+        .timeline li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-cyan); margin-top: 6px; }
+        .timeline li:not(:last-child)::after { content: ""; position: absolute; left: 4px; top: 18px; bottom: 0; width: 2px; background: var(--border-color); }
+        .timeline li.delivered::before { background: var(--accent-green); }
+        .timeline li.dispatched::before { background: var(--accent-yellow); }
+        .timeline strong { color: var(--ink); display: block; }
+        .timeline span { font-size: 13px; color: var(--text-muted); }
+
+        @media (max-width: 380px) {
+            .details { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    {% set role = profile.role if profile else None %}
+    {% set dashboard_url = url_for('admin_dashboard') if role == 'admin' else url_for('technician_dashboard') if role == 'technician' else url_for('dentist_dashboard') %}
+
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="{{ dashboard_url }}">
+                <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="">
+                DentaLink
+            </a>
+            {% if profile %}
+            <div class="who">{{ profile.display_name or profile.first_name }}<br>{{ role | title }}</div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash {{ 'success' if category == 'success' else 'error' }}" role="status">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        {% if problem == 'unknown' %}
+            <section class="card notice danger">
+                <h2>This label isn't recognized</h2>
+                <p class="muted">The code doesn't match any DentaLink dispatch label. Check that you scanned the label on the delivery box, or contact the lab.</p>
+            </section>
+
+        {% elif problem == 'voided' %}
+            <section class="card notice danger">
+                <h2>This label was replaced</h2>
+                <p class="muted">Case #{{ case.case_number }} has a newer label. Scan the newest label on the box, or contact the lab if there is only one.</p>
+            </section>
+
+        {% elif problem == 'wrong_clinic' %}
+            <section class="card notice danger">
+                <h2>This package isn't addressed to your clinic</h2>
+                <p class="muted">Case #{{ case.case_number }} belongs to another clinic. Don't open it. The lab has been alerted and will arrange collection.</p>
+            </section>
+
+        {% else %}
+            {% set status = case.status %}
+            {% set can_see_patient = role == 'admin' or (role == 'dentist' and case.dentist_id == profile.id) %}
+
+            <section class="card">
+                <div class="case-head">
+                    <div>
+                        <div class="case-number">#{{ case.case_number }}</div>
+                        <div class="case-sub">{{ (case.case_type or 'Restoration') | replace('_', ' ') | title }} · Due {{ case.due_date or 'not set' }}</div>
+                    </div>
+                    {% if status == 'ready_for_dispatch' %}
+                        <span class="pill ready">Ready for dispatch</span>
+                    {% elif status == 'in_transit' %}
+                        <span class="pill transit">In transit</span>
+                    {% elif status in ['delivered', 'completed'] %}
+                        <span class="pill delivered">Delivered</span>
+                    {% else %}
+                        <span class="pill other">{{ status | replace('_', ' ') | title }}</span>
+                    {% endif %}
+                </div>
+
+                <dl class="details">
+                    <div><dt>Patient</dt><dd>{{ case.patient_name if can_see_patient else patient_initials }}</dd></div>
+                    <div><dt>Reference</dt><dd>{{ case.patient_reference or '—' }}</dd></div>
+                    <div><dt>Clinic</dt><dd>{{ case.dentist.clinic_name or 'Independent Practice' }}</dd></div>
+                    <div><dt>Dentist</dt><dd>{{ case.dentist.display_name or case.dentist.first_name or '—' }}</dd></div>
+                    <div><dt>Technician</dt><dd>{{ case.technician.display_name or case.technician.first_name or '—' }}</dd></div>
+                    <div><dt>Units</dt><dd>{{ case.teeth | length }}</dd></div>
+                </dl>
+
+                {% if case.teeth %}
+                <div class="units-wrap">
+                    <table class="units">
+                        <thead><tr><th>Tooth</th><th>Material</th><th>Shade</th></tr></thead>
+                        <tbody>
+                            {% for t in case.teeth %}
+                            <tr>
+                                <td>#{{ t.tooth_number }}</td>
+                                <td>{{ (t.material or '—') | replace('_', ' ') | title }}</td>
+                                <td>{{ t.shade or '—' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                {% if case.instructions and can_see_patient %}
+                <div>
+                    <div class="muted" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Rx instructions</div>
+                    <p style="margin: 2px 0 0; color: var(--ink);">{{ case.instructions }}</p>
+                </div>
+                {% endif %}
+            </section>
+
+            {# ---------- Actions ---------- #}
+            {% if role in ['admin', 'technician'] and status == 'ready_for_dispatch' %}
+                <section class="card">
+                    <h2>Hand to courier</h2>
+                    <p class="muted">Confirm the box matches #{{ case.case_number }}, then record who is taking it. The clinic is notified right away.</p>
+                    <form method="POST" action="{{ url_for('dispatch_case', token=label.token) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label for="courier_name">Courier name</label>
+                        <input type="text" id="courier_name" name="courier_name" maxlength="120" autocomplete="off" placeholder="e.g. Juan Dela Cruz (Lalamove)" required>
+                        <button type="submit" class="btn btn-cyan">Hand to courier</button>
+                    </form>
+                </section>
+
+            {% elif role == 'dentist' and status in ['ready_for_dispatch', 'in_transit'] %}
+                <section class="card">
+                    <h2>Confirm receipt</h2>
+                    {% if status == 'ready_for_dispatch' %}
+                        <p class="muted">The lab hasn't scanned this package out yet. If it's in your hands, you can still confirm receipt and the lab will be told.</p>
+                    {% else %}
+                        <p class="muted">Check that the restoration matches the units above before confirming.</p>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('receive_case', token=label.token) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label for="received_by">Received by</label>
+                        <input type="text" id="received_by" name="received_by" maxlength="120" autocomplete="name" placeholder="{{ profile.display_name or profile.first_name }}">
+                        <button type="submit" class="btn btn-green">Confirm receipt</button>
+                    </form>
+                </section>
+
+            {% elif status == 'in_transit' %}
+                <section class="card notice">
+                    <h2>With the courier</h2>
+                    <p class="muted">Waiting for the clinic to scan this label on arrival.</p>
+                </section>
+
+            {% elif status in ['delivered', 'completed'] %}
+                <section class="card notice done">
+                    <h2>Delivered</h2>
+                    <p class="muted">
+                        {% if case.delivered_at %}Received <time datetime="{{ case.delivered_at }}">{{ case.delivered_at[:16] | replace('T', ' ') }} UTC</time>.{% endif %}
+                        Nothing more to do.
+                    </p>
+                </section>
+
+            {% else %}
+                <section class="card notice">
+                    <h2>Not ready for dispatch</h2>
+                    <p class="muted">This case is currently {{ status | replace('_', ' ') }}. It can't be handed over or received from this label right now.</p>
+                </section>
+            {% endif %}
+
+            {% if events %}
+            <section class="card">
+                <h2>Chain of custody</h2>
+                <ol class="timeline">
+                    {% for e in events %}
+                    <li class="{{ e.event_type }}">
+                        <div>
+                            {% if e.event_type == 'issued' %}
+                                <strong>Label issued</strong>
+                                <span>{{ e.actor_name }} · QC approved</span>
+                            {% elif e.event_type == 'dispatched' %}
+                                <strong>Handed to courier</strong>
+                                <span>{{ e.courier_name or 'Courier' }} · scanned by {{ e.actor_name }}</span>
+                            {% elif e.event_type == 'delivered' %}
+                                <strong>Delivered</strong>
+                                <span>Received by {{ e.received_by or e.actor_name }}{% if e.notes %} · {{ e.notes }}{% endif %}</span>
+                            {% endif %}
+                            <br><span><time datetime="{{ e.created_at }}">{{ e.created_at[:16] | replace('T', ' ') }} UTC</time></span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </section>
+            {% endif %}
+        {% endif %}
+
+        <a href="{{ dashboard_url }}" class="btn btn-outline">Go to dashboard</a>
+    </main>
+
+    <script>
+        // Show stored UTC timestamps in the viewer's local time
+        document.querySelectorAll("time[datetime]").forEach(el => {
+            const when = new Date(el.getAttribute("datetime"));
+            if (!isNaN(when)) {
+                el.textContent = when.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+            }
+        });
+    </script>
+</body>
+</html>

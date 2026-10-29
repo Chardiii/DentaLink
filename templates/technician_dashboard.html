@@ -357,7 +357,8 @@
         {% set milling_cases = cases | selectattr('status', 'equalto', 'milling_or_printing') | list %}
         {% set packing_cases = cases | selectattr('status', 'equalto', 'packing_and_curing') | list %}
         {% set qc_cases = cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
-        {% set completed_cases = cases | selectattr('status', 'equalto', 'completed') | list %}
+        {% set dispatch_cases = cases | selectattr('status', 'in', ['pending_admin_review', 'ready_for_dispatch', 'in_transit']) | list %}
+        {% set completed_cases = cases | selectattr('status', 'in', ['delivered', 'completed']) | list %}
         {% set total_active = assigned_cases|length + in_progress_cases|length + milling_cases|length + packing_cases|length + qc_cases|length %}
 
         <div class="pulse-strip">
@@ -436,7 +437,6 @@
                                         <option value="milling_or_printing">Milling / Printing</option>
                                         <option value="packing_and_curing">Packing & Curing</option>
                                         <option value="finishing_and_quality_check">Finishing & QC</option>
-                                        <option value="completed">Completed</option>
                                     </select>
                                     <button type="submit" class="btn-card-save">Start</button>
                                 </div>
@@ -476,7 +476,6 @@
                                         <option value="milling_or_printing">Milling / Printing</option>
                                         <option value="packing_and_curing">Packing & Curing</option>
                                         <option value="finishing_and_quality_check">Finishing & QC</option>
-                                        <option value="completed">Completed</option>
                                     </select>
                                     <button type="submit" class="btn-card-save">Save</button>
                                 </div>
@@ -513,7 +512,6 @@
                                         <option value="milling_or_printing" selected>Milling / Printing</option>
                                         <option value="packing_and_curing">Packing & Curing</option>
                                         <option value="finishing_and_quality_check">Finishing & QC</option>
-                                        <option value="completed">Completed</option>
                                     </select>
                                     <button type="submit" class="btn-card-save">Save</button>
                                 </div>
@@ -549,7 +547,6 @@
                                     <select name="status" class="select-dark status-dropdown">
                                         <option value="packing_and_curing" selected>Packing & Curing</option>
                                         <option value="finishing_and_quality_check">Finishing & QC</option>
-                                        <option value="completed">Completed</option>
                                     </select>
                                     <button type="submit" class="btn-card-save">Save</button>
                                 </div>
@@ -578,21 +575,47 @@
                             <div class="k-card-meta">
                                 <span>{{ c.case_type | replace('_', ' ') | title }}</span>
                             </div>
-                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
-                                  data-case-id="{{ c.id }}"
-                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
-                                <div class="k-card-action-bar">
-                                    <select name="status" class="select-dark status-dropdown">
-                                        <option value="finishing_and_quality_check" selected>Finishing & QC</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                    <button type="submit" class="btn-card-save">Finish</button>
-                                </div>
+                            <form method="POST" action="{{ url_for('submit_for_admin_review', case_id=c.id) }}" style="margin: 0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="btn-card-save" style="width: 100%; padding: 8px 10px;">Submit for QC review</button>
                             </form>
                             <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
                         </div>
                     {% else %}
                         <div class="empty-column">No units in Quality Check</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="kanban-column">
+                <div class="kanban-header">
+                    <span class="kanban-title">5. QC Review & Dispatch</span>
+                    <span class="kanban-count">{{ dispatch_cases|length }}</span>
+                </div>
+                <div class="kanban-body">
+                    {% for c in dispatch_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                {% if c.status == 'pending_admin_review' %}
+                                    <span class="k-due-chip">Awaiting admin QC</span>
+                                {% elif c.status == 'ready_for_dispatch' %}
+                                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-cyan);">Ready for pickup</span>
+                                {% else %}
+                                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-green);">In transit</span>
+                                {% endif %}
+                            </div>
+                            <div class="k-card-title">{{ c.patient_name }}</div>
+                            <div class="k-card-meta">
+                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                            </div>
+                            {% if c.status == 'ready_for_dispatch' %}
+                                <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn-card-save" style="display: block; text-align: center; text-decoration: none; padding: 8px 10px;">Print dispatch label</a>
+                            {% endif %}
+                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                        </div>
+                    {% else %}
+                        <div class="empty-column">Nothing waiting for QC or pickup</div>
                     {% endfor %}
                 </div>
             </div>
@@ -609,7 +632,7 @@
                     <div class="k-card-title">{{ c.patient_name }}</div>
                     <div class="k-card-meta">
                         <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                        <span>Delivered: {{ c.due_date or 'N/A' }}</span>
+                        <span>Delivered: {{ (c.delivered_at or '')[:10] or 'Before QR tracking' }}</span>
                     </div>
                     <a href="/technician/cases/{{ c.id }}" class="btn btn-outline" style="margin-top: 10px; font-size: 12px; color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">View Archived Case →</a>
                 </div>
