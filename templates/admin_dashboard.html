@@ -527,8 +527,8 @@
             <div class="metric-card" style="border-left: 3px solid var(--accent-green);">
                 <div class="metric-top">
                     <div>
-                        <p class="metric-title">Delivered Units</p>
-                        <p class="metric-value">{{ completed_this_month }}</p>
+                        <p class="metric-title">Delivered Units (This Month)</p>
+                        <p class="metric-value">{{ delivered_this_month }}</p>
                     </div>
                     <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
                         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -619,6 +619,12 @@
                 <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-qc')">
                     4. Finishing & QA <span class="stage-tab-badge">{{ qc_cases|length }}</span>
                 </button>
+                <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-review')">
+                    5. QC Review <span class="stage-tab-badge">{{ review_cases|length }}</span>
+                </button>
+                <button type="button" class="stage-tab-btn" onclick="switchStage(event, 'stage-dispatch')">
+                    6. Dispatch <span class="stage-tab-badge">{{ dispatch_cases|length }}</span>
+                </button>
             </div>
 
             <!-- MACRO FOR RENDERING ENHANCED CASE CARDS WITH CLINIC, TEETH & SHADE INFO -->
@@ -694,6 +700,103 @@
 
             <div id="stage-qc" class="stage-section">
                 {{ render_case_cards(qc_cases) }}
+            </div>
+
+            <div id="stage-review" class="stage-section">
+                <div class="cases-grid">
+                    {% for c in review_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
+                            </div>
+                            <div>
+                                <div class="k-card-title">{{ c.patient_name }}</div>
+                                <div class="k-card-subtitle">
+                                    <span>{{ c.case_type | replace('_', ' ') | title }}</span>
+                                    <span style="color: var(--accent-cyan); font-size: 11px; font-weight: 600;">Tech: {{ c.profiles.display_name if c.profiles else 'Unassigned' }}</span>
+                                </div>
+                            </div>
+                            <div class="case-clinical-meta">
+                                <div class="meta-row">
+                                    <span class="meta-label">Clinic:</span>
+                                    <span class="meta-val" style="color: var(--accent-yellow);">{{ c.profiles.clinic_name if c.profiles and c.profiles.clinic_name else 'Independent Practice' }}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Teeth Units:</span>
+                                    <div class="tooth-badge-list">
+                                        {% for t in c.teeth %}
+                                            <span class="tooth-pill">#{{ t.tooth_number }} ({{ t.shade or 'N/A' }})</span>
+                                        {% else %}
+                                            <span style="font-size: 11px; color: var(--text-muted);">Standard spec</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <form method="POST" action="{{ url_for('admin_approve_qc', case_id=c.id) }}" style="margin: 0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="btn btn-cyan" style="width: 100%; justify-content: center;">Approve QC &amp; print label</button>
+                            </form>
+                            <form class="reassign-form" method="POST" action="{{ url_for('admin_reject_qc', case_id=c.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="text" name="qc_notes" class="select-dark" style="flex: 1;" maxlength="1000" placeholder="What needs fixing?" aria-label="QC note for the technician" required>
+                                <button type="submit" class="btn btn-outline" style="padding: 5px 10px; font-size: 11px;">Return</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div class="empty-grid">No cases waiting for QC review.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="stage-dispatch" class="stage-section">
+                <div class="cases-grid">
+                    {% for c in dispatch_cases %}
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                {% if c.status == 'in_transit' %}
+                                    <span class="k-due-chip">In transit</span>
+                                {% else %}
+                                    <span class="tag">Ready for dispatch</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div class="k-card-title">{{ c.patient_name }}</div>
+                                <div class="k-card-subtitle">
+                                    <span>{{ c.profiles.clinic_name if c.profiles and c.profiles.clinic_name else 'Independent Practice' }}</span>
+                                    <span style="color: var(--accent-cyan); font-size: 11px; font-weight: 600;">{{ c.teeth|length }} unit{{ '' if c.teeth|length == 1 else 's' }}</span>
+                                </div>
+                            </div>
+                            <div class="case-clinical-meta">
+                                {% if c.status == 'in_transit' %}
+                                    <div class="meta-row">
+                                        <span class="meta-label">Courier:</span>
+                                        <span class="meta-val">{{ c.courier_name or 'Not recorded' }}</span>
+                                    </div>
+                                    <div class="meta-row">
+                                        <span class="meta-label">Left lab:</span>
+                                        <span class="meta-val">{{ (c.dispatched_at or '')[:16] | replace('T', ' ') }} UTC</span>
+                                    </div>
+                                {% else %}
+                                    <div class="meta-row">
+                                        <span class="meta-label">Next step:</span>
+                                        <span class="meta-val">Scan the label at courier handoff</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn btn-outline-cyan" style="flex: 1; justify-content: center;">Print label</a>
+                                <form method="POST" action="{{ url_for('admin_reissue_dispatch_label', case_id=c.id) }}" style="margin: 0;" onsubmit="return confirm('Replace this label? The old label will stop working.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="btn btn-outline" title="Use when a label is lost or damaged">Reissue</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="empty-grid">No cases waiting for pickup or in transit.</div>
+                    {% endfor %}
+                </div>
             </div>
 
         </div>

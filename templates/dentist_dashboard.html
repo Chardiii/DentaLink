@@ -396,8 +396,11 @@
             <button class="tab-btn" onclick="showCategory(event, 'sec-qc')">
                 Finishing & QC <span class="tab-badge">{{ qc_cases|length }}</span>
             </button>
+            <button class="tab-btn" onclick="showCategory(event, 'sec-transit')">
+                In Transit <span class="tab-badge">{{ transit_cases|length }}</span>
+            </button>
             <button class="tab-btn" onclick="showCategory(event, 'sec-completed')">
-                Completed <span class="tab-badge">{{ completed_cases|length }}</span>
+                Delivered <span class="tab-badge">{{ completed_cases|length }}</span>
             </button>
             <div style="width: 1px; height: 18px; background: var(--border-color); margin: 0 4px; align-self: center;"></div>
             <button class="tab-btn" onclick="showCategory(event, 'sec-drafts')">
@@ -511,16 +514,51 @@
             </div>
         </div>
 
+        <div id="sec-transit" class="category-section">
+            <div class="cases-grid">
+                {% for c in transit_cases %}
+                    <div class="k-card">
+                        <div class="k-card-header">
+                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            {% if c.status == 'in_transit' %}
+                                <span class="k-due-pill warning">On its way</span>
+                            {% else %}
+                                <span class="k-due-pill success">Packed at lab</span>
+                            {% endif %}
+                        </div>
+                        <div class="k-card-title">{{ c.patient_name }}</div>
+                        <div class="k-card-subtitle">Ref: {{ c.patient_reference or 'N/A' }} • {{ c.case_type | replace('_', ' ') | title }}</div>
+
+                        {% if c.teeth %}
+                        <div class="k-card-teeth">
+                            Teeth: {% for t in c.teeth %}{{ t.tooth_number }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="k-card-actions">
+                            {% if c.dispatch_token %}
+                                <a href="{{ url_for('scan_dispatch_label', token=c.dispatch_token) }}" class="btn-action-primary">Confirm receipt →</a>
+                            {% else %}
+                                <span style="font-size: 11px; color: var(--text-muted); padding: 6px 0;">Scan the label on the box when it arrives</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-grid">No cases on their way to your clinic right now.</div>
+                {% endfor %}
+            </div>
+        </div>
+
         <div id="sec-completed" class="category-section">
             <div class="cases-grid">
                 {% for c in completed_cases %}
                     <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);">
                         <div class="k-card-header">
                             <span class="k-badge-cyan">#{{ c.case_number }}</span>
-                            <span class="k-due-pill success">Dispatched</span>
+                            <span class="k-due-pill success">Delivered</span>
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
-                        <div class="k-card-subtitle">Completed: {{ c.due_date or 'N/A' }}</div>
+                        <div class="k-card-subtitle">Received: {{ (c.delivered_at or '')[:10] or 'Before QR tracking' }}</div>
 
                         <div class="k-card-actions">
                             <a href="{{ url_for('edit_dental_case', case_id=c.id) }}" class="btn-action-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-green);">View Final Specs →</a>

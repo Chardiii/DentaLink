@@ -4,12 +4,16 @@ import secrets
 import tempfile
 import uuid
 import zipfile
+from functools import wraps
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+import qrcode
+import qrcode.image.svg
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, g
+from markupsafe import Markup
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ml_models.forecaster import InventoryForecaster
 
 # Load variables from .env
@@ -57,6 +61,13 @@ BACKUP_TABLES = (
 )
 BACKUP_STORAGE_BUCKETS = ("dental-case-files",)
 LOGIN_HISTORY_PAGE_SIZE = 100
+
+# Case lifecycle after the bench stages:
+# finishing_and_quality_check -> pending_admin_review -> ready_for_dispatch -> in_transit -> delivered
+DISPATCH_STATUSES = ("ready_for_dispatch", "in_transit")
+# "completed" is the terminal status used before QR dispatch existed.
+DELIVERED_STATUSES = ("delivered", "completed")
+CLOSED_STATUSES = ("draft", "submitted", "cancelled") + DELIVERED_STATUSES
 
 import urllib.request
 import threading
@@ -216,19 +227,27 @@ def admin_dashboard():
         # 5. LAB PERFORMANCE METRICS
         # ==========================================
         now_str = datetime.now().strftime("%Y-%m-%d")
+        month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        completed_res = supabase_admin.table("dental_cases").select("id", count="exact").eq("status", "completed").execute()
-        completed_this_month = completed_res.count or 0
+        delivered_res = (
+            supabase_admin
+            .table("dental_cases")
+            .select("id", count="exact")
+            .eq("status", "delivered")
+            .gte("delivered_at", month_start.isoformat())
+            .execute()
+        )
+        delivered_this_month = delivered_res.count or 0
 
-        overdue_res = (
+        overdue_query = (
             supabase_admin
             .table("dental_cases")
             .select("id", count="exact")
             .lt("due_date", now_str)
-            .neq("status", "completed")
-            .neq("status", "cancelled")
-            .execute()
         )
+        for closed_status in ("cancelled",) + DELIVERED_STATUSES:
+            overdue_query = overdue_query.neq("status", closed_status)
+        overdue_res = overdue_query.execute()
         overdue_count = overdue_res.count or 0
 
         # ==========================================
@@ -305,16 +324,10 @@ def admin_dashboard():
         # ==========================================
         # 8. ACTIVE WORKFLOW CASES WITH TEETH & CLINIC
         # ==========================================
-        active_cases_res = (
-            supabase_admin
-            .table("dental_cases")
-            .select("*")
-            .neq("status", "draft")
-            .neq("status", "submitted")
-            .order("created_at", desc=True)
-            .execute()
-        )
-        active_cases = active_cases_res.data or []
+        active_cases_query = supabase_admin.table("dental_cases").select("*")
+        for closed_status in CLOSED_STATUSES:
+            active_cases_query = active_cases_query.neq("status", closed_status)
+        active_cases = active_cases_query.order("created_at", desc=True).execute().data or []
         active_case_ids = [c["id"] for c in active_cases]
 
         # Bulk fetch teeth for active cases
@@ -341,9 +354,31 @@ def admin_dashboard():
                 "dentist_name": dentist_profile.get("display_name") or "Clinical Partner"
             }
 
-        # Stage slices for audio triggers and quick template bindings
+        # Stage slices for the workflow tabs, audio triggers and quick template bindings
+        assigned_cases = [c for c in active_cases if c.get("status") == "assigned"]
+        setup_cases = [c for c in active_cases if c.get("status") in ("in_progress", "cad_designing", "wax_up_or_try_in")]
         milling_cases = [c for c in active_cases if c.get("status") == "milling_or_printing"]
+        packing_cases = [c for c in active_cases if c.get("status") == "packing_and_curing"]
         qc_cases = [c for c in active_cases if c.get("status") == "finishing_and_quality_check"]
+        review_cases = [c for c in active_cases if c.get("status") == "pending_admin_review"]
+        dispatch_cases = [c for c in active_cases if c.get("status") in DISPATCH_STATUSES]
+
+        # Courier names for cases already handed off
+        if dispatch_cases:
+            dispatch_events = (
+                supabase_admin
+                .table("case_dispatch_events")
+                .select("case_id, courier_name, created_at")
+                .in_("case_id", [c["id"] for c in dispatch_cases])
+                .eq("event_type", "dispatched")
+                .order("created_at")
+                .execute()
+                .data
+                or []
+            )
+            couriers_by_case = {e["case_id"]: e.get("courier_name") for e in dispatch_events}
+            for c in dispatch_cases:
+                c["courier_name"] = couriers_by_case.get(c["id"])
 
         # ==========================================
         # 9. RECENT NOTIFICATIONS
@@ -369,13 +404,18 @@ def admin_dashboard():
             approved_count=len(approved_users),
             rejected_count=len(rejected_users),
             total_count=len(all_users),
-            completed_this_month=completed_this_month,
+            delivered_this_month=delivered_this_month,
             overdue_count=overdue_count,
             unassigned_cases=unassigned_cases,
             technicians=technicians,
             active_cases=active_cases,
+            assigned_cases=assigned_cases,
+            setup_cases=setup_cases,
             milling_cases=milling_cases,
+            packing_cases=packing_cases,
             qc_cases=qc_cases,
+            review_cases=review_cases,
+            dispatch_cases=dispatch_cases,
             notifications=notifications,
             online_count=online_count,
             restock_requests=restock_requests
@@ -403,18 +443,66 @@ def _approved_admin_profile(user_id):
     return profile
 
 
-def _backup_csrf_token():
-    token = session.get("backup_csrf_token")
+def _csrf_token():
+    token = session.get("csrf_token")
     if not token:
         token = secrets.token_urlsafe(32)
-        session["backup_csrf_token"] = token
+        session["csrf_token"] = token
     return token
 
 
-def _valid_backup_csrf_token():
-    token = session.get("backup_csrf_token")
+def _valid_csrf_token():
+    token = session.get("csrf_token")
     submitted = request.form.get("csrf_token", "")
     return bool(token and submitted and secrets.compare_digest(token, submitted))
+
+
+@app.context_processor
+def inject_csrf_token():
+    if not session.get("user_id"):
+        return {}
+    return {"csrf_token": _csrf_token()}
+
+
+def _safe_next_path(path):
+    return (
+        isinstance(path, str)
+        and path.startswith("/")
+        and not path.startswith("//")
+        and "\\" not in path
+    )
+
+
+def role_required(*roles):
+    """Require an approved account with one of `roles`; POSTs must carry a CSRF token.
+
+    The approved profile is available to the view as `g.profile`.
+    """
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user_id = session.get("user_id")
+            if not user_id:
+                next_path = request.full_path if request.query_string else request.path
+                return redirect(url_for("login", next=next_path if request.method == "GET" else None))
+
+            profiles = (
+                supabase_admin.table("profiles")
+                .select("id, display_name, first_name, last_name, clinic_name, role, status")
+                .eq("id", user_id)
+                .execute()
+                .data
+                or []
+            )
+            if not profiles or profiles[0].get("status") != "approved" or profiles[0].get("role") not in roles:
+                return "Access denied.", 403
+            if request.method == "POST" and not _valid_csrf_token():
+                return "This form has expired. Reload the page and try again.", 400
+
+            g.profile = profiles[0]
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def _record_login_event(event_type, email, user_id=None, reason=None):
@@ -497,7 +585,7 @@ def admin_backup():
         return render_template(
             "admin_backup.html",
             profile=profile,
-            csrf_token=_backup_csrf_token(),
+            csrf_token=_csrf_token(),
         )
     except Exception:
         app.logger.exception("Unable to open the admin backup page")
@@ -513,7 +601,7 @@ def admin_backup_download():
     try:
         if not _approved_admin_profile(user_id):
             return "Access denied.", 403
-        if not _valid_backup_csrf_token():
+        if not _valid_csrf_token():
             return "Invalid backup request. Reload the page and try again.", 400
 
         backup_file = tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024)
@@ -601,7 +689,7 @@ def admin_backup_restore():
     try:
         if not _approved_admin_profile(user_id):
             return "Access denied.", 403
-        if not _valid_backup_csrf_token():
+        if not _valid_csrf_token():
             return "Invalid backup request. Reload the page and try again.", 400
 
         upload = request.files.get("backup_file")
@@ -778,10 +866,10 @@ def update_case_status(case_id):
             "wax_up_or_try_in",
             "milling_or_printing", 
             "packing_and_curing",
-            "finishing_and_quality_check", 
-            "completed"
+            "finishing_and_quality_check",
         ]
-        
+        # Cases leave the bench through submit-for-QC, never straight to completed.
+
         if new_status not in allowed_statuses:
             return "Invalid status selection.", 400
 
@@ -802,7 +890,6 @@ def update_case_status(case_id):
             "milling_or_printing": "in Milling / 3D Printing",
             "packing_and_curing": "in Acrylic Packing & Curing",
             "finishing_and_quality_check": "in Finishing & Quality Check",
-            "completed": "Completed"
         }
         readable_status = status_labels.get(new_status, new_status)
 
@@ -1106,82 +1193,6 @@ def admin_inventory_logs():
         return f"Audit logs error: {str(e)}", 500
 
 
-# =========================
-# TECHNICIAN: COMPLETE CASE
-# =========================
-@app.route("/technician/cases/<case_id>/complete", methods=["POST"])
-def complete_case(case_id):
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-
-    try:
-        profile_res = supabase_admin.table("profiles").select("role, display_name").eq("id", user_id).execute()
-        if not profile_res.data or profile_res.data[0]["role"] != "technician":
-            return "Access denied.", 403
-
-        case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number").eq("id", case_id).eq("technician_id", user_id).execute()
-        if not case_res.data:
-            return "Case not found or not assigned to you.", 404
-
-        dentist_id = case_res.data[0]["dentist_id"]
-        case_number = case_res.data[0]["case_number"]
-
-        # Mark case as fully completed
-        supabase_admin.table("dental_cases").update({
-            "status": "completed"
-        }).eq("id", case_id).execute()
-
-        # Notify Dentist
-        create_notification(
-            user_id=dentist_id,
-            message=f"Case Completed: Case {case_number} has been finished by the lab.",
-            link="/dentist"
-        )
-
-        return redirect(url_for("technician_dashboard"))
-
-    except Exception as e:
-        return f"Complete case error: {str(e)}", 500
-# =========================
-# ADMIN: FINALIZE & COMPLETE CASE
-# =========================
-@app.route("/admin/cases/<case_id>/finalize", methods=["POST"])
-def admin_finalize_case(case_id):
-    admin_id = session.get("user_id")
-    if not admin_id:
-        return redirect(url_for("login"))
-
-    try:
-        admin_res = supabase_admin.table("profiles").select("role").eq("id", admin_id).execute()
-        if not admin_res.data or admin_res.data[0]["role"] != "admin":
-            return "Access denied.", 403
-
-        # Fetch case data for notification
-        case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number").eq("id", case_id).execute()
-        if not case_res.data:
-            return "Case not found.", 404
-
-        dentist_id = case_res.data[0]["dentist_id"]
-        case_number = case_res.data[0]["case_number"]
-
-        # Mark case as completed
-        supabase_admin.table("dental_cases").update({
-            "status": "completed"
-        }).eq("id", case_id).execute()
-
-        # Notify Dentist that case is fully complete
-        create_notification(
-            user_id=dentist_id,
-            message=f"Case Completed: Case {case_number} has passed admin inspection and is fully completed.",
-            link="/dentist"
-        )
-
-        return redirect(url_for("admin_dashboard"))
-
-    except Exception as e:
-        return f"Finalize case error: {str(e)}", 500
-
 @app.route("/admin/users/<user_id>/approve", methods=["POST"])
 def approve_user(user_id):
     admin_id = session.get("user_id")
@@ -1389,10 +1400,27 @@ def dentist_dashboard():
             ]
         ]
         milling_cases = [c for c in dental_cases if c.get("status") == "milling_or_printing"]
-        qc_cases = [c for c in dental_cases if c.get("status") == "finishing_and_quality_check"]
-        completed_cases = [c for c in dental_cases if c.get("status") == "completed"]
+        qc_cases = [c for c in dental_cases if c.get("status") in ["finishing_and_quality_check", "pending_admin_review"]]
+        transit_cases = [c for c in dental_cases if c.get("status") in DISPATCH_STATUSES]
+        completed_cases = [c for c in dental_cases if c.get("status") in DELIVERED_STATUSES]
         draft_cases = [c for c in dental_cases if c.get("status") == "draft"]
-        ready_cases = [c for c in dental_cases if c.get("status") in ["ready_for_delivery", "delivered", "completed"]]
+        ready_cases = [c for c in dental_cases if c.get("status") in ["ready_for_delivery", *DELIVERED_STATUSES]]
+
+        # Active label tokens so the clinic can confirm receipt without scanning
+        if transit_cases:
+            labels = (
+                supabase_admin
+                .table("case_dispatches")
+                .select("case_id, token")
+                .in_("case_id", [c["id"] for c in transit_cases])
+                .eq("status", "active")
+                .execute()
+                .data
+                or []
+            )
+            tokens_by_case = {label["case_id"]: label["token"] for label in labels}
+            for c in transit_cases:
+                c["dispatch_token"] = tokens_by_case.get(c["id"])
 
         # =========================
         # 7. GET RECENT NOTIFICATIONS
@@ -1421,6 +1449,7 @@ def dentist_dashboard():
             active_cases=prod_cases + pending_cases,
             milling_cases=milling_cases,
             qc_cases=qc_cases,
+            transit_cases=transit_cases,
             ready_cases=ready_cases,
             completed_cases=completed_cases,
             draft_cases=draft_cases,
@@ -1803,6 +1832,11 @@ def login():
             # =========================
             # REDIRECT BY ROLE
             # =========================
+            # A scanned dispatch label sends people here with ?next=/d/<token>
+            next_path = request.args.get("next")
+            if _safe_next_path(next_path):
+                return redirect(next_path)
+
             if profile["role"] == "admin":
                 return redirect(url_for("admin_dashboard"))
 
@@ -2318,7 +2352,7 @@ def technician_dashboard():
         milling_cases = [c for c in assigned_cases if c.get("status") == "milling_or_printing"]
         packing_cases = [c for c in assigned_cases if c.get("status") == "packing_and_curing"]
         qc_cases = [c for c in assigned_cases if c.get("status") == "finishing_and_quality_check"]
-        completed_cases = [c for c in assigned_cases if c.get("status") in ["ready_for_delivery", "completed"]]
+        completed_cases = [c for c in assigned_cases if c.get("status") in ["ready_for_delivery", *DELIVERED_STATUSES]]
 
         # ==========================================
         # 6. TECHNICIAN'S MATERIAL RESTOCK REQUESTS
@@ -2676,50 +2710,413 @@ def return_case_to_dentist(case_id):
         return f"Return case error: {str(e)}", 500
 
 # =========================
-# TECHNICIAN: SUBMIT FOR ADMIN REVIEW
+# QC REVIEW & QR DISPATCH
 # =========================
-@app.route("/technician/cases/<case_id>/submit-review", methods=["POST"])
-def submit_for_admin_review(case_id):
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat()
 
+
+def _display_name(profile, fallback="Staff"):
+    return (profile or {}).get("display_name") or (profile or {}).get("first_name") or fallback
+
+
+def _notify_admins(message, link="/admin"):
+    admins = (
+        supabase_admin.table("profiles")
+        .select("id")
+        .eq("role", "admin")
+        .eq("status", "approved")
+        .execute()
+        .data
+        or []
+    )
+    for admin in admins:
+        create_notification(user_id=admin["id"], message=message, link=link)
+
+
+def _set_case_status(case_id, from_statuses, changes):
+    """Apply `changes` only while the case is still in one of `from_statuses`.
+
+    Returns the updated case, or None if someone else already moved it.
+    """
+    rows = (
+        supabase_admin.table("dental_cases")
+        .update(changes)
+        .eq("id", case_id)
+        .in_("status", list(from_statuses))
+        .execute()
+        .data
+        or []
+    )
+    return rows[0] if rows else None
+
+
+def _log_dispatch_event(case_id, event_type, dispatch_id=None, **fields):
     try:
-        # Verify Technician
-        profile_res = supabase_admin.table("profiles").select("role, display_name").eq("id", user_id).execute()
-        if not profile_res.data or profile_res.data[0]["role"] != "technician":
-            return "Access denied.", 403
+        supabase_admin.table("case_dispatch_events").insert({
+            "case_id": case_id,
+            "dispatch_id": dispatch_id,
+            "event_type": event_type,
+            "actor_id": session.get("user_id"),
+            "ip_address": request.remote_addr,
+            "user_agent": request.headers.get("User-Agent", "")[:512] or None,
+            **fields,
+        }).execute()
+    except Exception:
+        app.logger.exception("Unable to record dispatch event")
 
-        tech_name = profile_res.data[0]["display_name"]
 
-        # Fetch Case info
-        case_res = supabase_admin.table("dental_cases").select("case_number").eq("id", case_id).eq("technician_id", user_id).execute()
-        if not case_res.data:
-            return "Case not found or not assigned to you.", 404
-            
-        case_number = case_res.data[0]["case_number"]
+def _active_dispatch_label(case_id):
+    labels = (
+        supabase_admin.table("case_dispatches")
+        .select("*")
+        .eq("case_id", case_id)
+        .eq("status", "active")
+        .execute()
+        .data
+        or []
+    )
+    return labels[0] if labels else None
 
-        # Update status to pending admin review
-        supabase_admin.table("dental_cases").update({
-            "status": "pending_admin_review"
-        }).eq("id", case_id).execute()
 
-        # Find all approved admins to notify them for double checking
-        admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
-        admins = admins_res.data or []
+def _issue_dispatch_label(case_id):
+    """Void the case's current label, if any, and create a new one."""
+    old_label = _active_dispatch_label(case_id)
+    if old_label:
+        supabase_admin.table("case_dispatches").update({
+            "status": "voided",
+            "voided_at": _now_iso(),
+        }).eq("id", old_label["id"]).execute()
+        _log_dispatch_event(case_id, "voided", old_label["id"])
 
-        for admin in admins:
-            create_notification(
-                user_id=admin["id"],
-                message=f"Quality Check Required: Technician {tech_name} has finished Case {case_number}. Please double-check and finalize.",
-                link="/admin"
-            )
+    label = supabase_admin.table("case_dispatches").insert({
+        "case_id": case_id,
+        "token": secrets.token_urlsafe(16),
+        "created_by": session.get("user_id"),
+    }).execute().data[0]
+    _log_dispatch_event(case_id, "issued", label["id"])
+    return label
 
+
+def _dispatch_scan_url(token):
+    return (APP_URL or request.host_url).rstrip("/") + url_for("scan_dispatch_label", token=token)
+
+
+def _qr_svg(data):
+    qr = qrcode.QRCode(
+        error_correction=qrcode.constants.ERROR_CORRECT_Q,
+        border=2,
+        image_factory=qrcode.image.svg.SvgPathImage,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    return Markup(qr.make_image().to_string(encoding="unicode"))
+
+
+def _patient_initials(name):
+    return " ".join(f"{part[0].upper()}." for part in (name or "").split()) or "N/A"
+
+
+def _case_for_dispatch(case_id):
+    """Load a case with its teeth plus dentist and technician profiles."""
+    cases = supabase_admin.table("dental_cases").select("*").eq("id", case_id).execute().data or []
+    if not cases:
+        return None
+    case = cases[0]
+    case["teeth"] = (
+        supabase_admin.table("case_teeth")
+        .select("tooth_number, material, shade, restoration_type")
+        .eq("case_id", case_id)
+        .order("tooth_number")
+        .execute()
+        .data
+        or []
+    )
+    people_ids = [pid for pid in (case.get("dentist_id"), case.get("technician_id")) if pid]
+    people = (
+        supabase_admin.table("profiles")
+        .select("id, display_name, first_name, clinic_name, phone")
+        .in_("id", people_ids)
+        .execute()
+        .data
+        or []
+    ) if people_ids else []
+    people_by_id = {p["id"]: p for p in people}
+    case["dentist"] = people_by_id.get(case.get("dentist_id"), {})
+    case["technician"] = people_by_id.get(case.get("technician_id"), {})
+    return case
+
+
+def _load_dispatch_label(token):
+    labels = supabase_admin.table("case_dispatches").select("*").eq("token", token).execute().data or []
+    return labels[0] if labels else None
+
+
+@app.route("/technician/cases/<case_id>/submit-review", methods=["POST"])
+@role_required("technician")
+def submit_for_admin_review(case_id):
+    try:
+        tech_name = _display_name(g.profile, "Technician")
+        rows = (
+            supabase_admin.table("dental_cases")
+            .update({"status": "pending_admin_review"})
+            .eq("id", case_id)
+            .eq("technician_id", g.profile["id"])
+            .eq("status", "finishing_and_quality_check")
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            return "This case isn't in Finishing & QC or isn't assigned to you.", 409
+
+        case_number = rows[0]["case_number"]
+        log_case_status_change(case_id, "Submitted for admin QC", g.profile["id"], f"Submitted by technician {tech_name}")
+        _notify_admins(f"QC review needed: {tech_name} finished Case {case_number}. Inspect it and approve it for dispatch.")
         return redirect(url_for("technician_dashboard"))
+    except Exception:
+        app.logger.exception("Unable to submit case for QC review")
+        return "Unable to submit this case for QC. Check the server logs for details.", 500
 
-    except Exception as e:
-        return f"Submit review error: {str(e)}", 500
-    
+
+@app.route("/admin/cases/<case_id>/approve-qc", methods=["POST"])
+@role_required("admin")
+def admin_approve_qc(case_id):
+    try:
+        case = _set_case_status(case_id, ["pending_admin_review"], {"status": "ready_for_dispatch"})
+        if not case:
+            return "This case is no longer waiting for QC review.", 409
+
+        _issue_dispatch_label(case_id)
+        admin_name = _display_name(g.profile, "Admin")
+        log_case_status_change(case_id, "QC approved, ready for dispatch", g.profile["id"], f"Approved by {admin_name}")
+        if case.get("technician_id"):
+            create_notification(
+                user_id=case["technician_id"],
+                message=f"QC passed: Case {case['case_number']} is ready for dispatch. Print the label and pack the case.",
+                link=url_for("dispatch_slip", case_id=case_id),
+            )
+        return redirect(url_for("dispatch_slip", case_id=case_id))
+    except Exception:
+        app.logger.exception("Unable to approve QC")
+        return "Unable to approve this case. Check the server logs for details.", 500
+
+
+@app.route("/admin/cases/<case_id>/reject-qc", methods=["POST"])
+@role_required("admin")
+def admin_reject_qc(case_id):
+    try:
+        notes = request.form.get("qc_notes", "").strip()[:1000]
+        if not notes:
+            return "Add a note telling the technician what to fix.", 400
+
+        case = _set_case_status(case_id, ["pending_admin_review"], {"status": "finishing_and_quality_check"})
+        if not case:
+            return "This case is no longer waiting for QC review.", 409
+
+        log_case_status_change(case_id, "Returned to Finishing & QC", g.profile["id"], notes)
+        if case.get("technician_id"):
+            create_notification(
+                user_id=case["technician_id"],
+                message=f"QC returned: Case {case['case_number']} needs more work. Admin note: {notes}",
+                link=f"/technician/cases/{case_id}",
+            )
+        return redirect(url_for("admin_dashboard"))
+    except Exception:
+        app.logger.exception("Unable to reject QC")
+        return "Unable to return this case. Check the server logs for details.", 500
+
+
+@app.route("/cases/<case_id>/dispatch-slip")
+@role_required("admin", "technician")
+def dispatch_slip(case_id):
+    try:
+        case = _case_for_dispatch(case_id)
+        if not case:
+            return "Case not found.", 404
+        if g.profile["role"] == "technician" and case.get("technician_id") != g.profile["id"]:
+            return "Access denied.", 403
+        if case.get("status") not in DISPATCH_STATUSES:
+            return "A dispatch label is only available after the case passes QC.", 409
+
+        label = _active_dispatch_label(case_id)
+        if not label:
+            return "This case has no active label. Ask an admin to reissue it.", 404
+
+        scan_url = _dispatch_scan_url(label["token"])
+        return render_template(
+            "dispatch_slip.html",
+            case=case,
+            label=label,
+            qr_svg=_qr_svg(scan_url),
+            scan_url=scan_url,
+            patient_initials=_patient_initials(case.get("patient_name")),
+            back_url=url_for("admin_dashboard" if g.profile["role"] == "admin" else "technician_dashboard"),
+        )
+    except Exception:
+        app.logger.exception("Unable to render dispatch slip")
+        return "Unable to load the dispatch label. Check the server logs for details.", 500
+
+
+@app.route("/admin/cases/<case_id>/dispatch/reissue", methods=["POST"])
+@role_required("admin")
+def admin_reissue_dispatch_label(case_id):
+    try:
+        cases = supabase_admin.table("dental_cases").select("status").eq("id", case_id).execute().data or []
+        if not cases or cases[0].get("status") not in DISPATCH_STATUSES:
+            return "Labels can only be reissued for cases that are ready for dispatch or in transit.", 409
+        _issue_dispatch_label(case_id)
+        return redirect(url_for("dispatch_slip", case_id=case_id))
+    except Exception:
+        app.logger.exception("Unable to reissue dispatch label")
+        return "Unable to reissue the label. Check the server logs for details.", 500
+
+
+@app.route("/d/<token>")
+@role_required("admin", "technician", "dentist")
+def scan_dispatch_label(token):
+    try:
+        label = _load_dispatch_label(token)
+        if not label:
+            return render_template("dispatch_scan.html", problem="unknown", profile=g.profile), 404
+
+        case = _case_for_dispatch(label["case_id"])
+        if not case:
+            return render_template("dispatch_scan.html", problem="unknown", profile=g.profile), 404
+
+        if label["status"] != "active":
+            _log_dispatch_event(case["id"], "denied", label["id"], notes="voided_label")
+            return render_template("dispatch_scan.html", problem="voided", case=case, profile=g.profile), 410
+
+        if g.profile["role"] == "dentist" and case.get("dentist_id") != g.profile["id"]:
+            _log_dispatch_event(case["id"], "denied", label["id"], notes="wrong_clinic")
+            _notify_admins(
+                f"Delivery check: {_display_name(g.profile, 'A clinic')} scanned the label for Case "
+                f"{case['case_number']}, which is addressed to another clinic. Check for a mixed-up package."
+            )
+            return render_template("dispatch_scan.html", problem="wrong_clinic", case=case, profile=g.profile), 403
+
+        events = (
+            supabase_admin.table("case_dispatch_events")
+            .select("event_type, actor_id, courier_name, received_by, notes, created_at")
+            .eq("case_id", case["id"])
+            .in_("event_type", ["issued", "dispatched", "delivered"])
+            .order("created_at")
+            .execute()
+            .data
+            or []
+        )
+        actor_ids = list({e["actor_id"] for e in events if e.get("actor_id")})
+        actors = (
+            supabase_admin.table("profiles").select("id, display_name, first_name").in_("id", actor_ids).execute().data
+            or []
+        ) if actor_ids else []
+        actors_by_id = {a["id"]: _display_name(a) for a in actors}
+        for event in events:
+            event["actor_name"] = actors_by_id.get(event.get("actor_id"), "Unknown user")
+
+        return render_template(
+            "dispatch_scan.html",
+            case=case,
+            label=label,
+            events=events,
+            profile=g.profile,
+            patient_initials=_patient_initials(case.get("patient_name")),
+        )
+    except Exception:
+        app.logger.exception("Unable to load dispatch scan page")
+        return "Unable to load this delivery label. Check the server logs for details.", 500
+
+
+@app.route("/d/<token>/dispatch", methods=["POST"])
+@role_required("admin", "technician")
+def dispatch_case(token):
+    try:
+        label = _load_dispatch_label(token)
+        if not label or label["status"] != "active":
+            return redirect(url_for("scan_dispatch_label", token=token))
+
+        courier_name = request.form.get("courier_name", "").strip()[:120]
+        if not courier_name:
+            flash("Enter the courier's name before handing over the case.", "error")
+            return redirect(url_for("scan_dispatch_label", token=token))
+
+        case = _set_case_status(
+            label["case_id"],
+            ["ready_for_dispatch"],
+            {"status": "in_transit", "dispatched_at": _now_iso()},
+        )
+        if not case:
+            flash("This case has already been handed to a courier.", "error")
+            return redirect(url_for("scan_dispatch_label", token=token))
+
+        staff_name = _display_name(g.profile)
+        _log_dispatch_event(case["id"], "dispatched", label["id"], courier_name=courier_name)
+        log_case_status_change(case["id"], "Dispatched (in transit)", g.profile["id"], f"Handed to courier {courier_name} by {staff_name}")
+        create_notification(
+            user_id=case["dentist_id"],
+            message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. Scan the label when it arrives to confirm receipt.",
+            link=url_for("scan_dispatch_label", token=token),
+        )
+        _notify_admins(f"Dispatched: Case {case['case_number']} was handed to {courier_name} by {staff_name}.")
+        flash(f"Handed to {courier_name}. The clinic has been notified.", "success")
+        return redirect(url_for("scan_dispatch_label", token=token))
+    except Exception:
+        app.logger.exception("Unable to dispatch case")
+        return "Unable to record the handoff. Check the server logs for details.", 500
+
+
+@app.route("/d/<token>/receive", methods=["POST"])
+@role_required("dentist")
+def receive_case(token):
+    try:
+        label = _load_dispatch_label(token)
+        if not label or label["status"] != "active":
+            return redirect(url_for("scan_dispatch_label", token=token))
+
+        cases = (
+            supabase_admin.table("dental_cases")
+            .select("id, dentist_id, status")
+            .eq("id", label["case_id"])
+            .execute()
+            .data
+            or []
+        )
+        if not cases or cases[0].get("dentist_id") != g.profile["id"]:
+            return redirect(url_for("scan_dispatch_label", token=token))
+        was_scanned_out = cases[0].get("status") == "in_transit"
+
+        received_by = request.form.get("received_by", "").strip()[:120] or _display_name(g.profile, "Clinic")
+        case = _set_case_status(
+            label["case_id"],
+            DISPATCH_STATUSES,
+            {"status": "delivered", "delivered_at": _now_iso()},
+        )
+        if not case:
+            flash("This case was already confirmed as delivered.", "error")
+            return redirect(url_for("scan_dispatch_label", token=token))
+
+        skipped_note = None if was_scanned_out else "Received without a dispatch scan at the lab"
+        _log_dispatch_event(case["id"], "delivered", label["id"], received_by=received_by, notes=skipped_note)
+        log_case_status_change(case["id"], "Delivered", g.profile["id"], f"Received by {received_by}")
+
+        clinic = g.profile.get("clinic_name") or _display_name(g.profile, "the clinic")
+        message = f"Delivered: Case {case['case_number']} was received by {received_by} at {clinic}."
+        if skipped_note:
+            message += " It was never scanned out at the lab."
+        _notify_admins(message)
+        if case.get("technician_id"):
+            create_notification(
+                user_id=case["technician_id"],
+                message=f"Delivered: Case {case['case_number']} reached {clinic}.",
+                link="/technician",
+            )
+        flash("Receipt confirmed. The lab has been notified.", "success")
+        return redirect(url_for("scan_dispatch_label", token=token))
+    except Exception:
+        app.logger.exception("Unable to confirm receipt")
+        return "Unable to confirm receipt. Check the server logs for details.", 500
+
 # =========================
 # ADMIN: ASSIGN CASE TO TECH
 # =========================

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatch Label #{{ case.case_number }} | DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F1F5F9;
+            --ink: #0F172A;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg-main);
+            color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Screen-only toolbar */
+        .toolbar {
+            max-width: 100mm;
+            margin: 24px auto 16px;
+            padding: 0 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            box-sizing: content-box;
+        }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; text-decoration: none; font-family: inherit; }
+        .btn-cyan { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-cyan:hover { background: var(--accent-cyan-hover); }
+        .btn-outline { background: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-muted); }
+        .btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .hint { max-width: 100mm; margin: 0 auto 16px; padding: 0 16px; font-size: 12px; color: var(--text-muted); box-sizing: content-box; }
+
+        /* The label itself: 100 x 150 mm (4 x 6 in shipping label) */
+        .label {
+            width: 100mm;
+            height: 150mm;
+            margin: 0 auto 32px;
+            background: #FFFFFF;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            padding: 6mm;
+            display: flex;
+            flex-direction: column;
+            gap: 3.5mm;
+            overflow: hidden;
+        }
+        .label-head { display: flex; align-items: center; gap: 3mm; border-bottom: 0.4mm solid var(--ink); padding-bottom: 2.5mm; }
+        .label-head img { height: 9mm; width: auto; border-radius: 1mm; }
+        .label-head .lab { font-size: 9pt; font-weight: 700; line-height: 1.2; }
+        .label-head .lab span { display: block; font-size: 7pt; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+        .case-row { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; }
+        .case-number { font-size: 20pt; font-weight: 800; letter-spacing: 0.01em; }
+        .due { font-size: 8pt; font-weight: 700; text-align: right; }
+        .due span { display: block; font-size: 6.5pt; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+        .qr-block { display: flex; gap: 4mm; align-items: center; }
+        .qr-block svg { width: 38mm; height: 38mm; flex-shrink: 0; display: block; }
+        .qr-text { font-size: 8pt; line-height: 1.35; }
+        .qr-text strong { display: block; font-size: 9.5pt; margin-bottom: 1.5mm; }
+
+        .field-label { font-size: 6.5pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+        .deliver-to { border: 0.4mm solid var(--ink); border-radius: 1.5mm; padding: 2.5mm 3mm; display: grid; gap: 0.8mm; }
+        .deliver-to .clinic { font-size: 12pt; font-weight: 800; line-height: 1.15; }
+        .deliver-to .who { font-size: 9pt; }
+
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; font-size: 9pt; }
+        .meta-grid div { display: grid; gap: 0.5mm; }
+
+        .units { font-size: 8pt; border-collapse: collapse; width: 100%; }
+        .units th { text-align: left; font-size: 6.5pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 1mm; border-bottom: 0.2mm solid var(--border-color); }
+        .units td { padding: 0.8mm 0; border-bottom: 0.2mm solid var(--border-color); }
+        .units .more td { color: var(--text-muted); border-bottom: 0; }
+
+        .label-foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 6.5pt; color: var(--text-muted); border-top: 0.2mm solid var(--border-color); padding-top: 1.5mm; }
+        .mono { font-family: Consolas, 'SFMono-Regular', Menlo, monospace; }
+
+        @page { size: 100mm 150mm; margin: 0; }
+        @media print {
+            body { background: #FFFFFF; }
+            .toolbar, .hint { display: none; }
+            .label { margin: 0; border: 0; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <a href="{{ back_url }}" class="btn btn-outline">← Back</a>
+        <button type="button" class="btn btn-cyan" onclick="window.print()">Print label</button>
+    </div>
+    <p class="hint">Print at 100 × 150 mm (4 × 6 in) with scaling off, and attach the label to the outside of the delivery box.</p>
+
+    <article class="label">
+        <header class="label-head">
+            <img src="{{ url_for('static', filename='images/mrkzter_logo.jpg') }}" alt="">
+            <div class="lab">
+                Mrkzter Dental Laboratory
+                <span>DentaLink dispatch label</span>
+            </div>
+        </header>
+
+        <div class="case-row">
+            <div class="case-number">#{{ case.case_number }}</div>
+            <div class="due"><span>Due</span>{{ case.due_date or 'Not set' }}</div>
+        </div>
+
+        <div class="qr-block">
+            {{ qr_svg }}
+            <div class="qr-text">
+                <strong>Scan on arrival</strong>
+                Open your phone camera and point it at this code, then tap <em>Confirm receipt</em>. Sign in with your DentaLink account if asked.
+            </div>
+        </div>
+
+        <div class="deliver-to">
+            <span class="field-label">Deliver to</span>
+            <span class="clinic">{{ case.dentist.clinic_name or 'Independent Practice' }}</span>
+            <span class="who">{{ case.dentist.display_name or case.dentist.first_name or 'Clinical partner' }}{% if case.dentist.phone %} · {{ case.dentist.phone }}{% endif %}</span>
+        </div>
+
+        <div class="meta-grid">
+            <div><span class="field-label">Patient</span><span>{{ patient_initials }}{% if case.patient_reference %} · {{ case.patient_reference }}{% endif %}</span></div>
+            <div><span class="field-label">Restoration</span><span>{{ (case.case_type or 'N/A') | replace('_', ' ') | title }}</span></div>
+        </div>
+
+        {% if case.teeth %}
+        <table class="units">
+            <thead>
+                <tr><th>Tooth</th><th>Material</th><th>Shade</th></tr>
+            </thead>
+            <tbody>
+                {% set shown = 4 if case.teeth|length <= 4 else 3 %}
+                {% for t in case.teeth[:shown] %}
+                <tr>
+                    <td>#{{ t.tooth_number }}</td>
+                    <td>{{ (t.material or '—') | replace('_', ' ') | title }}</td>
+                    <td>{{ t.shade or '—' }}</td>
+                </tr>
+                {% endfor %}
+                {% if case.teeth|length > shown %}
+                <tr class="more"><td colspan="3">+ {{ case.teeth|length - shown }} more units. Full list on the scan page.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <footer class="label-foot">
+            <span>Label <span class="mono">{{ label.id[:8] }}</span></span>
+            <span>Issued {{ label.created_at[:10] }}</span>
+        </footer>
+    </article>
+</body>
+</html>
