@@ -1,0 +1,58 @@
+{# Result pop-up for restock request actions. Reads flashed messages with "restock-*" categories. #}
+{% with notices = get_flashed_messages(with_categories=true, category_filter=["restock-fulfilled", "restock-dismissed", "restock-stale"]) %}
+{% if notices %}
+{% set category, message = notices[-1] %}
+{% set kind = category.replace('restock-', '') %}
+{% set remaining = restock_requests|length if restock_requests else 0 %}
+<style>
+    .an-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; animation: an-fade 0.15s ease-out; }
+    .an-card { background: #FFFFFF; border-radius: 14px; width: 100%; max-width: 400px; padding: 28px 24px 22px; text-align: center; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25); font-family: inherit; animation: an-rise 0.2s ease-out; }
+    .an-icon { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+    .an-icon.fulfilled { background: rgba(16, 185, 129, 0.12); color: #059669; }
+    .an-icon.dismissed { background: #F1F5F9; color: #475569; }
+    .an-icon.stale { background: rgba(217, 119, 6, 0.12); color: #B45309; }
+    .an-title { margin: 0 0 8px; font-size: 18px; font-weight: 700; color: #0F172A; }
+    .an-text { margin: 0 0 22px; font-size: 14px; line-height: 1.5; color: #475569; }
+    .an-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .an-btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; }
+    .an-btn.primary { background: #0284C7; border-color: #0284C7; color: #FFFFFF; }
+    .an-btn:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+    @keyframes an-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes an-rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .an-overlay, .an-card { animation: none; } }
+</style>
+<div class="an-overlay" id="actionNotice" role="dialog" aria-modal="true" aria-labelledby="actionNoticeTitle">
+    <div class="an-card">
+        <div class="an-icon {{ kind }}" aria-hidden="true">
+            {% if kind == 'fulfilled' %}
+                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            {% elif kind == 'dismissed' %}
+                <svg width="26" height="26" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            {% else %}
+                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"/></svg>
+            {% endif %}
+        </div>
+        <h2 class="an-title" id="actionNoticeTitle">
+            {% if kind == 'fulfilled' %}Marked as restocked{% elif kind == 'dismissed' %}Request dismissed{% else %}Already handled{% endif %}
+        </h2>
+        <p class="an-text">{{ message }}</p>
+        <div class="an-actions">
+            {% if remaining and kind != 'stale' %}
+                <button type="button" class="an-btn" onclick="closeActionNotice(true)">View remaining requests ({{ remaining }})</button>
+            {% endif %}
+            <button type="button" class="an-btn primary" id="actionNoticeOk" onclick="closeActionNotice(false)">OK</button>
+        </div>
+    </div>
+</div>
+<script>
+    function closeActionNotice(openRequests) {
+        const notice = document.getElementById('actionNotice');
+        if (notice) notice.remove();
+        if (openRequests && typeof openRestockModal === 'function') openRestockModal();
+    }
+    document.getElementById('actionNoticeOk').focus();
+    document.getElementById('actionNotice').addEventListener('click', (e) => { if (e.target.id === 'actionNotice') closeActionNotice(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeActionNotice(false); }, { once: true });
+</script>
+{% endif %}
+{% endwith %}
