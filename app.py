@@ -218,6 +218,7 @@ def admin_dashboard():
             supabase_admin
             .table("material_requests")
             .select("*, profiles(display_name), dental_cases(case_number)")
+            .eq("status", "pending")
             .order("created_at", desc=True)
             .execute()
         )
@@ -1106,6 +1107,7 @@ def admin_inventory_logs():
             supabase_admin
             .table("material_requests")
             .select("*, profiles(display_name), dental_cases(case_number)")
+            .eq("status", "pending")
             .order("created_at", desc=True)
             .execute()
         )
@@ -2253,7 +2255,8 @@ def request_material(case_id):
         supabase_admin.table("material_requests").insert({
             "case_id": case_id,
             "technician_id": user_id,
-            "item_name": item_name
+            "item_name": item_name,
+            "status": "pending"
         }).execute()
 
         # Alert all admins
@@ -2266,6 +2269,67 @@ def request_material(case_id):
             )
             
     return redirect(f"/technician/cases/{case_id}")
+
+
+# =========================
+# ADMIN: RESOLVE RESTOCK REQUEST
+# =========================
+@app.route("/admin/restock-requests/<request_id>/resolve", methods=["POST"])
+@role_required("admin")
+def admin_resolve_restock_request(request_id):
+    next_path = request.form.get("next")
+    back = next_path if _safe_next_path(next_path) else url_for("admin_dashboard")
+    try:
+        action = request.form.get("action")
+        if action not in ("fulfilled", "dismissed"):
+            return "Invalid restock action.", 400
+
+        rows = (
+            supabase_admin.table("material_requests")
+            .update({"status": action, "resolved_at": _now_iso(), "resolved_by": g.profile["id"]})
+            .eq("id", request_id)
+            .eq("status", "pending")
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            # Already handled by another admin, or the request no longer exists.
+            flash("This request was already marked as restocked or dismissed, possibly by another administrator. Nothing was changed.", "restock-stale")
+            return redirect(back)
+
+        req = rows[0]
+        case_number = None
+        if req.get("case_id"):
+            cases = supabase_admin.table("dental_cases").select("case_number").eq("id", req["case_id"]).execute().data or []
+            case_number = cases[0]["case_number"] if cases else None
+        for_case = f" for Case {case_number}" if case_number else ""
+        admin_name = _display_name(g.profile, "an administrator")
+        if action == "fulfilled":
+            message = f"Restocked: your request for '{req['item_name']}'{for_case} was restocked by {admin_name}."
+        else:
+            message = f"Restock request closed: your request for '{req['item_name']}'{for_case} was dismissed by {admin_name}."
+
+        tech_name = "The technician"
+        if req.get("technician_id"):
+            create_notification(
+                user_id=req["technician_id"],
+                message=message,
+                link=f"/technician/cases/{req['case_id']}" if req.get("case_id") else "/technician",
+            )
+            techs = supabase_admin.table("profiles").select("display_name, first_name").eq("id", req["technician_id"]).execute().data or []
+            tech_name = _display_name(techs[0] if techs else None, "The technician")
+
+        if action == "fulfilled":
+            flash(f"'{req['item_name']}'{for_case} is closed as restocked. {tech_name} has been notified.", "restock-fulfilled")
+        else:
+            flash(f"'{req['item_name']}'{for_case} was closed without restocking. {tech_name} has been notified.", "restock-dismissed")
+        return redirect(back)
+    except Exception:
+        app.logger.exception("Unable to resolve restock request")
+        return "Unable to update the restock request. Check the server logs for details.", 500
+
+
 # =========================
 # TECHNICIAN DASHBOARD
 # =========================
@@ -3234,6 +3298,7 @@ def admin_inventory():
             supabase_admin
             .table("material_requests")
             .select("*, profiles(display_name), dental_cases(case_number)")
+            .eq("status", "pending")
             .order("created_at", desc=True)
             .execute()
         )
@@ -3533,7 +3598,7 @@ def admin_forecast_analytics():
         notif_res = supabase_admin.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
         notifications = notif_res.data or []
 
-        restock_res = supabase_admin.table("material_requests").select("*, profiles(display_name), dental_cases(case_number)").order("created_at", desc=True).execute()
+        restock_res = supabase_admin.table("material_requests").select("*, profiles(display_name), dental_cases(case_number)").eq("status", "pending").order("created_at", desc=True).execute()
         restock_requests = restock_res.data or []
 
         unassigned_res = supabase_admin.table("dental_cases").select("*").eq("status", "submitted").order("created_at", desc=True).execute()

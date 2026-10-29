@@ -1,0 +1,14 @@
+{# Actions for one pending restock request; expects `req` in scope. #}
+<div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+    <form method="POST" action="{{ url_for('admin_resolve_restock_request', request_id=req.id) }}" style="margin: 0; display: flex; gap: 6px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button type="submit" name="action" value="fulfilled" title="The material was restocked; notify the technician"
+                style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: none; cursor: pointer; background: #0284C7; color: #FFFFFF; font-family: inherit;">Mark restocked</button>
+        <button type="submit" name="action" value="dismissed" title="Close the request without restocking"
+                style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #CBD5E1; cursor: pointer; background: #FFFFFF; color: #475569; font-family: inherit;">Dismiss</button>
+    </form>
+    {% if request.endpoint != 'admin_inventory' %}
+        <a href="{{ url_for('admin_inventory') }}" style="font-size: 11px; color: #0284C7; text-decoration: none; white-space: nowrap;">Open inventory →</a>
+    {% endif %}
+</div>

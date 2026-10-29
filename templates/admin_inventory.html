@@ -663,7 +663,7 @@
                                         <td><span style="color: var(--accent-yellow); font-weight: 700;">{{ req.item_name }}</span></td>
                                         <td><span class="tag">#{{ req.dental_cases.case_number if req.dental_cases else 'N/A' }}</span></td>
                                         <td>
-                                            <a href="{{ url_for('admin_inventory') }}" class="btn btn-cyan" style="padding: 4px 10px; font-size: 11px;">Restock Supply →</a>
+                                            {% include 'partials/restock_actions.html' %}
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -1092,5 +1092,6 @@
             }
         }, REFRESH_INTERVAL_MS);
     </script>
+    {% include 'partials/action_notice.html' %}
 </body>
 </html>
