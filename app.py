@@ -86,6 +86,8 @@ BENCH_STATUSES = (
     "milling_or_printing", "packing_and_curing", "finishing_and_quality_check",
 )
 REASSIGNABLE_STATUSES = BENCH_STATUSES + ("needs_revision", "pending_admin_review")
+# A case can be flagged as rush from intake until it passes QC.
+RUSHABLE_STATUSES = ("submitted",) + REASSIGNABLE_STATUSES
 
 # The lab and its clinics are in the Philippines (UTC+8, no daylight saving).
 LAB_TZ = timezone(timedelta(hours=8))
@@ -965,6 +967,8 @@ def update_case_status(case_id):
         profile_res = supabase_admin.table("profiles").select("role, status, display_name").eq("id", user_id).execute()
         if not profile_res.data or profile_res.data[0]["role"] != "technician" or profile_res.data[0].get("status") != "approved":
             return "Access denied.", 403
+        if not _valid_csrf_token():
+            return "This form has expired. Reload the page and try again.", 400
 
         tech_name = profile_res.data[0]["display_name"]
         new_status = request.form.get("status")
@@ -2566,10 +2570,16 @@ def technician_dashboard():
                 case["teeth"] = []
                 case["case_teeth"] = []
 
-        # Due-date urgency for the pipeline cards (lab time).
+        # Due-date urgency for the pipeline cards (lab time). Within a stage, rush cases come
+        # first, then the soonest due date; cases without a due date go last.
         today = datetime.now(LAB_TZ).date()
         for case in assigned_cases:
             case["due_state"], case["due_label"] = _due_status(case.get("due_date"), today)
+            case["urgency_rank"] = (
+                0 if case.get("is_rush") else 1,
+                str(case.get("due_date") or "9999-12-31")[:10],
+                str(case.get("created_at") or ""),
+            )
 
         # ==========================================
         # 5. STAGE SLICES FOR UI FILTERS & SOUNDS
@@ -3721,6 +3731,43 @@ def admin_reject_qc(case_id):
     except Exception:
         app.logger.exception("Unable to reject QC")
         return "Unable to return this case. Check the server logs for details.", 500
+
+
+@app.route("/admin/cases/<case_id>/rush", methods=["POST"])
+@role_required("admin")
+def admin_set_rush(case_id):
+    """Mark or unmark a case as a rush job. The assigned technician is told when it becomes rush."""
+    rush = request.form.get("rush") == "1"
+    try:
+        updated = (
+            supabase_admin.table("dental_cases")
+            .update({"is_rush": rush})
+            .eq("id", case_id)
+            .in_("status", list(RUSHABLE_STATUSES))
+            .execute()
+            .data
+            or []
+        )
+        if not updated:
+            flash("This case has already passed QC or was closed, so its rush flag can't change.", "rush-stale")
+            return redirect(url_for("admin_dashboard"))
+
+        case = updated[0]
+        log_case_status_change(case_id, "Marked as rush" if rush else "Rush flag removed", g.profile["id"])
+        if rush and case.get("technician_id"):
+            create_notification(
+                user_id=case["technician_id"],
+                message=f"Rush: Case {case['case_number']} ({case.get('patient_name') or 'patient'}) is now a rush job. Please work on it first.",
+                link=f"/technician/cases/{case_id}",
+            )
+        if rush:
+            flash(f"Case {case['case_number']} is now a rush job and moves to the top of the technician's pipeline.", "rush-on")
+        else:
+            flash(f"Case {case['case_number']} is no longer marked as rush.", "rush-off")
+        return redirect(url_for("admin_dashboard"))
+    except Exception:
+        app.logger.exception("Unable to update rush flag")
+        return "Unable to update the rush flag. Run the latest migration, then check the server logs.", 500
 
 
 @app.route("/cases/<case_id>/dispatch-slip")
