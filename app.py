@@ -80,6 +80,12 @@ DISPATCH_STATUSES = ("ready_for_dispatch", "in_transit")
 # "completed" is the terminal status used before QR dispatch existed.
 DELIVERED_STATUSES = ("delivered", "completed")
 CLOSED_STATUSES = ("draft", "submitted", "cancelled") + DELIVERED_STATUSES
+# Stages a technician works through on the bench; only cases here can change stage or be returned.
+BENCH_STATUSES = (
+    "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
+    "milling_or_printing", "packing_and_curing", "finishing_and_quality_check",
+)
+REASSIGNABLE_STATUSES = BENCH_STATUSES + ("needs_revision", "pending_admin_review")
 
 # The lab and its clinics are in the Philippines (UTC+8, no daylight saving).
 LAB_TZ = timezone(timedelta(hours=8))
@@ -956,8 +962,8 @@ def update_case_status(case_id):
 
     try:
         # Verify Technician
-        profile_res = supabase_admin.table("profiles").select("role, display_name").eq("id", user_id).execute()
-        if not profile_res.data or profile_res.data[0]["role"] != "technician":
+        profile_res = supabase_admin.table("profiles").select("role, status, display_name").eq("id", user_id).execute()
+        if not profile_res.data or profile_res.data[0]["role"] != "technician" or profile_res.data[0].get("status") != "approved":
             return "Access denied.", 403
 
         tech_name = profile_res.data[0]["display_name"]
@@ -977,10 +983,13 @@ def update_case_status(case_id):
         if new_status not in allowed_statuses:
             return "Invalid status selection.", 400
 
-        # Fetch Case info
-        case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number").eq("id", case_id).eq("technician_id", user_id).execute()
+        # Fetch Case info; only cases still on the bench can change stage (an old browser tab
+        # must not pull a delivered or in-transit case back into production).
+        case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number, status").eq("id", case_id).eq("technician_id", user_id).execute()
         if not case_res.data:
             return "Case not found or not assigned to you.", 404
+        if case_res.data[0].get("status") not in BENCH_STATUSES:
+            return "This case has moved past the bench (for example to QC review or dispatch), so its stage can't be changed here. Reload your dashboard.", 409
 
         dentist_id = case_res.data[0]["dentist_id"]
         case_number = case_res.data[0]["case_number"]
@@ -997,10 +1006,12 @@ def update_case_status(case_id):
         }
         readable_status = status_labels.get(new_status, new_status)
 
-        # Update status in database
-        supabase_admin.table("dental_cases").update({
+        # Update status in database (only if it is still on the bench, in case it moved meanwhile)
+        updated = supabase_admin.table("dental_cases").update({
             "status": new_status
-        }).eq("id", case_id).execute()
+        }).eq("id", case_id).in_("status", list(BENCH_STATUSES)).execute().data or []
+        if not updated:
+            return "This case moved past the bench while you were working. Reload your dashboard.", 409
 
         # ==========================================
         # LOG STATUS CHANGE TO TIMELINE HISTORY
@@ -1123,16 +1134,22 @@ def admin_reassign_case(case_id):
             return "No technician selected.", 400
 
         # Fetch case and new tech info for logging/notification
-        case_res = supabase_admin.table("dental_cases").select("case_number").eq("id", case_id).execute()
-        case_number = case_res.data[0]["case_number"] if case_res.data else "Unknown"
+        case_res = supabase_admin.table("dental_cases").select("case_number, status").eq("id", case_id).execute()
+        if not case_res.data:
+            return "Case not found.", 404
+        if case_res.data[0].get("status") not in REASSIGNABLE_STATUSES:
+            return "Only cases still in production can be reassigned.", 409
+        case_number = case_res.data[0]["case_number"]
 
-        tech_res = supabase_admin.table("profiles").select("display_name").eq("id", new_tech_id).execute()
-        tech_name = tech_res.data[0]["display_name"] if tech_res.data else "New Technician"
+        tech_res = supabase_admin.table("profiles").select("display_name, role, status").eq("id", new_tech_id).execute()
+        if not tech_res.data or tech_res.data[0].get("role") != "technician" or tech_res.data[0].get("status") != "approved":
+            return "Choose an approved technician.", 400
+        tech_name = tech_res.data[0]["display_name"] or "New Technician"
 
         # UPDATE ONLY THE TECHNICIAN_ID (Status is intentionally preserved)
         supabase_admin.table("dental_cases").update({
             "technician_id": new_tech_id
-        }).eq("id", case_id).execute()
+        }).eq("id", case_id).in_("status", list(REASSIGNABLE_STATUSES)).execute()
 
         # Notify the newly assigned technician
         create_notification(
@@ -3203,8 +3220,8 @@ def return_case_to_dentist(case_id):
 
     try:
         # Verify Technician Role
-        profile_res = supabase_admin.table("profiles").select("role").eq("id", user_id).execute()
-        if not profile_res.data or profile_res.data[0].get("role") != "technician":
+        profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
+        if not profile_res.data or profile_res.data[0].get("role") != "technician" or profile_res.data[0].get("status") != "approved":
             return "Access denied.", 403
 
         # Get the technician's revision notes from the form
@@ -3212,19 +3229,24 @@ def return_case_to_dentist(case_id):
         if not revision_notes:
             return "You must provide a reason for sending the case back.", 400
 
-        # Fetch case to get the dentist_id for the notification
-        case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number").eq("id", case_id).execute()
+        # Only the assigned technician can return a case, and only while it is on the bench.
+        case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number, status").eq("id", case_id).eq("technician_id", user_id).execute()
         if not case_res.data:
-            return "Case not found.", 404
-            
+            return "Case not found or not assigned to you.", 404
+        if case_res.data[0].get("status") not in BENCH_STATUSES:
+            return "Only cases still on the bench can be returned to the dentist.", 409
+
         dentist_id = case_res.data[0]["dentist_id"]
         case_number = case_res.data[0]["case_number"]
 
         # Update the case status
-        supabase_admin.table("dental_cases").update({
+        updated = supabase_admin.table("dental_cases").update({
             "status": "needs_revision",
             "revision_notes": revision_notes
-        }).eq("id", case_id).execute()
+        }).eq("id", case_id).in_("status", list(BENCH_STATUSES)).execute().data or []
+        if not updated:
+            return "This case moved past the bench meanwhile. Reload your dashboard.", 409
+        log_case_status_change(case_id, "Returned to dentist for revision", user_id, revision_notes)
 
         # Send Notification to Dentist
         create_notification(
@@ -3659,25 +3681,33 @@ def admin_assign_case(case_id):
         return redirect(url_for("login"))
 
     try:
-        admin_res = supabase_admin.table("profiles").select("role").eq("id", admin_id).execute()
-        if not admin_res.data or admin_res.data[0]["role"] != "admin":
+        admin_res = supabase_admin.table("profiles").select("role, status").eq("id", admin_id).execute()
+        if not admin_res.data or admin_res.data[0]["role"] != "admin" or admin_res.data[0].get("status") != "approved":
             return "Access denied.", 403
 
         technician_id = request.form.get("technician_id")
         if not technician_id:
             return "Technician selection is required.", 400
+        tech_res = supabase_admin.table("profiles").select("role, status").eq("id", technician_id).execute()
+        if not tech_res.data or tech_res.data[0].get("role") != "technician" or tech_res.data[0].get("status") != "approved":
+            return "Choose an approved technician.", 400
 
-        # Fetch Case info for notification
-        case_res = supabase_admin.table("dental_cases").select("case_number").eq("id", case_id).execute()
+        # Fetch Case info for notification; only incoming (submitted) cases are assigned here.
+        case_res = supabase_admin.table("dental_cases").select("case_number, status").eq("id", case_id).execute()
         if not case_res.data:
             return "Case not found.", 404
+        if case_res.data[0].get("status") != "submitted":
+            return "This case was already assigned or has moved on. Use Reassign on the production board instead.", 409
         case_number = case_res.data[0]["case_number"]
 
         # Update case status to assigned and set technician_id
-        supabase_admin.table("dental_cases").update({
+        updated = supabase_admin.table("dental_cases").update({
             "technician_id": technician_id,
             "status": "assigned"
-        }).eq("id", case_id).execute()
+        }).eq("id", case_id).eq("status", "submitted").execute().data or []
+        if not updated:
+            return "This case was assigned by someone else meanwhile.", 409
+        log_case_status_change(case_id, "Assigned", admin_id, None)
 
         # NOTIFY ONLY THE SPECIFIC ASSIGNED TECHNICIAN
         create_notification(
