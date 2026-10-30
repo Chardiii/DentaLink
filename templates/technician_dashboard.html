@@ -91,7 +91,7 @@
         .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); }
 
         /* Dashboard Container */
-        .container { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
+        .container { max-width: 1680px; margin: 0 auto; padding: 24px 32px; }
 
         /* Production Pulse Bar */
         .pulse-strip {
@@ -125,48 +125,61 @@
         .btn-outline:hover { border-color: var(--text-muted); background-color: #F8FAFC; }
         .btn-toggle-completed.active-filter { background-color: rgba(16, 185, 129, 0.1); border-color: var(--accent-green); color: var(--accent-green); }
 
-        /* Kanban Layout */
+        /* Pipeline: all six stages share the width; narrower screens scroll sideways. */
+        .stage-nav { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 14px; padding-bottom: 2px; scrollbar-width: none; }
+        .stage-nav::-webkit-scrollbar { display: none; }
+        .stage-pill { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s; }
+        .stage-pill:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .stage-pill .pill-count { min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #F1F5F9; color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: center; }
+        .stage-pill.has-cases { color: #0F172A; }
+        .stage-pill.has-cases .pill-count { background: rgba(2, 132, 199, 0.12); color: var(--accent-cyan); }
+        .stage-pill .pill-alert { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-red); }
+
         .kanban-board {
-            display: flex;
-            gap: 16px;
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: minmax(250px, 1fr);
+            gap: 14px;
             overflow-x: auto;
-            padding-bottom: 16px;
-            align-items: flex-start;
+            padding-bottom: 12px;
+            scroll-snap-type: x proximity;
         }
-        .kanban-board::-webkit-scrollbar { height: 6px; }
-        .kanban-board::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+        .kanban-board::-webkit-scrollbar { height: 8px; }
+        .kanban-board::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
 
         .kanban-column {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
-            min-width: 290px;
-            max-width: 290px;
+            border-radius: 14px;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+            scroll-snap-align: start;
         }
 
         .kanban-header {
-            padding: 14px 16px;
+            padding: 12px 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 8px;
             border-bottom: 1px solid var(--border-color);
             background-color: var(--panel-header);
         }
-
-        .kanban-title { font-size: 12px; font-weight: 700; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px; }
-        .kanban-count { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+        .kanban-title { font-size: 12px; font-weight: 700; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .stage-step { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #E2E8F0; color: #475569; font-size: 11px; }
+        .kanban-count { flex: 0 0 auto; background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
 
         .kanban-body {
-            padding: 14px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            min-height: 220px;
-            max-height: 72vh;
+            gap: 10px;
+            flex: 1;
+            min-height: 200px;
+            max-height: 68vh;
             overflow-y: auto;
         }
         .kanban-body::-webkit-scrollbar { width: 4px; }
@@ -175,46 +188,51 @@
         .empty-column {
             border: 1px dashed var(--border-color);
             border-radius: 8px;
-            padding: 36px 16px;
+            padding: 28px 14px;
             text-align: center;
             color: var(--text-muted);
             font-size: 12px;
         }
 
-        /* Refined Kanban Cards */
+        /* Pipeline cards */
         .k-card {
             background-color: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 10px;
-            padding: 14px;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 12px;
+            transition: border-color 0.2s, box-shadow 0.2s;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-        }
-        .k-card:hover { border-color: var(--accent-cyan); box-shadow: 0 6px 18px rgba(2, 132, 199, 0.08); transform: translateY(-1px); }
-
-        .k-card-header { display: flex; justify-content: space-between; align-items: center; }
-        .k-badge-cyan { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(2, 132, 199, 0.25); }
-        .k-due-chip { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: rgba(217, 119, 6, 0.1); color: var(--accent-yellow); border: 1px solid rgba(217, 119, 6, 0.25); }
-
-        .k-card-title { color: #0F172A; font-size: 14px; font-weight: 700; margin: 0; line-height: 1.3; }
-        .k-card-meta { color: var(--text-muted); font-size: 11px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-
-        .k-card-action-bar {
-            display: flex;
             gap: 6px;
-            margin-top: 4px;
-            border-top: 1px solid var(--border-color);
-            padding-top: 8px;
-            align-items: center;
         }
+        .k-card:hover { border-color: var(--accent-cyan); box-shadow: 0 6px 18px rgba(2, 132, 199, 0.08); }
+        .k-card.due-overdue { border-left: 3px solid var(--accent-red); }
+        .k-card.due-today { border-left: 3px solid var(--accent-yellow); }
+
+        .k-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; flex-wrap: wrap; }
+        .k-badge-cyan { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid rgba(2, 132, 199, 0.25); white-space: nowrap; }
+        .k-due-chip { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; white-space: nowrap; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+        .k-due-chip.due-soon { background: rgba(217, 119, 6, 0.1); color: #B45309; border-color: rgba(217, 119, 6, 0.3); }
+        .k-due-chip.due-today { background: #FEF3C7; color: #92400E; border-color: #FCD34D; font-weight: 700; }
+        .k-due-chip.due-overdue { background: #FEE2E2; color: #B91C1C; border-color: #FCA5A5; font-weight: 700; }
+        .k-status-chip { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
+        .k-status-chip.review { background: rgba(217, 119, 6, 0.1); color: #B45309; }
+        .k-status-chip.ready { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); }
+        .k-status-chip.transit { background: rgba(16, 185, 129, 0.12); color: #047857; }
+
+        .k-card-title { color: #0F172A; font-size: 14px; font-weight: 700; margin: 0; line-height: 1.3; overflow-wrap: anywhere; }
+        .k-card-meta { color: var(--text-muted); font-size: 11px; display: flex; flex-direction: column; gap: 2px; }
+        .k-card-meta .k-stage-now { color: #334155; font-weight: 600; }
+
+        .k-card-actions { border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 2px; }
+        .k-card-action-bar { display: flex; gap: 6px; align-items: center; }
+        .k-card-action-bar .select-dark { min-width: 0; }
 
         .select-dark {
             background-color: #FFFFFF;
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            padding: 6px 10px;
+            padding: 7px 24px 7px 10px;
             border-radius: 6px;
             font-size: 11px;
             outline: none;
@@ -228,11 +246,42 @@
         }
         .select-dark:focus { border-color: var(--border-focus); box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.1); }
 
-        .btn-card-save { background-color: var(--accent-cyan); color: #FFFFFF; padding: 6px 10px; border-radius: 6px; font-weight: 700; font-size: 11px; border: none; cursor: pointer; transition: background 0.15s; }
+        .btn-card-save { flex: 0 0 auto; background-color: var(--accent-cyan); color: #FFFFFF; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 11px; border: none; cursor: pointer; transition: background 0.15s; text-decoration: none; text-align: center; }
         .btn-card-save:hover { background-color: var(--accent-cyan-hover); }
+        .btn-card-save.block { display: block; width: 100%; padding: 8px 10px; }
+        .k-card-note { font-size: 11px; color: var(--text-muted); text-align: center; }
 
         .view-link-btn { font-size: 11px; color: var(--text-muted); text-decoration: none; text-align: center; display: block; margin-top: 2px; }
         .view-link-btn:hover { color: var(--accent-cyan); text-decoration: underline; }
+
+        .pulse-tile.alert h3 { color: var(--accent-red); }
+        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .k-card.is-rush { border-left: 3px solid var(--accent-red); box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.12); }
+        .k-card[hidden], .empty-column[hidden] { display: none; }
+
+        .pipeline-tools { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .pipeline-tools .stage-nav { margin: 0; flex: 1; min-width: 0; }
+        .pipeline-search { flex: 0 0 260px; display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 36px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-card); color: var(--text-muted); }
+        .pipeline-search:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1); }
+        .pipeline-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text-main); }
+        .search-summary { margin: -4px 0 12px; font-size: 12px; color: var(--text-muted); }
+        .search-summary button { margin-left: 6px; border: 0; background: none; color: var(--accent-cyan); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+
+        @media (max-width: 720px) {
+            .app-header { padding: 10px 16px; }
+            .header-right { gap: 10px; }
+            .status-indicator, .version-badge, .header-titles p, .user-info { display: none; }
+            .notif-dropdown { width: min(340px, calc(100vw - 32px)); right: -60px; }
+            .container { padding: 16px; }
+            .pulse-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+            .pulse-tile { padding: 12px 14px; }
+            .pulse-icon { display: none; }
+            .pulse-info h3 { font-size: 20px; }
+            .kanban-board { grid-auto-columns: minmax(82vw, 1fr); }
+            .pipeline-tools { flex-direction: column; align-items: stretch; }
+            .pipeline-search { flex-basis: auto; }
+            .kanban-body { max-height: none; }
+        }
 
         /* Completed Grid */
         .completed-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
@@ -361,13 +410,81 @@
         {% set qc_cases = cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
         {% set dispatch_cases = cases | selectattr('status', 'in', ['pending_admin_review', 'ready_for_dispatch', 'in_transit']) | list %}
         {% set completed_cases = cases | selectattr('status', 'in', ['delivered', 'completed']) | list %}
-        {% set total_active = assigned_cases|length + in_progress_cases|length + milling_cases|length + packing_cases|length + qc_cases|length %}
+        {% set bench_cases = assigned_cases + in_progress_cases + milling_cases + packing_cases + qc_cases %}
+        {% set urgent_cases = bench_cases | selectattr('due_state', 'in', ['overdue', 'today', 'soon']) | list %}
+        {% set overdue_cases = bench_cases | selectattr('due_state', 'equalto', 'overdue') | list %}
+
+        {# Bench stages in order; a card's dropdown offers only the stages after its current one. #}
+        {% set flow = [
+            ('assigned', 'Assigned'), ('in_progress', 'In Progress'), ('cad_designing', 'CAD Designing'),
+            ('wax_up_or_try_in', 'Wax-up / Setup'), ('milling_or_printing', 'Milling / Printing'),
+            ('packing_and_curing', 'Packing & Curing'), ('finishing_and_quality_check', 'Finishing & QC'),
+        ] %}
+        {% set stages = [
+            {'id': 'assigned', 'title': 'Assigned', 'cases': assigned_cases | sort(attribute='urgency_rank'), 'empty': 'No new cases waiting'},
+            {'id': 'setup', 'title': 'Setup & CAD', 'cases': in_progress_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing in setup or CAD'},
+            {'id': 'milling', 'title': 'Milling / Printing', 'cases': milling_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing milling or printing'},
+            {'id': 'packing', 'title': 'Packing & Curing', 'cases': packing_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing packing or curing'},
+            {'id': 'qc', 'title': 'Finishing & QC', 'cases': qc_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing in finishing'},
+            {'id': 'dispatch', 'title': 'QC Review & Dispatch', 'cases': dispatch_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing waiting for QC or pickup'},
+        ] %}
+
+        {% macro case_card(c, stage) %}
+            {% set units = (c.case_teeth or []) | length %}
+            <article class="k-card{% if stage != 'dispatch' %} due-{{ c.due_state }}{% endif %}{% if c.is_rush %} is-rush{% endif %}"
+                     data-search="{{ [c.case_number, c.patient_name, c.case_type | replace('_', ' '), c.profiles.clinic_name if c.profiles else ''] | select | join(' ') | lower }}">
+                <div class="k-card-header">
+                    <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.is_rush %}<span class="rush-chip" title="The admin marked this as a rush job">Rush</span>{% endif %}{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
+                    {% if c.status == 'pending_admin_review' %}<span class="k-status-chip review">Awaiting admin QC</span>
+                    {% elif c.status == 'ready_for_dispatch' %}<span class="k-status-chip ready">Ready for pickup</span>
+                    {% elif c.status == 'in_transit' %}<span class="k-status-chip transit">In transit</span>
+                    {% else %}<span class="k-due-chip due-{{ c.due_state }}" title="Due date: {{ c.due_date or 'not set' }}">{{ c.due_label }}</span>{% endif %}
+                </div>
+                <div class="k-card-title">{{ c.patient_name }}</div>
+                <div class="k-card-meta">
+                    <span>{{ (c.case_type or 'case') | replace('_', ' ') | title }}{% if units %} · {{ units }} unit{{ 's' if units != 1 }}{% endif %}</span>
+                    {% if c.profiles and c.profiles.clinic_name %}<span>{{ c.profiles.clinic_name }}</span>{% endif %}
+                    {% if stage == 'setup' %}<span class="k-stage-now">Now: {{ dict(flow)[c.status] }}</span>{% endif %}
+                </div>
+                <div class="k-card-actions">
+                {% if stage in ['assigned', 'setup', 'milling', 'packing'] %}
+                    {% set ns = namespace(after=c.status not in dict(flow)) %}
+                    <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
+                          data-case-id="{{ c.id }}"
+                          data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="k-card-action-bar">
+                            <select name="status" class="select-dark status-dropdown" aria-label="Move case {{ c.case_number }} to">
+                                {% for value, label in flow %}
+                                    {% if ns.after %}<option value="{{ value }}">{{ label }}</option>{% endif %}
+                                    {% if value == c.status %}{% set ns.after = true %}{% endif %}
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn-card-save">{{ 'Start' if stage == 'assigned' else 'Move' }}</button>
+                        </div>
+                    </form>
+                {% elif stage == 'qc' %}
+                    <form method="POST" action="{{ url_for('submit_for_admin_review', case_id=c.id) }}" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn-card-save block">Submit for QC review</button>
+                    </form>
+                {% elif c.status == 'ready_for_dispatch' %}
+                    <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn-card-save block">Print dispatch label</a>
+                {% elif c.status == 'pending_admin_review' %}
+                    <div class="k-card-note">Admin is checking this case</div>
+                {% else %}
+                    <div class="k-card-note">On the way to the clinic</div>
+                {% endif %}
+                </div>
+                <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+            </article>
+        {% endmacro %}
 
         <div class="pulse-strip">
             <div class="pulse-tile" style="border-left: 3px solid var(--accent-cyan);">
                 <div class="pulse-info">
                     <span>Active Bench Workload</span>
-                    <h3>{{ total_active }}</h3>
+                    <h3>{{ bench_cases|length }}</h3>
                 </div>
                 <div class="pulse-icon" style="background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan);">
                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
@@ -376,17 +493,27 @@
 
             <div class="pulse-tile" style="border-left: 3px solid var(--accent-yellow);">
                 <div class="pulse-info">
-                    <span>Newly Dispatched</span>
+                    <span>New Assignments</span>
                     <h3 style="color: var(--accent-yellow);">{{ assigned_cases|length }}</h3>
                 </div>
                 <div class="pulse-icon" style="background: rgba(217, 119, 6, 0.1); color: var(--accent-yellow);">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                </div>
+            </div>
+
+            <div class="pulse-tile{% if overdue_cases %} alert{% endif %}" style="border-left: 3px solid var(--accent-red);">
+                <div class="pulse-info">
+                    <span>Due Within 2 Days</span>
+                    <h3>{{ urgent_cases|length }}{% if overdue_cases %} <small style="font-size: 12px; font-weight: 700;">({{ overdue_cases|length }} overdue)</small>{% endif %}</h3>
+                </div>
+                <div class="pulse-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-red);">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
 
             <div class="pulse-tile" style="border-left: 3px solid var(--accent-green);">
                 <div class="pulse-info">
-                    <span>Units Finished</span>
+                    <span>Delivered</span>
                     <h3>{{ completed_cases|length }}</h3>
                 </div>
                 <div class="pulse-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
@@ -409,224 +536,46 @@
             </div>
         </div>
 
+        <div class="pipeline-tools">
+        <label class="pipeline-search">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
+            <input type="search" id="pipelineSearch" placeholder="Search patient, case no., clinic" autocomplete="off" aria-label="Search cases">
+        </label>
+        <nav class="stage-nav" id="stage-nav" aria-label="Jump to a stage">
+            {% for st in stages %}
+                {% set late = st.cases | selectattr('due_state', 'equalto', 'overdue') | list if st.id != 'dispatch' else [] %}
+                <button type="button" class="stage-pill{% if st.cases %} has-cases{% endif %}" data-stage-target="stage-{{ st.id }}"{% if late %} title="{{ late|length }} overdue"{% endif %}>
+                    {{ loop.index }}. {{ st.title }}
+                    <span class="pill-count">{{ st.cases|length }}</span>
+                    {% if late %}<span class="pill-alert" aria-label="has overdue cases"></span>{% endif %}
+                </button>
+            {% endfor %}
+        </nav>
+        </div>
+        <div class="search-summary" id="searchSummary" hidden></div>
+
         <div class="kanban-board" id="kanban-pipeline">
-
-            <div class="kanban-column">
-                <div class="kanban-header">
-                    <span class="kanban-title">0. Assigned / New</span>
-                    <span class="kanban-count">{{ assigned_cases|length }}</span>
-                </div>
-                <div class="kanban-body">
-                    {% for c in assigned_cases %}
-                        <div class="k-card">
-                            <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
-                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
-                            </div>
-                            <div class="k-card-title">{{ c.patient_name }}</div>
-                            <div class="k-card-meta">
-                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                            </div>
-                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
-                                  data-case-id="{{ c.id }}"
-                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
-                                <div class="k-card-action-bar">
-                                    <select name="status" class="select-dark status-dropdown">
-                                        <option value="assigned" {% if c.status == 'assigned' %}selected{% endif %}>Assigned</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="cad_designing">CAD Designing</option>
-                                        <option value="wax_up_or_try_in">Wax-up / Setup</option>
-                                        <option value="milling_or_printing">Milling / Printing</option>
-                                        <option value="packing_and_curing">Packing & Curing</option>
-                                        <option value="finishing_and_quality_check">Finishing & QC</option>
-                                    </select>
-                                    <button type="submit" class="btn-card-save">Start</button>
-                                </div>
-                            </form>
-                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
-                        </div>
-                    {% else %}
-                        <div class="empty-column">No unstarted cases</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="kanban-column">
-                <div class="kanban-header">
-                    <span class="kanban-title">1. Setup & CAD</span>
-                    <span class="kanban-count">{{ in_progress_cases|length }}</span>
-                </div>
-                <div class="kanban-body">
-                    {% for c in in_progress_cases %}
-                        <div class="k-card">
-                            <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
-                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
-                            </div>
-                            <div class="k-card-title">{{ c.patient_name }}</div>
-                            <div class="k-card-meta">
-                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                            </div>
-                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
-                                  data-case-id="{{ c.id }}"
-                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
-                                <div class="k-card-action-bar">
-                                    <select name="status" class="select-dark status-dropdown">
-                                        <option value="in_progress" {% if c.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                                        <option value="cad_designing" {% if c.status == 'cad_designing' %}selected{% endif %}>CAD Designing</option>
-                                        <option value="wax_up_or_try_in" {% if c.status == 'wax_up_or_try_in' %}selected{% endif %}>Wax-up / Setup</option>
-                                        <option value="milling_or_printing">Milling / Printing</option>
-                                        <option value="packing_and_curing">Packing & Curing</option>
-                                        <option value="finishing_and_quality_check">Finishing & QC</option>
-                                    </select>
-                                    <button type="submit" class="btn-card-save">Save</button>
-                                </div>
-                            </form>
-                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
-                        </div>
-                    {% else %}
-                        <div class="empty-column">No units in CAD / Setup</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="kanban-column">
-                <div class="kanban-header">
-                    <span class="kanban-title">2. Milling / Printing</span>
-                    <span class="kanban-count">{{ milling_cases|length }}</span>
-                </div>
-                <div class="kanban-body">
-                    {% for c in milling_cases %}
-                        <div class="k-card">
-                            <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
-                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
-                            </div>
-                            <div class="k-card-title">{{ c.patient_name }}</div>
-                            <div class="k-card-meta">
-                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                            </div>
-                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
-                                  data-case-id="{{ c.id }}"
-                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
-                                <div class="k-card-action-bar">
-                                    <select name="status" class="select-dark status-dropdown">
-                                        <option value="milling_or_printing" selected>Milling / Printing</option>
-                                        <option value="packing_and_curing">Packing & Curing</option>
-                                        <option value="finishing_and_quality_check">Finishing & QC</option>
-                                    </select>
-                                    <button type="submit" class="btn-card-save">Save</button>
-                                </div>
-                            </form>
-                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
-                        </div>
-                    {% else %}
-                        <div class="empty-column">No units in CAM / Milling</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="kanban-column">
-                <div class="kanban-header">
-                    <span class="kanban-title">3. Packing & Curing</span>
-                    <span class="kanban-count">{{ packing_cases|length }}</span>
-                </div>
-                <div class="kanban-body">
-                    {% for c in packing_cases %}
-                        <div class="k-card">
-                            <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
-                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
-                            </div>
-                            <div class="k-card-title">{{ c.patient_name }}</div>
-                            <div class="k-card-meta">
-                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                            </div>
-                            <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
-                                  data-case-id="{{ c.id }}"
-                                  data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
-                                <div class="k-card-action-bar">
-                                    <select name="status" class="select-dark status-dropdown">
-                                        <option value="packing_and_curing" selected>Packing & Curing</option>
-                                        <option value="finishing_and_quality_check">Finishing & QC</option>
-                                    </select>
-                                    <button type="submit" class="btn-card-save">Save</button>
-                                </div>
-                            </form>
-                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
-                        </div>
-                    {% else %}
-                        <div class="empty-column">No units in Packing</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="kanban-column">
-                <div class="kanban-header">
-                    <span class="kanban-title">4. Finishing & QC</span>
-                    <span class="kanban-count">{{ qc_cases|length }}</span>
-                </div>
-                <div class="kanban-body">
-                    {% for c in qc_cases %}
-                        <div class="k-card">
-                            <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
-                                <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
-                            </div>
-                            <div class="k-card-title">{{ c.patient_name }}</div>
-                            <div class="k-card-meta">
-                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                            </div>
-                            <form method="POST" action="{{ url_for('submit_for_admin_review', case_id=c.id) }}" style="margin: 0;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <button type="submit" class="btn-card-save" style="width: 100%; padding: 8px 10px;">Submit for QC review</button>
-                            </form>
-                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
-                        </div>
-                    {% else %}
-                        <div class="empty-column">No units in Quality Check</div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="kanban-column">
-                <div class="kanban-header">
-                    <span class="kanban-title">5. QC Review & Dispatch</span>
-                    <span class="kanban-count">{{ dispatch_cases|length }}</span>
-                </div>
-                <div class="kanban-body">
-                    {% for c in dispatch_cases %}
-                        <div class="k-card">
-                            <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
-                                {% if c.status == 'pending_admin_review' %}
-                                    <span class="k-due-chip">Awaiting admin QC</span>
-                                {% elif c.status == 'ready_for_dispatch' %}
-                                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-cyan);">Ready for pickup</span>
-                                {% else %}
-                                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-green);">In transit</span>
-                                {% endif %}
-                            </div>
-                            <div class="k-card-title">{{ c.patient_name }}</div>
-                            <div class="k-card-meta">
-                                <span>{{ c.case_type | replace('_', ' ') | title }}</span>
-                            </div>
-                            {% if c.status == 'ready_for_dispatch' %}
-                                <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn-card-save" style="display: block; text-align: center; text-decoration: none; padding: 8px 10px;">Print dispatch label</a>
-                            {% endif %}
-                            <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
-                        </div>
-                    {% else %}
-                        <div class="empty-column">Nothing waiting for QC or pickup</div>
-                    {% endfor %}
-                </div>
-            </div>
-
+            {% for st in stages %}
+                <section class="kanban-column" id="stage-{{ st.id }}" aria-label="{{ st.title }}">
+                    <div class="kanban-header">
+                        <span class="kanban-title"><span class="stage-step">{{ loop.index }}</span>{{ st.title }}</span>
+                        <span class="kanban-count">{{ st.cases|length }}</span>
+                    </div>
+                    <div class="kanban-body">
+                        {% for c in st.cases %}
+                            {{ case_card(c, st.id) }}
+                        {% else %}
+                            <div class="empty-column">{{ st.empty }}</div>
+                        {% endfor %}
+                        {% if st.cases %}<div class="empty-column search-empty" hidden>No matches in this stage</div>{% endif %}
+                    </div>
+                </section>
+            {% endfor %}
         </div>
 
         <div class="completed-grid" id="completed-grid">
             {% for c in completed_cases %}
-                <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);">
+                <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);" data-search="{{ [c.case_number, c.patient_name, c.case_type | replace('_', ' ')] | select | join(' ') | lower }}">
                     <div class="k-card-header">
                         <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                         <span style="font-size: 11px; font-weight: 700; color: var(--accent-green);">Completed</span>
@@ -1011,6 +960,46 @@
             if (event.target === document.getElementById('materialModal')) { closeMaterialModal(); }
         }
 
+        document.addEventListener('click', function(e) {
+            const pill = e.target.closest('[data-stage-target]');
+            if (!pill) return;
+            const col = document.getElementById(pill.dataset.stageTarget);
+            const board = document.getElementById('kanban-pipeline');
+            if (col && board) board.scrollTo({ left: col.offsetLeft - board.offsetLeft, behavior: 'smooth' });
+        });
+
+        // Pipeline search: hides non-matching cards in the board and the archive.
+        function filterPipeline() {
+            const input = document.getElementById('pipelineSearch');
+            const q = input ? input.value.trim().toLowerCase() : '';
+            let shown = 0, total = 0;
+            const scope = showingCompleted ? '#completed-grid .k-card' : '#kanban-pipeline .k-card';
+            document.querySelectorAll('#kanban-pipeline .k-card, #completed-grid .k-card').forEach((card) => {
+                const match = !q || (card.dataset.search || '').includes(q);
+                card.hidden = !match;
+                if (card.matches(scope)) { total++; if (match) shown++; }
+            });
+            document.querySelectorAll('#kanban-pipeline .kanban-body').forEach((body) => {
+                const note = body.querySelector('.search-empty');
+                if (note) note.hidden = !q || !!body.querySelector('.k-card:not([hidden])');
+            });
+            const summary = document.getElementById('searchSummary');
+            summary.hidden = !q;
+            if (q) {
+                summary.textContent = `${shown} of ${total} cases match "${input.value.trim()}".`;
+                const clear = document.createElement('button');
+                clear.type = 'button';
+                clear.textContent = 'Clear search';
+                clear.onclick = () => { input.value = ''; filterPipeline(); input.focus(); };
+                summary.appendChild(clear);
+            }
+        }
+        document.getElementById('pipelineSearch').addEventListener('input', filterPipeline);
+        document.getElementById('pipelineSearch').addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.target.value = ''; filterPipeline(); }
+        });
+        document.addEventListener('live:updated', filterPipeline);
+
         let showingCompleted = false;
         function toggleCompleted() {
             showingCompleted = !showingCompleted;
@@ -1018,6 +1007,8 @@
             const title = document.getElementById('workspace-title-text');
             const pipeline = document.getElementById('kanban-pipeline');
             const completedGrid = document.getElementById('completed-grid');
+            document.getElementById('stage-nav').hidden = showingCompleted;
+            document.getElementById('pipelineSearch').placeholder = showingCompleted ? 'Search completed cases' : 'Search patient, case no., clinic';
 
             if (showingCompleted) {
                 btn.classList.add('active-filter');
@@ -1028,8 +1019,9 @@
                 btn.classList.remove('active-filter');
                 title.innerHTML = `<svg width="22" height="22" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24" style="margin-right: 8px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg> Fabrication Stages Pipeline`;
                 completedGrid.style.display = 'none';
-                pipeline.style.display = 'flex';
+                pipeline.style.display = '';
             }
+            filterPipeline();
         }
 
         const materialModal = document.getElementById('materialModal');
@@ -1162,7 +1154,7 @@
 
     </script>
     <script>
-        window.LIVE_REGIONS = ['.notif-wrapper', '.pulse-strip', '.workspace-actions', '#kanban-pipeline', '#completed-grid'];
+        window.LIVE_REGIONS = ['.notif-wrapper', '.pulse-strip', '.workspace-actions', '#stage-nav', '#kanban-pipeline', '#completed-grid'];
         window.liveHooks = {
             // Keep the "Completed Cases Archive" toggle as it was.
             after() {
