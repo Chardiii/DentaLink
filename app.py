@@ -61,6 +61,18 @@ BACKUP_TABLES = (
 )
 BACKUP_STORAGE_BUCKETS = ("dental-case-files",)
 LOGIN_HISTORY_PAGE_SIZE = 100
+LOGIN_EVENT_TYPES = ("all", "success", "failed", "blocked", "logout")
+LOGIN_HISTORY_PERIODS = {"all": None, "24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
+LOGIN_REASON_TEXT = {
+    "missing_credentials": "Email or password left blank",
+    "invalid_credentials": "Wrong email or password",
+    "authentication_error": "Sign-in service error",
+    "profile_not_found": "No DentaLink profile for this account",
+    "account_pending": "Account awaiting approval",
+    "account_rejected": "Account application rejected",
+    "account_not_approved": "Account not approved",
+    "invalid_account_role": "Account has an invalid role",
+}
 
 # Case lifecycle after the bench stages:
 # finishing_and_quality_check -> pending_admin_review -> ready_for_dispatch -> in_transit -> delivered
@@ -521,6 +533,42 @@ def _record_login_event(event_type, email, user_id=None, reason=None):
         app.logger.exception("Unable to record login history event")
 
 
+def _describe_user_agent(user_agent):
+    """Summarize a browser user-agent string, e.g. "Chrome on Windows"."""
+    if not user_agent:
+        return None
+    ua = user_agent.lower()
+    if "edg/" in ua:
+        browser = "Edge"
+    elif "opr/" in ua or "opera" in ua:
+        browser = "Opera"
+    elif "samsungbrowser" in ua:
+        browser = "Samsung Internet"
+    elif "firefox/" in ua or "fxios" in ua:
+        browser = "Firefox"
+    elif "chrome/" in ua or "crios" in ua:
+        browser = "Chrome"
+    elif "safari/" in ua:
+        browser = "Safari"
+    elif "python" in ua or "curl" in ua or "postman" in ua:
+        browser = "Script or tool"
+    else:
+        browser = "Unknown browser"
+    if "iphone" in ua or "ipad" in ua:
+        system = "iOS"
+    elif "android" in ua:
+        system = "Android"
+    elif "windows" in ua:
+        system = "Windows"
+    elif "mac os x" in ua or "macintosh" in ua:
+        system = "macOS"
+    elif "linux" in ua:
+        system = "Linux"
+    else:
+        return browser
+    return f"{browser} on {system}"
+
+
 def _backup_table_rows(table_name):
     rows = []
     offset = 0
@@ -809,23 +857,65 @@ def admin_login_history():
             page = max(1, int(request.args.get("page", "1")))
         except ValueError:
             page = 1
+        event_type = request.args.get("type", "all")
+        if event_type not in LOGIN_EVENT_TYPES:
+            event_type = "all"
+        period = request.args.get("period", "all")
+        if period not in LOGIN_HISTORY_PERIODS:
+            period = "all"
+        # Keep only characters that appear in email addresses; % would act as a wildcard.
+        search = "".join(ch for ch in request.args.get("q", "").strip()[:100] if ch.isalnum() or ch in "@._+-")
+
+        def with_filters(query):
+            if search:
+                query = query.ilike("email", f"%{search}%")
+            if LOGIN_HISTORY_PERIODS[period]:
+                since = datetime.now(timezone.utc) - LOGIN_HISTORY_PERIODS[period]
+                query = query.gte("created_at", since.isoformat())
+            return query
+
+        # Per-type counts for the filter chips, within the same search and time range.
+        type_counts = {}
+        for kind in LOGIN_EVENT_TYPES[1:]:
+            counted = with_filters(supabase_admin.table("login_history").select("id", count="exact")).eq("event_type", kind).limit(1).execute()
+            type_counts[kind] = counted.count or 0
+        type_counts["all"] = sum(type_counts.values())
+
         start = (page - 1) * LOGIN_HISTORY_PAGE_SIZE
-        result = (
-            supabase_admin.table("login_history")
-            .select("*", count="exact")
-            .order("created_at", desc=True)
-            .range(start, start + LOGIN_HISTORY_PAGE_SIZE - 1)
-            .execute()
-        )
+        query = with_filters(supabase_admin.table("login_history").select("*", count="exact"))
+        if event_type != "all":
+            query = query.eq("event_type", event_type)
+        result = query.order("created_at", desc=True).range(start, start + LOGIN_HISTORY_PAGE_SIZE - 1).execute()
+        events = result.data or []
         total_count = result.count or 0
         page_count = max(1, (total_count + LOGIN_HISTORY_PAGE_SIZE - 1) // LOGIN_HISTORY_PAGE_SIZE)
+
+        user_ids = list({e["user_id"] for e in events if e.get("user_id")})
+        names = {}
+        if user_ids:
+            people = supabase_admin.table("profiles").select("id, display_name, first_name, last_name, role").in_("id", user_ids).execute().data or []
+            names = {p["id"]: p for p in people}
+        for event in events:
+            person = names.get(event.get("user_id")) or {}
+            event["display_name"] = person.get("display_name") or " ".join(filter(None, [person.get("first_name"), person.get("last_name")])) or None
+            event["role"] = person.get("role")
+            event["reason_text"] = LOGIN_REASON_TEXT.get(event.get("reason"), (event.get("reason") or "").replace("_", " ").capitalize() or None)
+            event["device"] = _describe_user_agent(event.get("user_agent"))
+
+        filters = {"type": event_type, "period": period, "q": search}
         return render_template(
             "admin_login_history.html",
             profile=profile,
-            events=result.data or [],
+            events=events,
             page=page,
             page_count=page_count,
             total_count=total_count,
+            first_shown=start + 1 if events else 0,
+            last_shown=start + len(events),
+            type_counts=type_counts,
+            filters=filters,
+            filters_active=event_type != "all" or period != "all" or bool(search),
+            page_url=lambda **changes: url_for("admin_login_history", **{k: v for k, v in {**filters, "page": page, **changes}.items() if v not in ("all", "", None, 1)}),
         )
     except Exception:
         app.logger.exception("Unable to load admin login history")
