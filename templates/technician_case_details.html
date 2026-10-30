@@ -447,12 +447,18 @@
                     </div>
                     <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 12px 0;">Return case to the submitting dentist if scan data, margins, or bite registration are insufficient.</p>
                     
+                    {% if case.status in ['assigned', 'in_progress', 'cad_designing', 'wax_up_or_try_in', 'milling_or_printing', 'packing_and_curing', 'finishing_and_quality_check'] and case.technician_id == session.get('user_id') %}
                     <form method="POST" action="/technician/cases/{{ case.id }}/return">
                         <textarea name="revision_notes" class="textarea-dark" rows="3" required placeholder="Specify revision reason (e.g. margin distorted around #16)..." style="font-size: 12px; margin-bottom: 10px;"></textarea>
                         <button type="submit" class="btn btn-danger" style="width: 100%;">
                             Return Case to Clinic
                         </button>
                     </form>
+                    {% else %}
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0; padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: 8px;">
+                        {% if case.technician_id != session.get('user_id') %}Only the technician assigned to this case can return it.{% else %}This case has left the bench ({{ case.status|replace('_', ' ') }}), so it can no longer be returned to the clinic.{% endif %}
+                    </p>
+                    {% endif %}
                 </section>
 
             </div>
