@@ -2475,6 +2475,22 @@ def admin_resolve_restock_request(request_id):
 # =========================
 # TECHNICIAN DASHBOARD
 # =========================
+def _due_status(due_date, today):
+    """(state, label) for a case's due date: overdue, today, soon (within 2 days), later, or none."""
+    try:
+        due = datetime.strptime(str(due_date)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return "none", "No due date"
+    days = (due - today).days
+    if days < 0:
+        return "overdue", f"Overdue {-days}d"
+    if days == 0:
+        return "today", "Due today"
+    if days <= 2:
+        return "soon", "Due tomorrow" if days == 1 else f"Due in {days}d"
+    return "later", "Due " + due.strftime("%b %d").replace(" 0", " ")
+
+
 @app.route("/technician")
 def technician_dashboard():
     user_id = session.get("user_id")
@@ -2549,6 +2565,11 @@ def technician_dashboard():
             for case in assigned_cases:
                 case["teeth"] = []
                 case["case_teeth"] = []
+
+        # Due-date urgency for the pipeline cards (lab time).
+        today = datetime.now(LAB_TZ).date()
+        for case in assigned_cases:
+            case["due_state"], case["due_label"] = _due_status(case.get("due_date"), today)
 
         # ==========================================
         # 5. STAGE SLICES FOR UI FILTERS & SOUNDS
