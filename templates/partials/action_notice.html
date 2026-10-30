@@ -1,9 +1,19 @@
-{# Result pop-up for restock request actions. Reads flashed messages with "restock-*" categories. #}
-{% with notices = get_flashed_messages(with_categories=true, category_filter=["restock-fulfilled", "restock-dismissed", "restock-stale"]) %}
+{# Result pop-up for admin and dentist actions, shown once after a redirect.
+   Category -> (icon style, title): fulfilled = green check, dismissed = grey X, stale = amber warning. #}
+{% set notice_kinds = {
+    "restock-fulfilled": ("fulfilled", "Marked as restocked"),
+    "restock-dismissed": ("dismissed", "Request dismissed"),
+    "restock-stale": ("stale", "Already handled"),
+    "inventory-deleted": ("dismissed", "Material deleted"),
+    "inventory-stale": ("stale", "Material not found"),
+    "draft-deleted": ("dismissed", "Draft deleted"),
+    "draft-stale": ("stale", "Draft not deleted"),
+} %}
+{% with notices = get_flashed_messages(with_categories=true, category_filter=notice_kinds.keys()|list) %}
 {% if notices %}
 {% set category, message = notices[-1] %}
-{% set kind = category.replace('restock-', '') %}
-{% set remaining = restock_requests|length if restock_requests else 0 %}
+{% set kind, notice_title = notice_kinds[category] %}
+{% set remaining = restock_requests|length if restock_requests and category.startswith('restock-') else 0 %}
 <style>
     .an-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; animation: an-fade 0.15s ease-out; }
     .an-card { background: #FFFFFF; border-radius: 14px; width: 100%; max-width: 400px; padding: 28px 24px 22px; text-align: center; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25); font-family: inherit; animation: an-rise 0.2s ease-out; }
@@ -32,9 +42,7 @@
                 <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"/></svg>
             {% endif %}
         </div>
-        <h2 class="an-title" id="actionNoticeTitle">
-            {% if kind == 'fulfilled' %}Marked as restocked{% elif kind == 'dismissed' %}Request dismissed{% else %}Already handled{% endif %}
-        </h2>
+        <h2 class="an-title" id="actionNoticeTitle">{{ notice_title }}</h2>
         <p class="an-text">{{ message }}</p>
         <div class="an-actions">
             {% if remaining and kind != 'stale' %}
