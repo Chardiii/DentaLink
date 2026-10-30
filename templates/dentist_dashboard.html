@@ -1046,22 +1046,6 @@
             localStorage.setItem(KEY_ACTION_COUNT, totalDentistActions);
         });
 
-        // ==========================================
-        // SMART AUTO-REFRESH (Every 30 seconds)
-        // ==========================================
-        const REFRESH_INTERVAL_MS = 30000;
-        setInterval(() => {
-            const isCreateModalOpen = document.getElementById('createCaseModal')?.style.display === 'flex';
-            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
-            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
-
-            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
-
-            if (!isCreateModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
-                window.location.reload();
-            }
-        }, REFRESH_INTERVAL_MS);
 
         // UI Tabs
         // Delivered tab: search and month filter (client-side; every delivered case is already on the page)
@@ -1069,8 +1053,6 @@
             const search = document.getElementById('deliveredSearch');
             const month = document.getElementById('deliveredMonth');
             if (!search) return;
-            const cards = Array.from(document.querySelectorAll('.delivered-card'));
-            const noMatch = document.getElementById('deliveredNoMatch');
             const count = document.getElementById('deliveredCount');
             const monthName = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
             month.querySelectorAll('option[data-month-label]').forEach((o) => {
@@ -1079,6 +1061,10 @@
             });
             const plural = (n) => n + ' case' + (n === 1 ? '' : 's');
             function apply() {
+                // Looked up each time: live updates replace the delivered cards.
+                const cards = Array.from(document.querySelectorAll('.delivered-card'));
+                const noMatch = document.getElementById('deliveredNoMatch');
+                if (!noMatch) return;
                 const q = search.value.trim().toLowerCase();
                 let shown = 0;
                 cards.forEach((card) => {
@@ -1091,7 +1077,11 @@
             }
             search.addEventListener('input', apply);
             month.addEventListener('change', apply);
-            document.getElementById('deliveredClear').addEventListener('click', () => { search.value = ''; month.value = ''; apply(); search.focus(); });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#deliveredClear')) return;
+                search.value = ''; month.value = ''; apply(); search.focus();
+            });
+            document.addEventListener('live:updated', apply);
         })();
 
         function showCategory(event, sectionId) {
@@ -1293,5 +1283,17 @@
     </script>
     {% include 'partials/confirm_dialog.html' %}
     {% include 'partials/action_notice.html' %}
+    <script>
+        window.LIVE_REGIONS = ['.notif-wrapper', '.metrics-strip', '.category-tabs', '.category-section .cases-grid'];
+        window.liveHooks = {
+            // Keep the category tab the dentist was looking at.
+            before() { return Array.from(document.querySelectorAll('.category-tabs .tab-btn')).findIndex((b) => b.classList.contains('active')); },
+            after(i) {
+                if (i < 0) return;
+                document.querySelectorAll('.category-tabs .tab-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+            },
+        };
+    </script>
+    {% include 'partials/live_updates.html' %}
 </body>
 </html>

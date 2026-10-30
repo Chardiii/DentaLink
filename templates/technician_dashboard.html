@@ -1041,8 +1041,11 @@
         let currentSubmittingForm = null;
         const loggableStages = ["milling_or_printing", "packing_and_curing", "finishing_and_quality_check"];
 
-        document.querySelectorAll('.status-update-form').forEach(form => {
-            form.addEventListener('submit', function(e) {
+        // One page-level handler, so cards refreshed by live updates keep working.
+        document.addEventListener('submit', function(evt) {
+            const form = evt.target.closest('.status-update-form');
+            if (!form) return;
+            (function(e) {
                 const newStatus = this.querySelector('.status-dropdown').value;
                 const rawMaterials = this.dataset.materials; 
 
@@ -1093,7 +1096,7 @@
                     }
                     materialModal.style.display = 'flex';
                 }
-            });
+            }).call(form, evt);
         });
 
         function addMaterialRow() {
@@ -1157,22 +1160,17 @@
             currentSubmittingForm.submit();
         }
 
-        // ==========================================
-        // SMART AUTO-REFRESH (Every 30 seconds)
-        // ==========================================
-        const REFRESH_INTERVAL_MS = 30000;
-        setInterval(() => {
-            const isMaterialModalOpen = document.getElementById('materialModal')?.style.display === 'flex';
-            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
-            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
-
-            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
-
-            if (!isMaterialModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
-                window.location.reload();
-            }
-        }, REFRESH_INTERVAL_MS);
     </script>
+    <script>
+        window.LIVE_REGIONS = ['.notif-wrapper', '.pulse-strip', '.workspace-actions', '#kanban-pipeline', '#completed-grid'];
+        window.liveHooks = {
+            // Keep the "Completed Cases Archive" toggle as it was.
+            after() {
+                const btn = document.getElementById('completed-toggle-btn');
+                if (btn && typeof showingCompleted !== 'undefined') btn.classList.toggle('active-filter', showingCompleted);
+            },
+        };
+    </script>
+    {% include 'partials/live_updates.html' %}
 </body>
 </html>
