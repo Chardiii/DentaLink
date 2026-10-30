@@ -1216,23 +1216,33 @@
             setStatusFilter('all');
         }
 
-        function inventoryFiltersActive() {
-            const search = document.getElementById('inventorySearch');
-            return !!search && (search.value.trim() !== '' || invState.status !== 'all' || document.getElementById('categoryFilter').value !== '');
-        }
-
         (function initInventoryTable() {
             const search = document.getElementById('inventorySearch');
             if (!search) return;
             search.addEventListener('input', filterInventoryTable);
             document.getElementById('categoryFilter').addEventListener('change', filterInventoryTable);
             document.getElementById('inventorySort').addEventListener('change', sortInventoryTable);
-            document.querySelectorAll('.status-chip').forEach((chip) => chip.addEventListener('click', () => setStatusFilter(chip.dataset.status)));
-            document.querySelectorAll('[data-status-shortcut]').forEach((card) => card.addEventListener('click', () => {
-                setStatusFilter(card.dataset.statusShortcut);
-                document.getElementById('inventoryTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }));
+            // Page-level handlers, so chips and summary cards keep working after a live update.
+            document.addEventListener('click', (e) => {
+                const chip = e.target.closest('.status-chip');
+                if (chip) { setStatusFilter(chip.dataset.status); return; }
+                const card = e.target.closest('[data-status-shortcut]');
+                if (card && !card.disabled) {
+                    setStatusFilter(card.dataset.statusShortcut);
+                    document.getElementById('inventoryTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
             sortInventoryTable();
+            formatInventoryTimes();
+            // After a live update: keep the chosen status, sort, search, and category.
+            document.addEventListener('live:updated', () => {
+                setStatusFilter(invState.status);
+                sortInventoryTable();
+                formatInventoryTimes();
+            });
+        })();
+
+        function formatInventoryTimes() {
             // Relative "last change" times, e.g. "3 days ago"
             const rel = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
             const units = [['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
@@ -1248,7 +1258,7 @@
                 const d = new Date(el.getAttribute('datetime') + 'T00:00:00');
                 if (!isNaN(d)) el.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
             });
-        })();
+        }
 
         // ==========================================
         // ADD / EDIT MATERIAL MODAL
@@ -1356,23 +1366,13 @@
             closeAdjustModal();
         });
 
-        // Smart inactivity auto-refresh (every 30 seconds). It waits while a dialog is open,
-        // while you're typing, or while filters are applied, so your view isn't reset.
-        const REFRESH_INTERVAL_MS = 30000;
-        setInterval(() => {
-            const openModal = ['materialModal', 'adjustModal', 'incomingModal', 'restockModal', 'settingsModal']
-                .some((id) => document.getElementById(id)?.style.display === 'flex');
-            const confirmOpen = document.getElementById('confirmDialog')?.classList.contains('open');
-            const noticeOpen = !!document.getElementById('actionNotice');
-            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
-            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
-            if (!openModal && !confirmOpen && !noticeOpen && !isNotifOpen && !isUserTyping && !inventoryFiltersActive()) {
-                window.location.reload();
-            }
-        }, REFRESH_INTERVAL_MS);
     </script>
     {% include 'partials/confirm_dialog.html' %}
     {% include 'partials/action_notice.html' %}
+    <script>
+        window.LIVE_REGIONS = ['.sidebar-nav', '.notif-wrapper', '.inv-summary', '.status-chips', '#inventoryTable tbody', '#incomingModal .modal-body', '#restockModal .modal-body'];
+        window.liveHooks = {};
+    </script>
+    {% include 'partials/live_updates.html' %}
 </body>
 </html>

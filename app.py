@@ -3360,6 +3360,67 @@ def _create_remake_case(original, report, remake_path, due_date, note, return_re
 
 
 # =========================
+# LIVE UPDATES: lightweight change check polled by every dashboard
+# =========================
+def _latest(table, column, **filters):
+    """Newest value of `column` in `table` matching the equality filters, or ''."""
+    query = supabase_admin.table(table).select(column)
+    for key, value in filters.items():
+        query = query.eq(key, value)
+    # Skip NULLs: Postgres sorts them first on a descending order, which would hide newer rows.
+    rows = query.not_.is_(column, "null").order(column, desc=True).limit(1).execute().data or []
+    return str(rows[0].get(column) or "") if rows else ""
+
+
+def _count(table, **filters):
+    query = supabase_admin.table(table).select("id", count="exact")
+    for key, value in filters.items():
+        query = query.eq(key, value)
+    return query.limit(1).execute().count or 0
+
+
+@app.route("/api/live")
+@role_required("admin", "technician", "dentist")
+def live_status():
+    """Return a short fingerprint of everything this user's pages show.
+
+    Pages poll this every few seconds and refresh their sections only when the
+    fingerprint changes. Case rows have an auto-updated `updated_at`; inventory and
+    requests are tracked through their logs and counts.
+    """
+    try:
+        user_id, role = g.profile["id"], g.profile["role"]
+        scope = {"technician": {"technician_id": user_id}, "dentist": {"dentist_id": user_id}}.get(role, {})
+        parts = [
+            _latest("notifications", "created_at", user_id=user_id),
+            _latest("dental_cases", "updated_at", **scope),
+            str(_count("dental_cases", **scope)),
+        ]
+        if role == "admin":
+            parts += [
+                _latest("inventory_logs", "created_at"),
+                str(_count("inventory")),
+                str(_count("material_requests", status="pending")),
+                _latest("profiles", "created_at"),
+                str(_count("profiles", status="pending")),
+                str(_open_issue_count()),
+            ]
+        latest = (
+            supabase_admin.table("notifications").select("id, message, created_at")
+            .eq("user_id", user_id).order("created_at", desc=True).limit(1).execute().data or []
+        )
+        response = app.response_class(
+            json.dumps({"stamp": "|".join(parts), "latest": latest[0] if latest else None}),
+            mimetype="application/json",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except Exception:
+        app.logger.exception("Live status check failed")
+        return app.response_class(json.dumps({"error": "unavailable"}), status=503, mimetype="application/json")
+
+
+# =========================
 # NOTIFICATION HELPER
 # =========================
 def create_notification(user_id, message, link="#"):
