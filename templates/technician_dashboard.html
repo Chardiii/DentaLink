@@ -255,6 +255,17 @@
         .view-link-btn:hover { color: var(--accent-cyan); text-decoration: underline; }
 
         .pulse-tile.alert h3 { color: var(--accent-red); }
+        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .k-card.is-rush { border-left: 3px solid var(--accent-red); box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.12); }
+        .k-card[hidden], .empty-column[hidden] { display: none; }
+
+        .pipeline-tools { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .pipeline-tools .stage-nav { margin: 0; flex: 1; min-width: 0; }
+        .pipeline-search { flex: 0 0 260px; display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 36px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-card); color: var(--text-muted); }
+        .pipeline-search:focus-within { border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1); }
+        .pipeline-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text-main); }
+        .search-summary { margin: -4px 0 12px; font-size: 12px; color: var(--text-muted); }
+        .search-summary button { margin-left: 6px; border: 0; background: none; color: var(--accent-cyan); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
 
         @media (max-width: 720px) {
             .app-header { padding: 10px 16px; }
@@ -267,6 +278,8 @@
             .pulse-icon { display: none; }
             .pulse-info h3 { font-size: 20px; }
             .kanban-board { grid-auto-columns: minmax(82vw, 1fr); }
+            .pipeline-tools { flex-direction: column; align-items: stretch; }
+            .pipeline-search { flex-basis: auto; }
             .kanban-body { max-height: none; }
         }
 
@@ -408,19 +421,20 @@
             ('packing_and_curing', 'Packing & Curing'), ('finishing_and_quality_check', 'Finishing & QC'),
         ] %}
         {% set stages = [
-            {'id': 'assigned', 'title': 'Assigned', 'cases': assigned_cases, 'empty': 'No new cases waiting'},
-            {'id': 'setup', 'title': 'Setup & CAD', 'cases': in_progress_cases, 'empty': 'Nothing in setup or CAD'},
-            {'id': 'milling', 'title': 'Milling / Printing', 'cases': milling_cases, 'empty': 'Nothing milling or printing'},
-            {'id': 'packing', 'title': 'Packing & Curing', 'cases': packing_cases, 'empty': 'Nothing packing or curing'},
-            {'id': 'qc', 'title': 'Finishing & QC', 'cases': qc_cases, 'empty': 'Nothing in finishing'},
-            {'id': 'dispatch', 'title': 'QC Review & Dispatch', 'cases': dispatch_cases, 'empty': 'Nothing waiting for QC or pickup'},
+            {'id': 'assigned', 'title': 'Assigned', 'cases': assigned_cases | sort(attribute='urgency_rank'), 'empty': 'No new cases waiting'},
+            {'id': 'setup', 'title': 'Setup & CAD', 'cases': in_progress_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing in setup or CAD'},
+            {'id': 'milling', 'title': 'Milling / Printing', 'cases': milling_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing milling or printing'},
+            {'id': 'packing', 'title': 'Packing & Curing', 'cases': packing_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing packing or curing'},
+            {'id': 'qc', 'title': 'Finishing & QC', 'cases': qc_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing in finishing'},
+            {'id': 'dispatch', 'title': 'QC Review & Dispatch', 'cases': dispatch_cases | sort(attribute='urgency_rank'), 'empty': 'Nothing waiting for QC or pickup'},
         ] %}
 
         {% macro case_card(c, stage) %}
             {% set units = (c.case_teeth or []) | length %}
-            <article class="k-card{% if stage != 'dispatch' %} due-{{ c.due_state }}{% endif %}">
+            <article class="k-card{% if stage != 'dispatch' %} due-{{ c.due_state }}{% endif %}{% if c.is_rush %} is-rush{% endif %}"
+                     data-search="{{ [c.case_number, c.patient_name, c.case_type | replace('_', ' '), c.profiles.clinic_name if c.profiles else ''] | select | join(' ') | lower }}">
                 <div class="k-card-header">
-                    <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
+                    <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.is_rush %}<span class="rush-chip" title="The admin marked this as a rush job">Rush</span>{% endif %}{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                     {% if c.status == 'pending_admin_review' %}<span class="k-status-chip review">Awaiting admin QC</span>
                     {% elif c.status == 'ready_for_dispatch' %}<span class="k-status-chip ready">Ready for pickup</span>
                     {% elif c.status == 'in_transit' %}<span class="k-status-chip transit">In transit</span>
@@ -438,6 +452,7 @@
                     <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
                           data-case-id="{{ c.id }}"
                           data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="k-card-action-bar">
                             <select name="status" class="select-dark status-dropdown" aria-label="Move case {{ c.case_number }} to">
                                 {% for value, label in flow %}
@@ -521,6 +536,11 @@
             </div>
         </div>
 
+        <div class="pipeline-tools">
+        <label class="pipeline-search">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
+            <input type="search" id="pipelineSearch" placeholder="Search patient, case no., clinic" autocomplete="off" aria-label="Search cases">
+        </label>
         <nav class="stage-nav" id="stage-nav" aria-label="Jump to a stage">
             {% for st in stages %}
                 {% set late = st.cases | selectattr('due_state', 'equalto', 'overdue') | list if st.id != 'dispatch' else [] %}
@@ -531,6 +551,8 @@
                 </button>
             {% endfor %}
         </nav>
+        </div>
+        <div class="search-summary" id="searchSummary" hidden></div>
 
         <div class="kanban-board" id="kanban-pipeline">
             {% for st in stages %}
@@ -545,6 +567,7 @@
                         {% else %}
                             <div class="empty-column">{{ st.empty }}</div>
                         {% endfor %}
+                        {% if st.cases %}<div class="empty-column search-empty" hidden>No matches in this stage</div>{% endif %}
                     </div>
                 </section>
             {% endfor %}
@@ -552,7 +575,7 @@
 
         <div class="completed-grid" id="completed-grid">
             {% for c in completed_cases %}
-                <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);">
+                <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);" data-search="{{ [c.case_number, c.patient_name, c.case_type | replace('_', ' ')] | select | join(' ') | lower }}">
                     <div class="k-card-header">
                         <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                         <span style="font-size: 11px; font-weight: 700; color: var(--accent-green);">Completed</span>
@@ -945,6 +968,38 @@
             if (col && board) board.scrollTo({ left: col.offsetLeft - board.offsetLeft, behavior: 'smooth' });
         });
 
+        // Pipeline search: hides non-matching cards in the board and the archive.
+        function filterPipeline() {
+            const input = document.getElementById('pipelineSearch');
+            const q = input ? input.value.trim().toLowerCase() : '';
+            let shown = 0, total = 0;
+            const scope = showingCompleted ? '#completed-grid .k-card' : '#kanban-pipeline .k-card';
+            document.querySelectorAll('#kanban-pipeline .k-card, #completed-grid .k-card').forEach((card) => {
+                const match = !q || (card.dataset.search || '').includes(q);
+                card.hidden = !match;
+                if (card.matches(scope)) { total++; if (match) shown++; }
+            });
+            document.querySelectorAll('#kanban-pipeline .kanban-body').forEach((body) => {
+                const note = body.querySelector('.search-empty');
+                if (note) note.hidden = !q || !!body.querySelector('.k-card:not([hidden])');
+            });
+            const summary = document.getElementById('searchSummary');
+            summary.hidden = !q;
+            if (q) {
+                summary.textContent = `${shown} of ${total} cases match "${input.value.trim()}".`;
+                const clear = document.createElement('button');
+                clear.type = 'button';
+                clear.textContent = 'Clear search';
+                clear.onclick = () => { input.value = ''; filterPipeline(); input.focus(); };
+                summary.appendChild(clear);
+            }
+        }
+        document.getElementById('pipelineSearch').addEventListener('input', filterPipeline);
+        document.getElementById('pipelineSearch').addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.target.value = ''; filterPipeline(); }
+        });
+        document.addEventListener('live:updated', filterPipeline);
+
         let showingCompleted = false;
         function toggleCompleted() {
             showingCompleted = !showingCompleted;
@@ -953,6 +1008,7 @@
             const pipeline = document.getElementById('kanban-pipeline');
             const completedGrid = document.getElementById('completed-grid');
             document.getElementById('stage-nav').hidden = showingCompleted;
+            document.getElementById('pipelineSearch').placeholder = showingCompleted ? 'Search completed cases' : 'Search patient, case no., clinic';
 
             if (showingCompleted) {
                 btn.classList.add('active-filter');
@@ -965,6 +1021,7 @@
                 completedGrid.style.display = 'none';
                 pipeline.style.display = '';
             }
+            filterPipeline();
         }
 
         const materialModal = document.getElementById('materialModal');

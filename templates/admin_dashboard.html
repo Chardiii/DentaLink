@@ -308,6 +308,14 @@
         .tooth-badge-list { display: flex; gap: 4px; flex-wrap: wrap; }
         .tooth-pill { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 10px; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(2, 132, 199, 0.25); font-weight: 700; }
 
+        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .k-card.is-rush { border-left: 3px solid #EF4444; }
+        .rush-form { margin: 0; }
+        .rush-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 6px; border: 1px dashed #FCA5A5; background: transparent; color: #B91C1C; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .rush-toggle:hover { background: #FEF2F2; }
+        .rush-toggle.on { border-style: solid; border-color: var(--border-color); color: var(--text-muted); }
+        .rush-toggle.on:hover { color: #0F172A; background: #F8FAFC; }
+
         .reassign-form {
             display: flex;
             gap: 6px;
@@ -637,16 +645,27 @@
                 </button>
             </div>
 
+            {% macro rush_toggle(c) %}
+                <form class="rush-form" method="POST" action="{{ url_for('admin_set_rush', case_id=c.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="rush" value="{{ '0' if c.is_rush else '1' }}">
+                    <button type="submit" class="rush-toggle{% if c.is_rush %} on{% endif %}" title="{{ 'Remove the rush flag' if c.is_rush else 'Put this case at the top of the technician\'s pipeline' }}">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        {{ 'Remove rush' if c.is_rush else 'Mark as rush' }}
+                    </button>
+                </form>
+            {% endmacro %}
+
             <!-- MACRO FOR RENDERING ENHANCED CASE CARDS WITH CLINIC, TEETH & SHADE INFO -->
             {% macro render_case_cards(cases_list) %}
                 <div class="cases-grid">
                     {% for c in cases_list %}
-                        <div class="k-card">
+                        <div class="k-card{% if c.is_rush %} is-rush{% endif %}">
                             <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
+                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.is_rush %}<span class="rush-chip">Rush</span>{% endif %}{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
                             </div>
-                            
+
                             <div>
                                 <div class="k-card-title">{{ c.patient_name }}</div>
                                 <div class="k-card-subtitle">
@@ -684,6 +703,7 @@
                                 </select>
                                 <button type="submit" class="btn btn-outline-cyan" style="padding: 5px 10px; font-size: 11px;">Move</button>
                             </form>
+                            {{ rush_toggle(c) }}
                         </div>
                     {% else %}
                         <div class="empty-grid">No cases currently in this stage.</div>
@@ -890,7 +910,10 @@
                             <tbody>
                                 {% for case in unassigned_cases %}
                                     <tr>
-                                        <td><span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span>{% if case.remake_of %} <span class="remake-chip">Remake</span>{% endif %}</td>
+                                        <td>
+                                            <span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span>{% if case.is_rush %} <span class="rush-chip">Rush</span>{% endif %}{% if case.remake_of %} <span class="remake-chip">Remake</span>{% endif %}
+                                            <div style="margin-top: 6px;">{{ rush_toggle(case) }}</div>
+                                        </td>
                                         <td><strong>{{ case.patient_name }}</strong></td>
                                         <td><span class="tag">{{ case.case_type | replace('_', ' ') | title }}</span></td>
                                         <td><span style="color: var(--accent-yellow); font-weight: 600;">{{ case.due_date or 'Not Set' }}</span></td>
