@@ -275,10 +275,104 @@
             .app-sidebar { display: none; }
             .dashboard-container { margin-left: 0; padding: 20px; }
         }
+        /* ---------- Materials page ---------- */
+        .inv-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+        .inv-stat { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03); text-align: left; font: inherit; color: inherit; }
+        .inv-stat-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+        .inv-stat-value { font-size: 26px; font-weight: 800; color: #0F172A; line-height: 1.15; font-variant-numeric: tabular-nums; }
+        .inv-stat-note { font-size: 12px; color: var(--text-muted); }
+        .inv-stat-btn { cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+        .inv-stat-btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06); }
+        .inv-stat-btn:disabled { cursor: default; }
+        .inv-stat-btn.out:not(:disabled) { border-color: #FECACA; background: #FFF7F7; }
+        .inv-stat-btn.out:not(:disabled) .inv-stat-value, .inv-stat-btn.out:not(:disabled) .inv-stat-note { color: #B91C1C; }
+        .inv-stat-btn.low:not(:disabled) { border-color: #FDE68A; background: #FFFCF2; }
+        .inv-stat-btn.low:not(:disabled) .inv-stat-value, .inv-stat-btn.low:not(:disabled) .inv-stat-note { color: #B45309; }
+        .inv-stat-btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .inv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .inv-toolbar .search-box { flex: 1 1 260px; min-width: 0; }
+        .select-dark.compact { width: auto; min-width: 160px; padding-right: 34px; }
+        .status-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+        .status-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--border-color); border-radius: 999px; background: #FFFFFF; color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .status-chip span { font-variant-numeric: tabular-nums; padding: 0 6px; border-radius: 999px; background: #F1F5F9; }
+        .status-chip:hover { border-color: #94A3B8; color: #0F172A; }
+        .status-chip.active { background: #0F172A; border-color: #0F172A; color: #FFFFFF; }
+        .status-chip.active span { background: rgba(255, 255, 255, .2); }
+        .status-chip.out:not(.active) span { background: #FEE2E2; color: #B91C1C; }
+        .status-chip.low:not(.active) span { background: #FEF3C7; color: #B45309; }
+        .status-chip:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .inv-count { margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
+
+        .table-scroll { overflow-x: auto; }
+        .inv-table { min-width: 860px; }
+        .inv-table td { vertical-align: top; padding-top: 14px; padding-bottom: 14px; }
+        .inv-table th.num, .inv-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .inv-row td:first-child { box-shadow: inset 3px 0 0 transparent; }
+        .inv-row.status-out td:first-child { box-shadow: inset 3px 0 0 #EF4444; }
+        .inv-row.status-low td:first-child { box-shadow: inset 3px 0 0 #F59E0B; }
+        .mat-name { font-weight: 700; color: #0F172A; font-size: 13.5px; }
+        .mat-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+        .cat-tag { padding: 1px 7px; border-radius: 5px; background: #E0F2FE; color: #0369A1; font-size: 11px; font-weight: 700; }
+        .qty strong { font-size: 16px; color: #0F172A; font-variant-numeric: tabular-nums; }
+        .qty span { font-size: 12px; color: var(--text-muted); }
+        .stock-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+        .stock-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .stock-pill.out { color: #B91C1C; background: #FEF2F2; border-color: #FECACA; }
+        .stock-pill.low { color: #B45309; background: #FFFBEB; border-color: #FDE68A; }
+        .stock-pill.ok { color: #047857; background: #ECFDF5; border-color: #A7F3D0; }
+        .forecast-line { margin-top: 6px; font-size: 12px; color: var(--text-muted); cursor: help; }
+        .forecast-line.soon { color: #B45309; font-weight: 600; }
+        .muted { color: #94A3B8; }
+        .row-actions { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
+        .btn-adjust { padding: 7px 12px; border: 1px solid rgba(2, 132, 199, .35); border-radius: 8px; background: #FFFFFF; color: var(--accent-cyan); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .btn-adjust:hover { background: rgba(2, 132, 199, .06); border-color: var(--accent-cyan); }
+        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: #64748B; cursor: pointer; }
+        .icon-btn:hover { color: #0F172A; border-color: #94A3B8; }
+        .icon-btn.danger:hover { color: #B91C1C; border-color: #FECACA; background: #FEF2F2; }
+        .btn-adjust:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .inv-empty { text-align: center; padding: 44px 16px !important; }
+        .inv-empty strong { display: block; color: #0F172A; font-size: 14px; margin-bottom: 4px; }
+        .inv-empty span { display: block; color: var(--text-muted); font-size: 13px; margin-bottom: 14px; }
+        .inv-empty .btn { display: inline-flex; }
+
+        /* modals */
+        .modal-container.narrow { max-width: 480px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+        .form-grid .span-2 { grid-column: 1 / -1; }
+        .form-grid .form-group { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+        .form-grid .form-group[hidden] { display: none; }
+        .req { color: var(--accent-red); }
+        .field-hint { margin: 0; font-size: 11.5px; color: var(--text-muted); }
+        .adjust-body { display: grid; gap: 14px; }
+        .adjust-current { margin: 0; font-size: 13px; color: var(--text-muted); }
+        .adjust-current strong { color: #0F172A; font-size: 15px; }
+        .adjust-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .adjust-option { position: relative; cursor: pointer; }
+        .adjust-option input { position: absolute; opacity: 0; pointer-events: none; }
+        .adjust-option span { display: flex; flex-direction: column; gap: 2px; height: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: #FFFFFF; transition: border-color .15s, box-shadow .15s; }
+        .adjust-option strong { font-size: 13px; color: #0F172A; }
+        .adjust-option small { font-size: 11px; color: var(--text-muted); }
+        .adjust-option input:checked + span { border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .15); background: #F0F9FF; }
+        .adjust-option input:focus-visible + span { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .amount-row { display: flex; align-items: center; gap: 10px; }
+        .amount-row .input-dark { max-width: 180px; font-size: 16px; font-weight: 700; }
+        .unit-suffix { color: var(--text-muted); font-weight: 600; }
+        .adjust-preview { margin: 0; min-height: 20px; font-size: 13px; color: var(--text-muted); }
+        .adjust-preview strong { color: #0F172A; font-variant-numeric: tabular-nums; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-        .btn-delete-item { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: #94A3B8; cursor: pointer; transition: all 0.15s; }
-        .btn-delete-item:hover { color: #B91C1C; border-color: #FECACA; background: #FEF2F2; }
-        .btn-delete-item:focus-visible { outline: 2px solid #B91C1C; outline-offset: 2px; }
+
+        @media (max-width: 1100px) { .inv-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 560px) {
+            .inv-summary { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .inv-stat-value { font-size: 22px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .adjust-options { grid-template-columns: 1fr; }
+            .select-dark.compact { flex: 1 1 140px; }
+        }
+        @media (prefers-reduced-motion: reduce) { .inv-stat-btn, .adjust-option span { transition: none; } }
     </style>
 </head>
 <body>
@@ -423,169 +517,171 @@
             </div>
         </div>
 
-        <!-- KPI SUMMARY METRICS STRIP -->
-        {% set total_skus = inventory|length %}
-        {% set low_stock_items = [] %}
+        <!-- INVENTORY SUMMARY -->
+        {% set ns = namespace(out=0, low=0, ok=0, value=0, uncosted=0) %}
         {% for item in inventory %}
-            {% if item.quantity <= item.minimum_threshold %}
-                {% set _ = low_stock_items.append(item) %}
-            {% endif %}
+            {% set q = (item.quantity or 0)|float %}
+            {% if q <= 0 %}{% set ns.out = ns.out + 1 %}{% elif q <= (item.minimum_threshold or 0)|float %}{% set ns.low = ns.low + 1 %}{% else %}{% set ns.ok = ns.ok + 1 %}{% endif %}
+            {% if item.unit_cost %}{% set ns.value = ns.value + q * item.unit_cost|float %}{% elif q > 0 %}{% set ns.uncosted = ns.uncosted + 1 %}{% endif %}
         {% endfor %}
-        
-        <div class="metrics-grid">
-            <div class="metric-card" style="border-left: 3px solid var(--accent-cyan);">
-                <div class="metric-top">
-                    <div>
-                        <p class="metric-title">Cataloged SKUs</p>
-                        <p class="metric-value">{{ total_skus }}</p>
-                    </div>
-                    <div class="metric-icon" style="background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan);">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    </div>
-                </div>
-                <div class="metric-bottom" style="color: var(--accent-cyan);">
-                    <span>Total tracked raw items</span>
-                </div>
-            </div>
 
-            <div class="metric-card" style="border-left: 3px solid {% if low_stock_items|length > 0 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
-                <div class="metric-top">
-                    <div>
-                        <p class="metric-title">Low Stock Alerts</p>
-                        <p class="metric-value">{{ low_stock_items|length }}</p>
-                    </div>
-                    <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-red);">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                    </div>
-                </div>
-                <div class="metric-bottom" style="color: {% if low_stock_items|length > 0 %}var(--accent-red){% else %}var(--accent-green){% endif %};">
-                    <span>{% if low_stock_items|length > 0 %}Restock purchase orders needed{% else %}All material levels healthy{% endif %}</span>
-                </div>
+        <div class="inv-summary">
+            <div class="inv-stat">
+                <span class="inv-stat-label">Materials tracked</span>
+                <span class="inv-stat-value">{{ inventory|length }}</span>
+                <span class="inv-stat-note">{{ inventory|map(attribute='category')|select|unique|list|length }} categories</span>
             </div>
-
-            <div class="metric-card" style="border-left: 3px solid var(--accent-green);">
-                <div class="metric-top">
-                    <div>
-                        <p class="metric-title">Stock Health</p>
-                        <p class="metric-value">
-                            {% if total_skus > 0 %}
-                                {{ ((total_skus - low_stock_items|length) / total_skus * 100)|round|int }}%
-                            {% else %}
-                                100%
-                            {% endif %}
-                        </p>
-                    </div>
-                    <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green);">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    </div>
-                </div>
-                <div class="metric-bottom" style="color: var(--accent-green);">
-                    <span>Supplies above reorder line</span>
-                </div>
+            <button type="button" class="inv-stat inv-stat-btn out" data-status-shortcut="out" {% if not ns.out %}disabled{% endif %}>
+                <span class="inv-stat-label">Out of stock</span>
+                <span class="inv-stat-value">{{ ns.out }}</span>
+                <span class="inv-stat-note">{% if ns.out %}Show these materials →{% else %}None right now{% endif %}</span>
+            </button>
+            <button type="button" class="inv-stat inv-stat-btn low" data-status-shortcut="low" {% if not ns.low %}disabled{% endif %}>
+                <span class="inv-stat-label">Low stock</span>
+                <span class="inv-stat-value">{{ ns.low }}</span>
+                <span class="inv-stat-note">{% if ns.low %}At or below reorder level →{% else %}All above reorder level{% endif %}</span>
+            </button>
+            <div class="inv-stat">
+                <span class="inv-stat-label">Stock value</span>
+                <span class="inv-stat-value">₱{{ "{:,.0f}".format(ns.value) }}</span>
+                <span class="inv-stat-note">{% if ns.uncosted %}{{ ns.uncosted }} material{{ 's' if ns.uncosted != 1 }} without a unit cost{% else %}On-hand quantity × unit cost{% endif %}</span>
             </div>
         </div>
 
-        <!-- INVENTORY TABLE PANEL -->
+        <!-- MATERIALS TABLE -->
         <div class="panel">
             <div class="panel-header">
                 <div>
                     <h2 class="panel-title">
-                        <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                        Current Lab Stock Levels
+                        <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        Lab Materials
                     </h2>
-                    <p class="panel-subtitle">Monitor raw material consumption, thresholds, and perform stock adjustments.</p>
+                    <p class="panel-subtitle">Restock, record use, or enter a stock count. Every change is saved in the audit log.</p>
                 </div>
-                <button type="button" class="btn btn-cyan" onclick="openAddItemModal()">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    + Add New Item
-                </button>
-            </div>
-
-            <!-- Client-Side Instant Filter & Search Bar -->
-            <div class="filter-bar">
-                <div class="search-box">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    <input type="text" id="inventorySearch" class="input-dark" placeholder="Search by item name or supplier..." onkeyup="filterInventoryTable()">
-                </div>
-                <div style="min-width: 180px;">
-                    <select id="categoryFilter" class="select-dark" onchange="filterInventoryTable()">
-                        <option value="">All Categories</option>
-                        <option value="Zirconia">Zirconia</option>
-                        <option value="Acrylic & Denture">Acrylic & Denture</option>
-                        <option value="3D Printing Resin">3D Printing Resin</option>
-                        <option value="Ceramic & E.max">Ceramic & E.max</option>
-                        <option value="Consumables">Consumables / Burrs</option>
-                    </select>
+                <div class="header-actions">
+                    <a href="{{ url_for('admin_inventory_logs') }}" class="btn btn-outline">Audit log</a>
+                    <button type="button" class="btn btn-cyan" onclick="openMaterialModal()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"></path></svg>
+                        Add material
+                    </button>
                 </div>
             </div>
 
-            <div style="overflow-x: auto;">
-                <table class="dark-table" id="inventoryTable">
+            {% if inventory %}
+            <div class="inv-toolbar">
+                <label class="search-box">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="search" id="inventorySearch" class="input-dark" placeholder="Search material, supplier, or category" aria-label="Search materials" autocomplete="off">
+                </label>
+                <div class="status-chips" role="group" aria-label="Filter by stock status">
+                    <button type="button" class="status-chip active" data-status="all">All <span>{{ inventory|length }}</span></button>
+                    <button type="button" class="status-chip out" data-status="out">Out <span>{{ ns.out }}</span></button>
+                    <button type="button" class="status-chip low" data-status="low">Low <span>{{ ns.low }}</span></button>
+                    <button type="button" class="status-chip ok" data-status="ok">In stock <span>{{ ns.ok }}</span></button>
+                </div>
+                <select id="categoryFilter" class="select-dark compact" aria-label="Filter by category">
+                    <option value="">All categories</option>
+                    {% for cat in inventory|map(attribute='category')|select|unique|sort %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+                </select>
+                <select id="inventorySort" class="select-dark compact" aria-label="Sort materials">
+                    <option value="urgent">Most urgent first</option>
+                    <option value="name">Name A–Z</option>
+                    <option value="qty">Lowest quantity</option>
+                    <option value="recent">Recently changed</option>
+                </select>
+            </div>
+            <p class="inv-count" id="inventoryCount" aria-live="polite">{{ inventory|length }} material{{ 's' if inventory|length != 1 }}</p>
+            {% endif %}
+
+            <div class="table-scroll">
+                <table class="dark-table inv-table" id="inventoryTable">
+                    {% if inventory %}
                     <thead>
                         <tr>
-                            <th>Item Name</th>
-                            <th>Category</th>
-                            <th>Supplier</th>
-                            <th>Unit Cost</th>
-                            <th>Quantity</th>
-                            <th>Status & Forecast</th>
-                            <th>Quick Stock Adjust</th>
-                            <th><span class="sr-only">Delete</span></th>
+                            <th scope="col">Material</th>
+                            <th scope="col">On hand</th>
+                            <th scope="col">Status</th>
+                            <th scope="col" class="num">Unit cost</th>
+                            <th scope="col">Last change</th>
+                            <th scope="col"><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
+                    {% endif %}
                     <tbody>
                         {% for item in inventory %}
-                            <tr class="inv-row" data-category="{{ item.category }}">
-                                <td><strong style="color: #0F172A;" class="item-name-cell">{{ item.item_name }}</strong></td>
-                                <td><span style="color: var(--accent-cyan); font-size: 12px;">{{ item.category }}</span></td>
-                                <td class="supplier-cell" style="color: var(--text-muted);">{{ item.supplier_name or 'N/A' }}</td>
-                                <td>₱{{ "%.2f"|format(item.unit_cost or 0.00) }}</td>
-                                <td><strong style="font-size: 14px;">{{ item.quantity }}</strong> <span style="font-size: 11px; color: var(--text-muted);">{{ item.unit }}</span></td>
+                            {% set q = (item.quantity or 0)|float %}
+                            {% set reorder = (item.minimum_threshold or 0)|float %}
+                            {% set status = 'out' if q <= 0 else ('low' if q <= reorder else 'ok') %}
+                            {% set pred = pred_map.get(item.id) %}
+                            {% set n_logs = log_counts.get(item.id, 0) %}
+                            {% set changed = last_change.get(item.id) %}
+                            <tr class="inv-row status-{{ status }}"
+                                data-search="{{ (item.item_name ~ ' ' ~ (item.supplier_name or '') ~ ' ' ~ (item.category or ''))|lower }}"
+                                data-name="{{ item.item_name|lower }}" data-status="{{ status }}" data-category="{{ item.category or '' }}"
+                                data-qty="{{ q }}" data-ratio="{{ (q / reorder) if reorder > 0 else (0 if q <= 0 else 99) }}" data-changed="{{ changed or '' }}">
                                 <td>
-                                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                                        {% if item.quantity <= item.minimum_threshold %}
-                                            <span class="low-stock">⚠️ Low Stock (≤{{ item.minimum_threshold }})</span>
-                                        {% else %}
-                                            <span class="normal-stock">In Stock</span>
-                                        {% endif %}
-                                        
-                                        <!-- ML FORECAST INJECTION -->
-                                        {% set pred = pred_map.get(item.id) %}
-                                        {% if pred %}
-                                            <span style="font-size: 11px; color: var(--accent-cyan); font-weight: 600;">
-                                                ⏳ ~{{ pred.estimated_days_left }} days left <small style="color: var(--text-muted);">({{ pred.projected_stockout_date }})</small>
-                                            </span>
-                                        {% else %}
-                                            <span style="font-size: 11px; color: var(--text-muted);">No usage logs yet</span>
-                                        {% endif %}
+                                    <div class="mat-name">{{ item.item_name }}</div>
+                                    <div class="mat-meta">
+                                        <span class="cat-tag">{{ item.category or 'Uncategorized' }}</span>
+                                        <span>{{ item.supplier_name or 'No supplier set' }}</span>
                                     </div>
                                 </td>
                                 <td>
-                                    <form method="POST" action="/admin/inventory/update/{{ item.id }}" style="display: flex; gap: 6px; align-items: center; margin:0;">
-                                        <select name="action" class="select-dark" style="padding: 6px 8px; font-size: 11px; width: auto;">
-                                            <option value="add">Restock (+)</option>
-                                            <option value="subtract">Use (-)</option>
-                                        </select>
-                                        <input type="number" name="amount" value="1" min="0.01" step="any" class="input-dark" style="width: 70px; padding: 6px 8px; font-size: 11px;" placeholder="Qty" required>
-                                        <button type="submit" class="btn btn-cyan" style="padding: 6px 10px; font-size: 11px;">Apply</button>
-                                    </form>
+                                    <div class="qty"><strong>{{ '%g'|format(q) }}</strong> <span>{{ item.unit }}</span></div>
+                                    <div class="mat-meta">Reorder at {{ '%g'|format(reorder) }}</div>
                                 </td>
                                 <td>
-                                    {% set n_logs = log_counts.get(item.id, 0) %}
-                                    <button type="button" class="btn-delete-item" title="Delete {{ item.item_name }}" aria-label="Delete {{ item.item_name }}"
-                                            data-confirm-action="{{ url_for('delete_inventory_item', item_id=item.id) }}"
-                                            data-confirm-title="Delete {{ item.item_name }}?"
-                                            data-confirm-message="This removes the material from inventory and forecasting{% if n_logs %}, together with its {{ n_logs }} stock-change record{{ 's' if n_logs != 1 }}{% endif %}. This can't be undone; download a backup first if you may need it."
-                                            data-confirm-label="Delete material">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
-                                    </button>
+                                    {% if status == 'out' %}
+                                        <span class="stock-pill out">Out of stock</span>
+                                    {% elif status == 'low' %}
+                                        <span class="stock-pill low">Low stock</span>
+                                    {% else %}
+                                        <span class="stock-pill ok">In stock</span>
+                                    {% endif %}
+                                    {% if pred and q > 0 and n_logs and pred.estimated_days_left < 999 %}
+                                        <div class="forecast-line {{ 'soon' if pred.estimated_days_left <= 7 }}" title="Estimate from past usage (forecasting module)">
+                                            Runs out ≈ <time datetime="{{ pred.projected_stockout_date }}">{{ pred.projected_stockout_date }}</time> ({{ pred.estimated_days_left|round|int }} days)
+                                        </div>
+                                    {% elif q > 0 and not n_logs %}
+                                        <div class="forecast-line muted">No usage recorded yet</div>
+                                    {% endif %}
+                                </td>
+                                <td class="num">{% if item.unit_cost %}₱{{ "{:,.2f}".format(item.unit_cost|float) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                                <td>{% if changed %}<time class="rel" datetime="{{ changed }}">{{ changed[:10] }}</time>{% else %}<span class="muted">—</span>{% endif %}</td>
+                                <td>
+                                    <div class="row-actions">
+                                        <button type="button" class="btn-adjust" onclick="openAdjustModal(this)"
+                                                data-id="{{ item.id }}" data-name="{{ item.item_name }}" data-qty="{{ '%g'|format(q) }}" data-unit="{{ item.unit }}"
+                                                data-action="{{ 'add' if status != 'ok' else 'subtract' }}">Adjust stock</button>
+                                        <button type="button" class="icon-btn" title="Edit details of {{ item.item_name }}" aria-label="Edit details of {{ item.item_name }}"
+                                                onclick="openMaterialModal(this)"
+                                                data-id="{{ item.id }}" data-name="{{ item.item_name }}" data-category="{{ item.category or '' }}" data-unit="{{ item.unit or '' }}"
+                                                data-supplier="{{ item.supplier_name or '' }}" data-reorder="{{ '%g'|format(reorder) }}" data-cost="{{ '%g'|format((item.unit_cost or 0)|float) }}">
+                                            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 16.536 8 18l1.464-4.536z"/></svg>
+                                        </button>
+                                        <button type="button" class="icon-btn danger" title="Delete {{ item.item_name }}" aria-label="Delete {{ item.item_name }}"
+                                                data-confirm-action="{{ url_for('delete_inventory_item', item_id=item.id) }}"
+                                                data-confirm-title="Delete {{ item.item_name }}?"
+                                                data-confirm-message="This removes the material from inventory and forecasting{% if n_logs %}, together with its {{ n_logs }} stock-change record{{ 's' if n_logs != 1 }}{% endif %}. This can't be undone; download a backup first if you may need it."
+                                                data-confirm-label="Delete material">
+                                            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         {% else %}
-                            <tr id="emptyRow">
-                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">No inventory items recorded yet. Use the "+ Add New Item" button above to add supplies.</td>
-                            </tr>
+                            <tr><td colspan="6" class="inv-empty">
+                                <strong>No materials yet</strong>
+                                <span>Add the lab's materials (zirconia discs, e.max blocks, acrylic, resin) to start tracking stock.</span>
+                                <button type="button" class="btn btn-cyan" onclick="openMaterialModal()">Add the first material</button>
+                            </td></tr>
                         {% endfor %}
+                        {% if inventory %}
+                            <tr id="noMatchRow" hidden><td colspan="6" class="inv-empty">
+                                <strong>No materials match these filters</strong>
+                                <button type="button" class="btn btn-outline" onclick="resetInventoryFilters()">Clear filters</button>
+                            </td></tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
@@ -769,73 +865,93 @@
         </div>
     </div>
 
-    <!-- ADD INVENTORY ITEM MODAL -->
-    <div class="modal-overlay" id="addItemModal">
+    <!-- ADD / EDIT MATERIAL MODAL -->
+    <div class="modal-overlay" id="materialModal" role="dialog" aria-modal="true" aria-labelledby="materialModalTitle">
         <div class="modal-container">
             <div class="modal-header">
-                <h2 class="modal-title">
-                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    Add New Inventory Item
-                </h2>
-                <button type="button" class="close-btn" onclick="closeAddItemModal()">×</button>
+                <h2 class="modal-title" id="materialModalTitle">Add material</h2>
+                <button type="button" class="close-btn" onclick="closeMaterialModal()" aria-label="Close">×</button>
             </div>
-            
-            <form method="POST" action="{{ url_for('add_inventory_item') }}">
-                <div class="modal-body">
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label class="form-label">Item Name <span style="color: var(--accent-red);">*</span></label>
-                        <input type="text" name="item_name" class="input-dark" placeholder="e.g., Zirconia Disc A2 98mm" required>
+            <form method="POST" id="materialForm" action="{{ url_for('add_inventory_item') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="modal-body form-grid">
+                    <div class="form-group span-2">
+                        <label class="form-label" for="matName">Material name <span class="req">*</span></label>
+                        <input type="text" id="matName" name="item_name" class="input-dark" placeholder="e.g. Zirconia Disc A2 98mm" maxlength="120" required>
                     </div>
-
-                    <div class="grid-2">
-                        <div class="form-group">
-                            <label class="form-label">Category <span style="color: var(--accent-red);">*</span></label>
-                            <select name="category" class="select-dark" required>
-                                <option value="">Select Category</option>
-                                <option value="Zirconia">Zirconia</option>
-                                <option value="Acrylic & Denture">Acrylic & Denture</option>
-                                <option value="3D Printing Resin">3D Printing Resin</option>
-                                <option value="Ceramic & E.max">Ceramic & E.max</option>
-                                <option value="Consumables">Consumables / Burrs</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Supplier Name</label>
-                            <input type="text" name="supplier_name" class="input-dark" placeholder="e.g., DentalDepot Inc.">
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label" for="matCategory">Category <span class="req">*</span></label>
+                        <input type="text" id="matCategory" name="category" class="input-dark" list="categoryOptions" placeholder="Choose or type a category" maxlength="60" required>
+                        <datalist id="categoryOptions">{% for cat in categories %}<option value="{{ cat }}"></option>{% endfor %}</datalist>
                     </div>
-
-                    <div class="grid-2">
-                        <div class="form-group">
-                            <label class="form-label">Initial Quantity <span style="color: var(--accent-red);">*</span></label>
-                            <input type="number" name="quantity" value="10" min="0" step="any" class="input-dark" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Unit of Measure <span style="color: var(--accent-red);">*</span></label>
-                            <input type="text" name="unit" class="input-dark" placeholder="e.g., discs, bottles, pcs" required>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label" for="matUnit">Unit <span class="req">*</span></label>
+                        <input type="text" id="matUnit" name="unit" class="input-dark" list="unitOptions" placeholder="e.g. disc, block, bottle" maxlength="30" required>
+                        <datalist id="unitOptions">{% for u in ['disc', 'block', 'ingot', 'bottle', 'jar', 'kit', 'pack', 'piece', 'gram', 'ml', 'liter'] %}<option value="{{ u }}"></option>{% endfor %}</datalist>
                     </div>
-
-                    <div class="grid-2">
-                        <div class="form-group">
-                            <label class="form-label">Low Alert Threshold <span style="color: var(--accent-red);">*</span></label>
-                            <input type="number" name="minimum_threshold" value="3" min="1" step="any" class="input-dark" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Unit Cost (₱) <span style="color: var(--accent-red);">*</span></label>
-                            <input type="number" step="0.01" name="unit_cost" value="0.00" min="0" class="input-dark" required>
-                        </div>
+                    <div class="form-group" id="startQtyGroup">
+                        <label class="form-label" for="matQty">Starting quantity <span class="req">*</span></label>
+                        <input type="number" id="matQty" name="quantity" value="0" min="0" step="any" class="input-dark" required>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label" for="matReorder">Reorder level <span class="req">*</span></label>
+                        <input type="number" id="matReorder" name="minimum_threshold" value="2" min="0" step="any" class="input-dark" required>
+                        <span class="field-hint">Shown as "Low stock" at or below this amount.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="matSupplier">Supplier</label>
+                        <input type="text" id="matSupplier" name="supplier_name" class="input-dark" placeholder="e.g. Ivoclar Philippines" maxlength="120">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="matCost">Unit cost (₱)</label>
+                        <input type="number" id="matCost" name="unit_cost" value="0" min="0" step="0.01" class="input-dark">
+                    </div>
+                    <p class="field-hint span-2" id="editQtyHint" hidden>To change the quantity, close this and use <strong>Adjust stock</strong> so the change is logged.</p>
                 </div>
-
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline" onclick="closeAddItemModal()">Cancel</button>
-                    <button type="submit" class="btn btn-cyan">Save New Item</button>
+                    <button type="button" class="btn btn-outline" onclick="closeMaterialModal()">Cancel</button>
+                    <button type="submit" class="btn btn-cyan" id="materialSubmit">Add material</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- ADJUST STOCK MODAL -->
+    <div class="modal-overlay" id="adjustModal" role="dialog" aria-modal="true" aria-labelledby="adjustModalTitle">
+        <div class="modal-container narrow">
+            <div class="modal-header">
+                <h2 class="modal-title" id="adjustModalTitle">Adjust stock</h2>
+                <button type="button" class="close-btn" onclick="closeAdjustModal()" aria-label="Close">×</button>
+            </div>
+            <form method="POST" id="adjustForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="modal-body adjust-body">
+                    <p class="adjust-current">On hand now: <strong id="adjustCurrent"></strong></p>
+                    <div class="adjust-options" role="radiogroup" aria-label="Type of change">
+                        <label class="adjust-option"><input type="radio" name="action" value="add" id="actAdd"><span><strong>Restock</strong><small>Delivery received</small></span></label>
+                        <label class="adjust-option"><input type="radio" name="action" value="subtract" id="actSubtract"><span><strong>Record use</strong><small>Used, broken, expired</small></span></label>
+                        <label class="adjust-option"><input type="radio" name="action" value="set" id="actSet"><span><strong>Stock count</strong><small>Set what's on the shelf</small></span></label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="adjustAmount" id="adjustAmountLabel">Quantity</label>
+                        <div class="amount-row">
+                            <input type="number" id="adjustAmount" name="amount" min="0" step="any" class="input-dark" required>
+                            <span class="unit-suffix" id="adjustUnit"></span>
+                        </div>
+                    </div>
+                    <p class="adjust-preview" id="adjustPreview" aria-live="polite"></p>
+                    <div class="form-group">
+                        <label class="form-label" for="adjustReason">Reason <span class="muted">(optional)</span></label>
+                        <input type="text" id="adjustReason" name="reason" class="input-dark" maxlength="200" placeholder="e.g. Delivery from Ivoclar, invoice #1043">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeAdjustModal()">Cancel</button>
+                    <button type="submit" class="btn btn-cyan" id="adjustSubmit">Save change</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <script>
         // ==========================================
         // SYNTHESIZED WEB AUDIO ENGINE WITH SLIDER SUPPORT
@@ -1012,8 +1128,6 @@
         });
 
         // Modal Open/Close Helpers
-        function openAddItemModal() { document.getElementById('addItemModal').style.display = 'flex'; }
-        function closeAddItemModal() { document.getElementById('addItemModal').style.display = 'none'; }
 
         function openIncomingModal() { document.getElementById('incomingModal').style.display = 'flex'; }
         function closeIncomingModal() { document.getElementById('incomingModal').style.display = 'none'; }
@@ -1050,31 +1164,177 @@
         }
 
         // Real-Time Table Filter by Search Text & Category
+        // ==========================================
+        // MATERIALS TABLE: search, status chips, category, sort
+        // ==========================================
+        const invState = { status: 'all' };
+        function invRows() { return Array.from(document.querySelectorAll('.inv-row')); }
+
         function filterInventoryTable() {
-            const query = document.getElementById('inventorySearch').value.toLowerCase();
-            const selectedCat = document.getElementById('categoryFilter').value.toLowerCase();
-            const rows = document.querySelectorAll('.inv-row');
-
-            rows.forEach(row => {
-                const itemName = row.querySelector('.item-name-cell').textContent.toLowerCase();
-                const supplier = row.querySelector('.supplier-cell').textContent.toLowerCase();
-                const rowCat = (row.getAttribute('data-category') || '').toLowerCase();
-
-                const matchesQuery = itemName.includes(query) || supplier.includes(query);
-                const matchesCat = !selectedCat || rowCat.includes(selectedCat);
-
-                if (matchesQuery && matchesCat) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+            const search = document.getElementById('inventorySearch');
+            if (!search) return;
+            const q = search.value.trim().toLowerCase();
+            const cat = document.getElementById('categoryFilter').value;
+            let shown = 0;
+            invRows().forEach((row) => {
+                const ok = (!q || row.dataset.search.includes(q))
+                    && (invState.status === 'all' || row.dataset.status === invState.status)
+                    && (!cat || row.dataset.category === cat);
+                row.hidden = !ok;
+                if (ok) shown++;
             });
+            const total = invRows().length;
+            document.getElementById('noMatchRow').hidden = shown !== 0;
+            const plural = (n) => n + ' material' + (n === 1 ? '' : 's');
+            document.getElementById('inventoryCount').textContent = shown === total ? plural(total) : 'Showing ' + shown + ' of ' + plural(total);
         }
 
+        function sortInventoryTable() {
+            const select = document.getElementById('inventorySort');
+            if (!select) return;
+            const rank = { out: 0, low: 1, ok: 2 };
+            const by = {
+                urgent: (a, b) => rank[a.dataset.status] - rank[b.dataset.status] || parseFloat(a.dataset.ratio) - parseFloat(b.dataset.ratio) || a.dataset.name.localeCompare(b.dataset.name),
+                name: (a, b) => a.dataset.name.localeCompare(b.dataset.name),
+                qty: (a, b) => parseFloat(a.dataset.qty) - parseFloat(b.dataset.qty) || a.dataset.name.localeCompare(b.dataset.name),
+                recent: (a, b) => (b.dataset.changed || '').localeCompare(a.dataset.changed || ''),
+            }[select.value];
+            const body = document.querySelector('#inventoryTable tbody');
+            const noMatch = document.getElementById('noMatchRow');
+            invRows().sort(by).forEach((row) => body.insertBefore(row, noMatch));
+        }
+
+        function setStatusFilter(status) {
+            invState.status = status;
+            document.querySelectorAll('.status-chip').forEach((chip) => chip.classList.toggle('active', chip.dataset.status === status));
+            filterInventoryTable();
+        }
+
+        function resetInventoryFilters() {
+            document.getElementById('inventorySearch').value = '';
+            document.getElementById('categoryFilter').value = '';
+            setStatusFilter('all');
+        }
+
+        function inventoryFiltersActive() {
+            const search = document.getElementById('inventorySearch');
+            return !!search && (search.value.trim() !== '' || invState.status !== 'all' || document.getElementById('categoryFilter').value !== '');
+        }
+
+        (function initInventoryTable() {
+            const search = document.getElementById('inventorySearch');
+            if (!search) return;
+            search.addEventListener('input', filterInventoryTable);
+            document.getElementById('categoryFilter').addEventListener('change', filterInventoryTable);
+            document.getElementById('inventorySort').addEventListener('change', sortInventoryTable);
+            document.querySelectorAll('.status-chip').forEach((chip) => chip.addEventListener('click', () => setStatusFilter(chip.dataset.status)));
+            document.querySelectorAll('[data-status-shortcut]').forEach((card) => card.addEventListener('click', () => {
+                setStatusFilter(card.dataset.statusShortcut);
+                document.getElementById('inventoryTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }));
+            sortInventoryTable();
+            // Relative "last change" times, e.g. "3 days ago"
+            const rel = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+            const units = [['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+            document.querySelectorAll('time.rel[datetime]').forEach((el) => {
+                const d = new Date(el.getAttribute('datetime'));
+                if (isNaN(d)) return;
+                el.title = d.toLocaleString();
+                const secs = Math.round((d - Date.now()) / 1000);
+                const unit = units.find(([, s]) => Math.abs(secs) >= s);
+                el.textContent = unit ? rel.format(Math.round(secs / unit[1]), unit[0]) : 'just now';
+            });
+            document.querySelectorAll('.forecast-line time[datetime]').forEach((el) => {
+                const d = new Date(el.getAttribute('datetime') + 'T00:00:00');
+                if (!isNaN(d)) el.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            });
+        })();
+
+        // ==========================================
+        // ADD / EDIT MATERIAL MODAL
+        // ==========================================
+        const addMaterialUrl = "{{ url_for('add_inventory_item') }}";
+        const editMaterialUrl = "{{ url_for('edit_inventory_item', item_id='__ID__') }}";
+        function openMaterialModal(btn) {
+            const form = document.getElementById('materialForm');
+            const editing = !!(btn && btn.dataset && btn.dataset.id);
+            form.reset();
+            form.action = editing ? editMaterialUrl.replace('__ID__', btn.dataset.id) : addMaterialUrl;
+            document.getElementById('materialModalTitle').textContent = editing ? 'Edit ' + btn.dataset.name : 'Add material';
+            document.getElementById('materialSubmit').textContent = editing ? 'Save details' : 'Add material';
+            document.getElementById('startQtyGroup').hidden = editing;
+            document.getElementById('matQty').disabled = editing;
+            document.getElementById('editQtyHint').hidden = !editing;
+            if (editing) {
+                document.getElementById('matName').value = btn.dataset.name;
+                document.getElementById('matCategory').value = btn.dataset.category;
+                document.getElementById('matUnit').value = btn.dataset.unit;
+                document.getElementById('matSupplier').value = btn.dataset.supplier;
+                document.getElementById('matReorder').value = btn.dataset.reorder;
+                document.getElementById('matCost').value = btn.dataset.cost;
+            }
+            document.getElementById('materialModal').style.display = 'flex';
+            document.getElementById('matName').focus();
+        }
+        function closeMaterialModal() { document.getElementById('materialModal').style.display = 'none'; }
+        // Kept for older buttons that still call these names
+        function openAddItemModal() { openMaterialModal(); }
+        function closeAddItemModal() { closeMaterialModal(); }
+
+        // ==========================================
+        // ADJUST STOCK MODAL with live preview
+        // ==========================================
+        const adjustUrl = "{{ url_for('update_inventory_stock', item_id='__ID__') }}";
+        const adjust = { qty: 0, unit: '' };
+        function openAdjustModal(btn) {
+            const form = document.getElementById('adjustForm');
+            form.reset();
+            form.action = adjustUrl.replace('__ID__', btn.dataset.id);
+            adjust.qty = parseFloat(btn.dataset.qty) || 0;
+            adjust.unit = btn.dataset.unit || '';
+            document.getElementById('adjustModalTitle').textContent = 'Adjust stock: ' + btn.dataset.name;
+            document.getElementById('adjustCurrent').textContent = fmtQty(adjust.qty) + ' ' + adjust.unit;
+            document.getElementById('adjustUnit').textContent = adjust.unit;
+            document.getElementById(btn.dataset.action === 'add' ? 'actAdd' : 'actSubtract').checked = true;
+            updateAdjustPreview();
+            document.getElementById('adjustModal').style.display = 'flex';
+            document.getElementById('adjustAmount').focus();
+        }
+        function closeAdjustModal() { document.getElementById('adjustModal').style.display = 'none'; }
+        function fmtQty(n) { return (Math.round(n * 100) / 100).toString(); }
+        function updateAdjustPreview() {
+            const action = (document.querySelector('#adjustForm input[name="action"]:checked') || {}).value;
+            const raw = document.getElementById('adjustAmount').value;
+            const amount = parseFloat(raw);
+            const label = { add: 'Quantity received', subtract: 'Quantity used', set: 'Counted on the shelf' }[action] || 'Quantity';
+            document.getElementById('adjustAmountLabel').textContent = label;
+            const preview = document.getElementById('adjustPreview');
+            const submit = document.getElementById('adjustSubmit');
+            if (raw === '' || isNaN(amount) || amount < 0 || (amount === 0 && action !== 'set')) {
+                preview.textContent = '';
+                submit.disabled = raw !== '' ;
+                return;
+            }
+            let next = action === 'add' ? adjust.qty + amount : action === 'subtract' ? Math.max(adjust.qty - amount, 0) : amount;
+            next = Math.round(next * 100) / 100;
+            const capped = action === 'subtract' && amount > adjust.qty;
+            preview.innerHTML = '';
+            const strong = document.createElement('strong');
+            strong.textContent = fmtQty(adjust.qty) + ' → ' + fmtQty(next) + ' ' + adjust.unit;
+            preview.append('New quantity: ', strong);
+            if (capped) preview.append(' (can\'t go below zero)');
+            if (next === adjust.qty) preview.append(' · no change');
+            submit.disabled = next === adjust.qty;
+        }
+        document.querySelectorAll('#adjustForm input[name="action"]').forEach((r) => r.addEventListener('change', updateAdjustPreview));
+        document.getElementById('adjustAmount').addEventListener('input', updateAdjustPreview);
+        document.getElementById('adjustForm').addEventListener('submit', () => { document.getElementById('adjustSubmit').disabled = true; });
+
         window.onclick = function(event) {
-            if (!event.target.closest('.notif-wrapper') && 
-                !event.target.closest('#addItemModal') && 
-                !event.target.closest('#incomingModal') && 
+            if (!event.target.closest('.notif-wrapper') &&
+                !event.target.closest('#materialModal') &&
+                !event.target.closest('#adjustModal') &&
+                !event.target.closest('#incomingModal') &&
                 !event.target.closest('#restockModal') &&
                 !event.target.closest('#settingsModal')) {
                 const dd = document.getElementById('notifDropdown');
@@ -1084,25 +1344,30 @@
                     bell.classList.remove('active');
                 }
             }
-            if (event.target === document.getElementById('addItemModal')) { closeAddItemModal(); }
+            if (event.target === document.getElementById('materialModal')) { closeMaterialModal(); }
+            if (event.target === document.getElementById('adjustModal')) { closeAdjustModal(); }
             if (event.target === document.getElementById('incomingModal')) { closeIncomingModal(); }
             if (event.target === document.getElementById('restockModal')) { closeRestockModal(); }
             if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            closeMaterialModal();
+            closeAdjustModal();
+        });
 
-        // Smart Inactivity Auto-Refresh (Every 30 seconds)
+        // Smart inactivity auto-refresh (every 30 seconds). It waits while a dialog is open,
+        // while you're typing, or while filters are applied, so your view isn't reset.
         const REFRESH_INTERVAL_MS = 30000;
         setInterval(() => {
-            const isAddModalOpen = document.getElementById('addItemModal')?.style.display === 'flex';
-            const isIncomingModalOpen = document.getElementById('incomingModal')?.style.display === 'flex';
-            const isRestockModalOpen = document.getElementById('restockModal')?.style.display === 'flex';
-            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
+            const openModal = ['materialModal', 'adjustModal', 'incomingModal', 'restockModal', 'settingsModal']
+                .some((id) => document.getElementById(id)?.style.display === 'flex');
+            const confirmOpen = document.getElementById('confirmDialog')?.classList.contains('open');
+            const noticeOpen = !!document.getElementById('actionNotice');
             const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
-
             const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
             const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
-
-            if (!isAddModalOpen && !isIncomingModalOpen && !isRestockModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
+            if (!openModal && !confirmOpen && !noticeOpen && !isNotifOpen && !isUserTyping && !inventoryFiltersActive()) {
                 window.location.reload();
             }
         }, REFRESH_INTERVAL_MS);

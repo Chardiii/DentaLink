@@ -4035,6 +4035,12 @@ def admin_inventory():
             inventory=inventory_items,
             pred_map=pred_map,  # Passed to HTML for forecasting UI display
             log_counts={item["id"]: sum(1 for log in historical_logs if log.get("inventory_id") == item["id"]) for item in inventory_items},
+            last_change={
+                item["id"]: max((log.get("created_at") or "" for log in historical_logs if log.get("inventory_id") == item["id"]), default=None)
+                for item in inventory_items
+            },
+            categories=sorted(set(INVENTORY_CATEGORIES) | {i["category"] for i in inventory_items if i.get("category")}, key=str.lower),
+            standard_categories=INVENTORY_CATEGORIES,
             notifications=notifications,
             restock_requests=restock_requests,
             unassigned_cases=unassigned_cases,
@@ -4049,51 +4055,102 @@ def admin_inventory():
 # =========================
 # ADMIN: ADD INVENTORY ITEM
 # =========================
+INVENTORY_CATEGORIES = ("Zirconia", "Ceramic & E.max", "Acrylic & Denture", "3D Printing Resin", "Consumables")
+
+
+def _inventory_details_from_form():
+    """Read and validate the material detail fields shared by the add and edit forms."""
+    def number(field, label, default=None):
+        raw = (request.form.get(field) or "").strip()
+        if raw == "" and default is not None:
+            return default
+        try:
+            value = float(raw)
+        except ValueError:
+            raise ValueError(f"{label} must be a number.")
+        if value < 0:
+            raise ValueError(f"{label} can't be negative.")
+        return round(value, 2)
+
+    details = {
+        "item_name": " ".join(request.form.get("item_name", "").split())[:120],
+        "category": request.form.get("category", "").strip()[:60],
+        "unit": request.form.get("unit", "").strip()[:30],
+        "supplier_name": request.form.get("supplier_name", "").strip()[:120] or None,
+        "minimum_threshold": number("minimum_threshold", "Reorder level"),
+        "unit_cost": number("unit_cost", "Unit cost", default=0.0),
+    }
+    if not details["item_name"]:
+        raise ValueError("Enter the material's name.")
+    if not details["category"]:
+        raise ValueError("Choose a category.")
+    if not details["unit"]:
+        raise ValueError("Enter the unit, e.g. disc, block, bottle, or gram.")
+    return details
+
+
+def _duplicate_material(name, exclude_id=None):
+    same = supabase_admin.table("inventory").select("id, item_name").ilike("item_name", name).execute().data or []
+    return next((m for m in same if m["id"] != exclude_id and m["item_name"].strip().lower() == name.lower()), None)
+
+
 @app.route("/admin/inventory/add", methods=["POST"])
+@role_required("admin")
 def add_inventory_item():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-
     try:
-        item_name = request.form.get("item_name", "").strip()
-        category = request.form.get("category", "").strip()
-        quantity = float(request.form.get("quantity", 0))
-        unit = request.form.get("unit", "").strip()
-        min_threshold = float(request.form.get("minimum_threshold", 5))
-        supplier_name = request.form.get("supplier_name", "").strip() or None
-        unit_cost = float(request.form.get("unit_cost", 0.00))
+        try:
+            details = _inventory_details_from_form()
+            quantity = float(request.form.get("quantity") or 0)
+            if quantity < 0:
+                raise ValueError("Starting quantity can't be negative.")
+        except ValueError as error:
+            flash(str(error), "inventory-input")
+            return redirect(url_for("admin_inventory"))
+        if _duplicate_material(details["item_name"]):
+            flash(f"'{details['item_name']}' is already in inventory. Adjust its stock instead of adding it again.", "inventory-input")
+            return redirect(url_for("admin_inventory"))
 
-        if not item_name or not category or not unit:
-            return "All fields are required.", 400
-
-        # Insert Item
-        inv_res = supabase_admin.table("inventory").insert({
-            "item_name": item_name,
-            "category": category,
-            "quantity": quantity,
-            "unit": unit,
-            "minimum_threshold": min_threshold,
-            "supplier_name": supplier_name,
-            "unit_cost": unit_cost
-        }).execute()
-
-        if inv_res.data:
-            item_id = inv_res.data[0]["id"]
-            # Log initial restock
+        quantity = round(quantity, 2)
+        inv_res = supabase_admin.table("inventory").insert({**details, "quantity": quantity}).execute()
+        if inv_res.data and quantity:
             supabase_admin.table("inventory_logs").insert({
-                "inventory_id": item_id,
-                "user_id": user_id,
+                "inventory_id": inv_res.data[0]["id"],
+                "user_id": g.profile["id"],
                 "action_type": "restock",
                 "quantity_changed": quantity,
                 "previous_quantity": 0,
                 "new_quantity": quantity,
-                "notes": "Initial stock entry"
+                "notes": "Initial stock entry",
             }).execute()
-
+        flash(f"'{details['item_name']}' was added with {quantity:g} {details['unit']} in stock.", "inventory-added")
         return redirect(url_for("admin_inventory"))
-    except Exception as e:
-        return f"Add item error: {str(e)}", 500
+    except Exception:
+        app.logger.exception("Unable to add inventory item")
+        return "Unable to add this material. Check the server logs for details.", 500
+
+
+@app.route("/admin/inventory/<item_id>/edit", methods=["POST"])
+@role_required("admin")
+def edit_inventory_item(item_id):
+    try:
+        items = supabase_admin.table("inventory").select("id, item_name").eq("id", item_id).execute().data or []
+        if not items:
+            flash("This material no longer exists. Nothing was changed.", "inventory-stale")
+            return redirect(url_for("admin_inventory"))
+        try:
+            details = _inventory_details_from_form()
+        except ValueError as error:
+            flash(str(error), "inventory-input")
+            return redirect(url_for("admin_inventory"))
+        if _duplicate_material(details["item_name"], exclude_id=item_id):
+            flash(f"Another material is already named '{details['item_name']}'.", "inventory-input")
+            return redirect(url_for("admin_inventory"))
+        supabase_admin.table("inventory").update(details).eq("id", item_id).execute()
+        flash(f"Details for '{details['item_name']}' were saved.", "inventory-updated")
+        return redirect(url_for("admin_inventory"))
+    except Exception:
+        app.logger.exception("Unable to edit inventory item")
+        return "Unable to save these details. Check the server logs for details.", 500
 
 
 # =========================
@@ -4130,68 +4187,61 @@ def delete_inventory_item(item_id):
 # ADMIN: UPDATE STOCK QUANTITY
 # =========================
 @app.route("/admin/inventory/update/<item_id>", methods=["POST"])
+@role_required("admin")
 def update_inventory_stock(item_id):
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-
+    """Restock, record use, or set the counted quantity; every change is logged."""
     try:
-        # Verify admin
-        profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
-        if not profile_res.data or profile_res.data[0].get("role") != "admin" or profile_res.data[0].get("status") != "approved":
-            return "Access denied.", 403
-
         action = request.form.get("action")
-        amount = float(request.form.get("amount", 0))
+        reason = request.form.get("reason", "").strip()[:200]
+        try:
+            amount = round(float(request.form.get("amount") or ""), 2)
+        except ValueError:
+            flash("Enter a quantity as a number.", "inventory-input")
+            return redirect(url_for("admin_inventory"))
+        if action not in ("add", "subtract", "set"):
+            return "Invalid action type.", 400
+        if amount < 0 or (amount == 0 and action != "set"):
+            flash("Enter a quantity greater than zero.", "inventory-input")
+            return redirect(url_for("admin_inventory"))
 
-        if amount <= 0:
-            return "Invalid quantity amount.", 400
+        items = supabase_admin.table("inventory").select("*").eq("id", item_id).execute().data or []
+        if not items:
+            flash("This material no longer exists. Nothing was changed.", "inventory-stale")
+            return redirect(url_for("admin_inventory"))
+        item = items[0]
+        current_qty = round(float(item.get("quantity") or 0), 2)
+        unit = item.get("unit") or ""
 
-        # Fetch current item stock
-        item_res = supabase_admin.table("inventory").select("*").eq("id", item_id).execute()
-        if not item_res.data:
-            return "Item not found.", 404
-
-        item = item_res.data[0]
-        current_qty = float(item["quantity"])
-
-        # Calculate new quantity based on action
         if action == "add":
             new_qty = round(current_qty + amount, 2)
-            quantity_changed = amount
-            action_type = "restock"
-            notes = f"Manual restock of +{amount}"
+            summary = f"Restocked +{amount:g} {unit}"
         elif action == "subtract":
-            if current_qty - amount < 0:
-                new_qty = 0.00
-                quantity_changed = -current_qty
-                notes = f"Manual adjustment: attempted -{amount}, capped at 0 to avoid negative inventory."
-            else:
-                new_qty = round(current_qty - amount, 2)
-                quantity_changed = -amount
-                action_type = "manual_deduction"
-                notes = f"Manual usage of -{amount}"
+            new_qty = round(max(current_qty - amount, 0), 2)
+            summary = f"Recorded use of {amount:g} {unit}" + (" (capped at 0)" if current_qty - amount < 0 else "")
         else:
-            return "Invalid action type.", 400
+            new_qty = amount
+            summary = f"Stock count: {amount:g} {unit} on hand"
+        change = round(new_qty - current_qty, 2)
+        if change == 0:
+            flash(f"'{item['item_name']}' already has {current_qty:g} {unit}. Nothing was changed.", "inventory-nochange")
+            return redirect(url_for("admin_inventory"))
 
-        # Update inventory item quantity
         supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
-
-        # Insert audit log entry
         supabase_admin.table("inventory_logs").insert({
             "inventory_id": item_id,
-            "user_id": user_id,
-            "action_type": action_type,
-            "quantity_changed": quantity_changed,
+            "user_id": g.profile["id"],
+            # Stock counts reuse the existing log types so usage history stays consistent.
+            "action_type": "restock" if change > 0 else "manual_deduction",
+            "quantity_changed": change,
             "previous_quantity": current_qty,
             "new_quantity": new_qty,
-            "notes": notes
+            "notes": summary + (f". Reason: {reason}" if reason else ""),
         }).execute()
-
+        flash(f"{item['item_name']}: {current_qty:g} → {new_qty:g} {unit}.", "inventory-adjusted")
         return redirect(url_for("admin_inventory"))
-
-    except Exception as e:
-        return f"Stock update error: {str(e)}", 500
+    except Exception:
+        app.logger.exception("Unable to update stock")
+        return "Unable to update stock. Check the server logs for details.", 500
 
 
 # =========================
