@@ -118,6 +118,10 @@
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
                 Forecast Analytics
             </a>
+            <a href="{{ url_for('admin_delivery_issues') }}" class="nav-pill{% if active_admin_page == 'delivery_issues' %} active{% endif %}"{% if active_admin_page == 'delivery_issues' %} aria-current="page"{% endif %}>
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+                Delivery Issues
+            </a>
             <a href="{{ url_for('admin_backup') }}" class="nav-pill{% if active_admin_page == 'backup' %} active{% endif %}"{% if active_admin_page == 'backup' %} aria-current="page"{% endif %}>
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v3h14v-3"></path></svg>
                 Backup &amp; Recovery
