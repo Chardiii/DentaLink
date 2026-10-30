@@ -66,6 +66,15 @@
         .btn-ghost { background: #FFFFFF; border-color: var(--border-color); color: var(--text-main); }
         .btn-ghost:hover { border-color: #94A3B8; }
         .decision { align-content: start; display: grid; gap: 8px; }
+        fieldset.paths { margin: 0; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; display: grid; gap: 10px; }
+        fieldset.paths legend { padding: 0 6px; font-size: 12px; font-weight: 700; color: #0F172A; }
+        label.path { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; font-size: 13px; cursor: pointer; }
+        label.path input { margin-top: 3px; }
+        label.check { display: flex; gap: 8px; align-items: center; font-weight: 400; font-size: 13px; cursor: pointer; }
+        .row { display: grid; gap: 4px; }
+        input[type="date"] { height: 38px; border: 1px solid var(--border-color); border-radius: 10px; padding: 0 10px; font: inherit; font-size: 13px; max-width: 200px; }
+        input[type="date"]:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .15); }
+        .remake-line { font-size: 13px; color: #92400E; background: #FEF3C7; border-radius: 8px; padding: 6px 10px; justify-self: start; }
         .pill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; }
         .pill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
         .pill.neutral { color: var(--neutral); background: var(--neutral-bg); border-color: var(--neutral-line); }
@@ -122,9 +131,19 @@
                     {% if r.status == 'open' %}
                         <form class="decide" method="POST" action="{{ url_for('admin_review_delivery_issue', report_id=r.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <fieldset class="paths">
+                                <legend>If you accept a remake</legend>
+                                <label class="path"><input type="radio" name="remake_path" value="lab" checked> <span><strong>Remake from the original prescription</strong><br><span class="hint">Goes straight to {{ r.technician_name if r.technician_name != 'Unassigned' else 'Incoming cases' }}; the dentist does nothing.</span></span></label>
+                                <label class="path"><input type="radio" name="remake_path" value="dentist"> <span><strong>Ask the dentist for something first</strong><br><span class="hint">e.g. a new impression or shade photo. Goes to the dentist's Action Required tab.</span></span></label>
+                                <div class="row">
+                                    <label for="due-{{ r.id }}">Remake due date</label>
+                                    <input type="date" id="due-{{ r.id }}" name="due_date" value="{{ default_due }}" min="{{ today }}">
+                                </div>
+                                <label class="check"><input type="checkbox" name="return_original" value="1" checked> Ask the clinic to return the original restoration</label>
+                            </fieldset>
                             <label for="note-{{ r.id }}">Note to the dentist</label>
-                            <textarea id="note-{{ r.id }}" name="admin_note" maxlength="1000" placeholder="e.g. We'll remake the crown with a lower occlusal contact; expect it by Nov 12."></textarea>
-                            <span class="hint">Optional when accepting a remake; required when no remake is needed.</span>
+                            <textarea id="note-{{ r.id }}" name="admin_note" maxlength="1000" placeholder="e.g. We'll lower the occlusal contact on #11. / Please send a new impression of #11."></textarea>
+                            <span class="hint">Required when asking the dentist for something, or when no remake is needed.</span>
                             <div class="actions">
                                 <button type="submit" name="decision" value="remake_accepted" class="btn btn-primary">Accept remake</button>
                                 <button type="submit" name="decision" value="no_action" class="btn btn-ghost">No remake needed</button>
@@ -134,6 +153,10 @@
                         <div class="decision">
                             <span class="pill {{ 'ok' if r.status == 'remake_accepted' else 'neutral' }}">{{ r.decision_label }}</span>
                             <span class="hint">By {{ r.reviewer_name }}{% if r.reviewed_at %} · <time datetime="{{ r.reviewed_at }}">{{ r.reviewed_at[:10] }}</time>{% endif %}</span>
+                            {% if r.remake %}
+                                <span class="remake-line">Remake <strong>#{{ r.remake.case_number }}</strong> · {{ 'waiting for the dentist' if r.remake.status == 'needs_revision' else r.remake.status|replace('_', ' ') }} · due {{ r.remake.due_date }}</span>
+                            {% endif %}
+                            {% if r.return_requested %}<span class="hint">Clinic asked to return the original restoration.</span>{% endif %}
                             {% if r.admin_note %}<div class="details">{{ r.admin_note }}</div>{% endif %}
                         </div>
                     {% endif %}

@@ -32,6 +32,8 @@
         .case-no { font-size: 13px; font-weight: 700; color: var(--accent-cyan); }
         h1 { margin: 2px 0 4px; font-size: 26px; color: var(--ink); letter-spacing: -.02em; }
         .sub { color: var(--text-muted); }
+        .link-row { margin-top: 6px; display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px 10px; border-radius: 8px; background: #FEF3C7; color: #92400E; font-size: 12.5px; font-weight: 600; margin-right: 6px; }
+        .link-row a { color: #92400E; text-decoration: underline; }
         .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
         .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
         .pill.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
@@ -123,6 +125,12 @@
                 <div class="case-no">Case #{{ case.case_number }}</div>
                 <h1>{{ case.patient_name }}</h1>
                 <div class="sub">{{ (case.case_type or 'Restoration')|replace('_', ' ')|title }} · Ref {{ case.patient_reference or 'N/A' }} · Due {{ case.due_date or 'not set' }}</div>
+                {% if parent %}
+                    <div class="link-row">Remake of <a href="{{ url_for('dentist_case_summary', case_id=parent.id) }}">#{{ parent.case_number }}</a>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</div>
+                {% endif %}
+                {% for rm in remakes %}
+                    <div class="link-row">Remake <a href="{{ url_for('dentist_case_summary', case_id=rm.id) if rm.status not in ['draft', 'needs_revision'] else url_for('edit_dental_case', case_id=rm.id) }}">#{{ rm.case_number }}</a> · {{ status_labels.get(rm.status, rm.status|replace('_', ' ')|capitalize) if rm.status != 'needs_revision' else 'Waiting for your update' }} · due {{ rm.due_date }}</div>
+                {% endfor %}
             </div>
             {% if status in ['delivered', 'completed'] %}
                 <span class="pill ok">Delivered</span>
@@ -234,6 +242,7 @@
                             <span class="hint">Reported <time datetime="{{ r.created_at }}">{{ r.created_at[:10] }}</time></span>
                             {% if r.details %}<div>{{ r.details }}</div>{% endif %}
                             {% if r.admin_note %}<div><strong>Lab's reply:</strong> {{ r.admin_note }}</div>{% endif %}
+                            {% if r.return_requested %}<div class="hint">The lab asked you to send the original restoration back with the courier.</div>{% endif %}
                         </div>
                     {% endfor %}
                     {% if can_report %}

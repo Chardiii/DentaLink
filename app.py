@@ -2803,6 +2803,14 @@ def edit_dental_case(case_id):
             
             submit_action = request.form.get("submit_action", "draft").strip()
             new_status = "submitted" if submit_action == "send" else "draft"
+            # A remake goes straight back to its technician when resent, and never becomes a
+            # deletable draft (it shares stored files with the original case).
+            resend_to_technician = bool(case.get("remake_of") and case.get("technician_id"))
+            if case.get("remake_of"):
+                if submit_action == "send":
+                    new_status = "assigned" if resend_to_technician else "submitted"
+                else:
+                    new_status = case["status"]
 
             # -----------------------------
             # UPDATE CASE DETAILS
@@ -2841,6 +2849,17 @@ def edit_dental_case(case_id):
             
             if teeth_to_insert:
                 supabase_admin.table("case_teeth").insert(teeth_to_insert).execute()
+
+            if case.get("remake_of") and submit_action == "send":
+                log_case_status_change(case_id, "Remake details sent by dentist", user_id, None)
+                if resend_to_technician:
+                    create_notification(
+                        user_id=case["technician_id"],
+                        message=f"Remake ready: the dentist sent the updated details for #{case['case_number']}. You can start work.",
+                        link=f"/technician/cases/{case_id}",
+                    )
+                else:
+                    _notify_admins(f"Remake #{case['case_number']} is ready for assignment.")
 
             return redirect(url_for("dentist_dashboard"))
 
@@ -2883,6 +2902,10 @@ def delete_draft_case(case_id):
         # Remove uploaded files from storage first, then the child rows, then the case itself.
         files = supabase_admin.table("case_files").select("file_path").eq("case_id", case_id).execute().data or []
         paths = [f["file_path"] for f in files if f.get("file_path")]
+        if paths:
+            # Keep any file that another case (such as a remake) still uses.
+            shared = supabase_admin.table("case_files").select("file_path").in_("file_path", paths).neq("case_id", case_id).execute().data or []
+            paths = [p for p in paths if p not in {s["file_path"] for s in shared}]
         if paths:
             try:
                 supabase_admin.storage.from_("dental-case-files").remove(paths)
@@ -3029,6 +3052,18 @@ def dentist_case_summary(case_id):
 
         receipt = _delivery_receipt(case, events)
         reports = _issue_reports_for([case_id])
+        # Links between an original case and its remakes (empty until the remake migration runs)
+        parent, remakes = None, []
+        try:
+            if case.get("remake_of"):
+                parents = supabase_admin.table("dental_cases").select("id, case_number").eq("id", case["remake_of"]).execute().data or []
+                parent = parents[0] if parents else None
+            remakes = (
+                supabase_admin.table("dental_cases").select("id, case_number, status, due_date")
+                .eq("remake_of", case_id).order("created_at").execute().data or []
+            )
+        except Exception:
+            app.logger.warning("Remake columns unavailable; run the remakes migration")
         has_open_report = any(r["status"] == "open" for r in reports)
         can_report = (
             case.get("status") == "delivered"
@@ -3050,6 +3085,8 @@ def dentist_case_summary(case_id):
             issue_types=ISSUE_TYPES,
             issue_decisions=ISSUE_DECISIONS,
             window_days=ISSUE_REPORT_WINDOW_DAYS,
+            parent=parent,
+            remakes=remakes,
         )
     except Exception:
         app.logger.exception("Unable to load case summary")
@@ -3127,9 +3164,9 @@ def admin_delivery_issues():
         elif view == "resolved":
             reports = [r for r in reports if r["status"] != "open"]
 
-        case_ids = list({r["case_id"] for r in reports})
+        case_ids = list({r["case_id"] for r in reports} | {r["remake_case_id"] for r in reports if r.get("remake_case_id")})
         cases = (
-            supabase_admin.table("dental_cases").select("id, case_number, patient_name, case_type, technician_id, dentist_id, delivered_at, due_date, created_at")
+            supabase_admin.table("dental_cases").select("id, case_number, patient_name, case_type, technician_id, dentist_id, delivered_at, due_date, created_at, status")
             .in_("id", case_ids).execute().data or []
         ) if case_ids else []
         cases_by_id = {c["id"]: c for c in cases}
@@ -3146,6 +3183,7 @@ def admin_delivery_issues():
             r["reviewer_name"] = _display_name(people_by_id.get(r.get("reviewed_by")), "an administrator")
             r["issue_label"] = ISSUE_TYPES.get(r["issue_type"], r["issue_type"])
             r["decision_label"] = ISSUE_DECISIONS.get(r["status"])
+            r["remake"] = cases_by_id.get(r.get("remake_case_id"))
         return render_template(
             "admin_delivery_issues.html",
             profile=g.profile,
@@ -3153,6 +3191,8 @@ def admin_delivery_issues():
             counts=counts,
             view=view,
             migrated=migrated,
+            today=datetime.now(LAB_TZ).date().isoformat(),
+            default_due=(datetime.now(LAB_TZ).date() + timedelta(days=5)).isoformat(),
         )
     except Exception:
         app.logger.exception("Unable to load delivery issues")
@@ -3171,6 +3211,26 @@ def admin_review_delivery_issue(report_id):
         if decision == "no_action" and not note:
             flash("Add a short note for the dentist explaining why no remake is needed.", "review-note")
             return redirect(back)
+
+        # Remake details are checked before the report is claimed.
+        remake_path = request.form.get("remake_path", "lab")
+        return_requested = request.form.get("return_original") == "1"
+        due_date = None
+        if decision == "remake_accepted":
+            if remake_path not in ("lab", "dentist"):
+                return "Invalid remake path.", 400
+            try:
+                due_date = datetime.strptime(request.form.get("due_date", ""), "%Y-%m-%d").date()
+            except ValueError:
+                flash("Choose a due date for the remake.", "review-input")
+                return redirect(back)
+            if due_date < datetime.now(LAB_TZ).date():
+                flash("The remake's due date can't be in the past.", "review-input")
+                return redirect(back)
+            if remake_path == "dentist" and not note:
+                flash("Tell the dentist what the lab needs, e.g. a new impression of #11.", "review-input")
+                return redirect(back)
+
         rows = (
             supabase_admin.table("case_issue_reports")
             .update({"status": decision, "admin_note": note or None, "reviewed_by": g.profile["id"], "reviewed_at": _now_iso()})
@@ -3180,20 +3240,123 @@ def admin_review_delivery_issue(report_id):
             flash("This report was already reviewed, possibly by another administrator. Nothing was changed.", "review-stale")
             return redirect(back)
         report = rows[0]
-        cases = supabase_admin.table("dental_cases").select("case_number").eq("id", report["case_id"]).execute().data or []
-        case_number = cases[0]["case_number"] if cases else "your case"
-        if decision == "remake_accepted":
-            message = f"Remake accepted: the laboratory will remake Case {case_number}."
+        originals = supabase_admin.table("dental_cases").select("*").eq("id", report["case_id"]).execute().data or []
+        original = originals[0] if originals else {}
+        case_number = original.get("case_number", "your case")
+
+        if decision == "no_action":
+            create_notification(
+                user_id=report["dentist_id"],
+                message=f"Issue reviewed on Case {case_number}: no remake needed. Note from the lab: {note}",
+                link=url_for("dentist_case_summary", case_id=report["case_id"]),
+            )
+            flash(f"Case {case_number}: no remake needed. The dentist has been notified.", "issue-reviewed")
+            return redirect(back)
+
+        try:
+            remake = _create_remake_case(original, report, remake_path, due_date, note, return_requested)
+        except Exception:
+            # Put the report back so the admin can try again.
+            supabase_admin.table("case_issue_reports").update(
+                {"status": "open", "admin_note": None, "reviewed_by": None, "reviewed_at": None}
+            ).eq("id", report_id).execute()
+            raise
+
+        return_line = " Please send the original restoration back with the courier." if return_requested else ""
+        due_text = due_date.strftime("%b %d, %Y").replace(" 0", " ")
+        if remake_path == "dentist":
+            create_notification(
+                user_id=report["dentist_id"],
+                message=(f"Remake accepted for Case {case_number}, but the lab needs something from you first: {note} "
+                         f"Update and resend remake #{remake['case_number']}.{return_line}"),
+                link=url_for("edit_dental_case", case_id=remake["id"]),
+            )
+            outcome = f"Remake #{remake['case_number']} is waiting in the dentist's Action Required tab."
         else:
-            message = f"Issue reviewed on Case {case_number}: no remake needed."
-        if note:
-            message += f" Note from the lab: {note}"
-        create_notification(user_id=report["dentist_id"], message=message, link=url_for("dentist_case_summary", case_id=report["case_id"]))
-        flash(f"Case {case_number}: {ISSUE_DECISIONS[decision].lower()}. The dentist has been notified.", "issue-reviewed")
+            message = f"Remake accepted: the lab is remaking Case {case_number} as #{remake['case_number']}, due {due_text}.{return_line}"
+            if note:
+                message += f" Note from the lab: {note}"
+            create_notification(user_id=report["dentist_id"], message=message, link=url_for("dentist_case_summary", case_id=remake["id"]))
+            if remake.get("technician_id"):
+                create_notification(
+                    user_id=remake["technician_id"],
+                    message=f"Remake assigned: #{remake['case_number']} remakes Case {case_number} ({remake['remake_reason']}). Due {due_text}.",
+                    link=f"/technician/cases/{remake['id']}",
+                )
+                outcome = f"Remake #{remake['case_number']} was assigned to {remake['technician_name']}."
+            else:
+                outcome = f"Remake #{remake['case_number']} is in Incoming cases for assignment; the original technician is no longer active."
+        flash(f"{outcome} The dentist has been notified.", "issue-reviewed")
         return redirect(back)
     except Exception:
         app.logger.exception("Unable to review delivery issue")
         return "Unable to save the decision. Check the server logs for details.", 500
+
+
+def _create_remake_case(original, report, remake_path, due_date, note, return_requested):
+    """Create a new case that remakes `original`, copying its prescription, teeth and files."""
+    tech = {}
+    if original.get("technician_id"):
+        techs = (
+            supabase_admin.table("profiles").select("id, display_name, first_name, role, status")
+            .eq("id", original["technician_id"]).execute().data or []
+        )
+        if techs and techs[0].get("role") == "technician" and techs[0].get("status") == "approved":
+            tech = techs[0]
+
+    reason = ISSUE_TYPES.get(report["issue_type"], "Reported issue")
+    if report.get("details"):
+        reason += f": {report['details']}"
+    if return_requested:
+        reason += " (clinic asked to return the original restoration)"
+
+    if remake_path == "dentist":
+        status = "needs_revision"
+    else:
+        status = "assigned" if tech else "submitted"
+
+    remake = supabase_admin.table("dental_cases").insert({
+        "case_number": _next_case_number(),
+        "dentist_id": original["dentist_id"],
+        "technician_id": tech.get("id"),
+        "patient_name": original.get("patient_name"),
+        "patient_reference": original.get("patient_reference"),
+        "case_type": original.get("case_type"),
+        "material": original.get("material"),
+        "shade": original.get("shade"),
+        "instructions": original.get("instructions"),
+        "due_date": due_date.isoformat(),
+        "status": status,
+        "revision_notes": note if remake_path == "dentist" else None,
+        "remake_of": original["id"],
+        "remake_reason": reason,
+    }).execute().data[0]
+
+    teeth = supabase_admin.table("case_teeth").select("*").eq("case_id", original["id"]).execute().data or []
+    if teeth:
+        supabase_admin.table("case_teeth").insert([
+            {k: t.get(k) for k in ("tooth_number", "restoration_type", "material", "shade", "notes")} | {"case_id": remake["id"]}
+            for t in teeth
+        ]).execute()
+    # The remake points at the same stored files; nothing is duplicated in storage.
+    files = supabase_admin.table("case_files").select("*").eq("case_id", original["id"]).execute().data or []
+    if files:
+        supabase_admin.table("case_files").insert([
+            {k: f.get(k) for k in ("uploaded_by", "file_name", "file_path", "file_type", "mime_type", "file_size")} | {"case_id": remake["id"]}
+            for f in files
+        ]).execute()
+
+    log_case_status_change(
+        remake["id"],
+        f"Remake created from #{original['case_number']}",
+        g.profile["id"],
+        reason + (f" Lab note: {note}" if note else ""),
+    )
+    supabase_admin.table("case_issue_reports").update(
+        {"remake_case_id": remake["id"], "return_requested": return_requested}
+    ).eq("id", report["id"]).execute()
+    remake["technician_name"] = _display_name(tech, "the original technician")
+    return remake
 
 
 # =========================

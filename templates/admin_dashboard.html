@@ -375,6 +375,8 @@
             .app-sidebar { display: none; }
             .dashboard-container { margin-left: 0; padding: 20px; }
         }
+        .case-tags { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .remake-chip { padding: 2px 7px; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -641,7 +643,7 @@
                     {% for c in cases_list %}
                         <div class="k-card">
                             <div class="k-card-header">
-                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
                             </div>
                             
@@ -715,7 +717,7 @@
                     {% for c in review_cases %}
                         <div class="k-card">
                             <div class="k-card-header">
-                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
                             </div>
                             <div>
@@ -762,7 +764,7 @@
                     {% for c in dispatch_cases %}
                         <div class="k-card">
                             <div class="k-card-header">
-                                <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 {% if c.status == 'in_transit' %}
                                     <span class="k-due-chip">In transit</span>
                                 {% else %}
@@ -888,7 +890,7 @@
                             <tbody>
                                 {% for case in unassigned_cases %}
                                     <tr>
-                                        <td><span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span></td>
+                                        <td><span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span>{% if case.remake_of %} <span class="remake-chip">Remake</span>{% endif %}</td>
                                         <td><strong>{{ case.patient_name }}</strong></td>
                                         <td><span class="tag">{{ case.case_type | replace('_', ' ') | title }}</span></td>
                                         <td><span style="color: var(--accent-yellow); font-weight: 600;">{{ case.due_date or 'Not Set' }}</span></td>
