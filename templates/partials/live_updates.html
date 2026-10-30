@@ -1,0 +1,124 @@
+{# Near-real-time updates without full page reloads.
+
+   Every 10 seconds (and whenever the tab becomes visible again) the page asks /api/live
+   for a small fingerprint of the data it shows. When the fingerprint changes, the page
+   fetches a fresh copy of itself in the background and swaps only its live sections.
+   Open dialogs, typed text, the current tab, and scroll position are left alone: if the
+   user is busy, the swap waits until they're done.
+
+   Each page declares its live sections before including this partial:
+     window.LIVE_REGIONS = ['.sidebar-nav', '#kanban-pipeline', ...];
+   and may define hooks to keep page state across a swap:
+     window.liveHooks = { before() { return state; }, after(state) { ... } };
+   Pages can also listen for the 'live:updated' event to re-run their own setup. #}
+<style>
+    .live-toast { position: fixed; right: 20px; bottom: 20px; z-index: 1900; display: flex; align-items: flex-start; gap: 10px; max-width: min(380px, calc(100vw - 40px));
+        padding: 12px 14px; border-radius: 12px; background: #0F172A; color: #F8FAFC; font-family: inherit; font-size: 13px; line-height: 1.45;
+        box-shadow: 0 16px 36px rgba(15, 23, 42, .28); transform: translateY(16px); opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; }
+    .live-toast.show { opacity: 1; transform: none; pointer-events: auto; }
+    .live-toast .live-dot { flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: #34D399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .25); }
+    .live-toast strong { display: block; font-size: 12px; color: #94A3B8; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 2px; }
+    .live-toast button { margin-left: auto; background: none; border: 0; color: #94A3B8; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 0 0 6px; }
+    .live-toast button:hover { color: #FFFFFF; }
+    @media (prefers-reduced-motion: reduce) { .live-toast { transition: none; } }
+</style>
+<div class="live-toast" id="liveToast" role="status" aria-live="polite">
+    <span class="live-dot" aria-hidden="true"></span>
+    <div><strong>Updated</strong><span id="liveToastText"></span></div>
+    <button type="button" aria-label="Dismiss" onclick="document.getElementById('liveToast').classList.remove('show')">×</button>
+</div>
+<script>
+(function () {
+    const STATUS_URL = "{{ url_for('live_status') }}";
+    const INTERVAL_MS = 10000;
+    let stamp = null;
+    let latestId = null;
+    let pending = null;      // newest status that hasn't been applied yet
+    let applying = false;
+    let stopped = false;
+    let toastTimer = null;
+
+    function regions() { return window.LIVE_REGIONS || []; }
+
+    // The user is in the middle of something: don't touch the page yet.
+    function busy() {
+        const openOverlay = Array.from(document.querySelectorAll('.modal-overlay')).some((el) => getComputedStyle(el).display !== 'none');
+        const confirmOpen = document.querySelector('#confirmDialog.open');
+        const noticeOpen = document.getElementById('actionNotice');
+        const dropdownOpen = document.querySelector('.notif-dropdown.show');
+        const el = document.activeElement;
+        const typingInRegion = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)
+            && regions().some((sel) => Array.from(document.querySelectorAll(sel)).some((r) => r.contains(el)));
+        return !!(openOverlay || confirmOpen || noticeOpen || dropdownOpen || typingInRegion);
+    }
+
+    function showToast(text) {
+        const toast = document.getElementById('liveToast');
+        document.getElementById('liveToastText').textContent = text;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 7000);
+    }
+
+    async function applyUpdate() {
+        if (!pending || applying || busy()) return;
+        applying = true;
+        const status = pending;
+        try {
+            const res = await fetch(window.location.href, { credentials: 'same-origin', cache: 'no-store', headers: { 'X-Live-Refresh': '1' } });
+            if (!res.ok || res.redirected) return;
+            const fresh = new DOMParser().parseFromString(await res.text(), 'text/html');
+            if (busy()) return;   // the user started something while we were fetching
+            const hooks = window.liveHooks || {};
+            const state = hooks.before ? hooks.before() : undefined;
+            regions().forEach((selector) => {
+                const current = document.querySelectorAll(selector);
+                const next = fresh.querySelectorAll(selector);
+                if (current.length !== next.length) return;
+                current.forEach((el, i) => { if (el.innerHTML !== next[i].innerHTML) el.innerHTML = next[i].innerHTML; });
+            });
+            if (hooks.after) hooks.after(state);
+            document.dispatchEvent(new CustomEvent('live:updated'));
+
+            const isNew = status.latest && status.latest.id !== latestId;
+            if (isNew && typeof window.triggerNotificationSound === 'function') {
+                try { window.triggerNotificationSound(); } catch (e) { /* sound is optional */ }
+            }
+            showToast(isNew ? status.latest.message : 'This page now shows the latest changes.');
+            stamp = status.stamp;
+            latestId = status.latest ? status.latest.id : null;
+            if (pending === status) pending = null;
+        } catch (e) {
+            // Network hiccup: try again on the next check.
+        } finally {
+            applying = false;
+        }
+    }
+
+    async function check() {
+        if (stopped || document.hidden) return;
+        try {
+            const res = await fetch(STATUS_URL, { credentials: 'same-origin', cache: 'no-store' });
+            const type = res.headers.get('content-type') || '';
+            if (res.redirected || !type.includes('application/json')) { stopped = true; return; }  // signed out
+            if (!res.ok) return;
+            const status = await res.json();
+            if (stamp === null) {               // first check: remember what the page was rendered with
+                stamp = status.stamp;
+                latestId = status.latest ? status.latest.id : null;
+                return;
+            }
+            if (status.stamp !== stamp) pending = status;
+        } catch (e) {
+            return;
+        }
+        applyUpdate();
+    }
+
+    check();
+    setInterval(() => { if (pending) applyUpdate(); else check(); }, INTERVAL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    // Apply a waiting update soon after the user finishes (closes a dialog, leaves a field).
+    ['click', 'focusout', 'keyup'].forEach((type) => document.addEventListener(type, () => { if (pending) setTimeout(applyUpdate, 400); }, true));
+})();
+</script>

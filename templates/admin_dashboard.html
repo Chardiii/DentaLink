@@ -1282,25 +1282,20 @@
             if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
         }
 
-        // ==========================================
-        // SMART AUTO-REFRESH (Every 30 seconds)
-        // ==========================================
-        const REFRESH_INTERVAL_MS = 30000;
-
-        setInterval(() => {
-            const isIncomingModalOpen = document.getElementById('incomingModal')?.style.display === 'flex';
-            const isRestockModalOpen = document.getElementById('restockModal')?.style.display === 'flex';
-            const isSettingsModalOpen = document.getElementById('settingsModal')?.style.display === 'flex';
-            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
-
-            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
-
-            if (!isIncomingModalOpen && !isRestockModalOpen && !isSettingsModalOpen && !isNotifOpen && !isUserTyping) {
-                window.location.reload();
-            }
-        }, REFRESH_INTERVAL_MS);
     </script>
     {% include 'partials/action_notice.html' %}
+    <script>
+        window.LIVE_REGIONS = ['.sidebar-nav', '.notif-wrapper', '.metrics-grid', 'main .panel', '#incomingModal .modal-body', '#restockModal .modal-body'];
+        window.liveHooks = {
+            // Keep the production-stage tab the admin was looking at.
+            before() { const s = document.querySelector('.stage-section.active'); return s ? s.id : null; },
+            after(id) {
+                if (!id) return;
+                document.querySelectorAll('.stage-section').forEach((s) => s.classList.toggle('active', s.id === id));
+                document.querySelectorAll('.stage-tab-btn').forEach((b) => b.classList.toggle('active', (b.getAttribute('onclick') || '').includes("'" + id + "'")));
+            },
+        };
+    </script>
+    {% include 'partials/live_updates.html' %}
 </body>
 </html>

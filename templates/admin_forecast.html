@@ -645,22 +645,12 @@
             }
         }
 
-        // Smart Auto-Refresh (30s)
-        const REFRESH_INTERVAL_MS = 30000;
-        setInterval(() => {
-            const isNotifOpen = document.getElementById('notifDropdown')?.classList.contains('show');
-            const isModalOpen = document.getElementById('incomingModal')?.style.display === 'flex' || 
-                                document.getElementById('restockModal')?.style.display === 'flex' || 
-                                document.getElementById('settingsModal')?.style.display === 'flex' ||
-                                document.getElementById('restockConfirmModal')?.style.display === 'flex';
-            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            const isUserTyping = activeTag === 'input' || activeTag === 'select' || activeTag === 'textarea';
-
-            if (!isNotifOpen && !isModalOpen && !isUserTyping) {
-                window.location.reload();
-            }
-        }, REFRESH_INTERVAL_MS);
     </script>
     {% include 'partials/action_notice.html' %}
+    <script>
+        window.LIVE_REGIONS = ['.sidebar-nav', '.notif-wrapper', '.forecast-grid', '#incomingModal .modal-body', '#restockModal .modal-body'];
+        window.liveHooks = {};
+    </script>
+    {% include 'partials/live_updates.html' %}
 </body>
 </html>
