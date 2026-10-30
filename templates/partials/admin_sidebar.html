@@ -74,8 +74,11 @@
     .btn-icon:hover { color: #EF4444; }
     @media (max-width: 1024px) {
         .app-sidebar { position: static; width: auto; height: auto; gap: 20px; }
-        .sidebar-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+        .sidebar-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
         .sidebar-footer { display: grid; grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+        .sidebar-footer { grid-template-columns: 1fr; }
     }
 </style>
 

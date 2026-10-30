@@ -12,9 +12,11 @@
             --text-main: #1E293B;
             --text-muted: #64748B;
             --accent-cyan: #0284C7;
-            --accent-red: #B91C1C;
-            --accent-green: #047857;
-            --accent-yellow: #B45309;
+            --accent-cyan-hover: #0369A1;
+            --ok: #047857;      --ok-bg: #ECFDF5;      --ok-line: #A7F3D0;
+            --bad: #B91C1C;     --bad-bg: #FEF2F2;     --bad-line: #FECACA;
+            --warn: #B45309;    --warn-bg: #FFFBEB;    --warn-line: #FDE68A;
+            --neutral: #475569; --neutral-bg: #F1F5F9; --neutral-line: #CBD5E1;
             --sidebar-width: 260px;
         }
         * { box-sizing: border-box; }
@@ -30,90 +32,262 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             line-height: 1.5;
         }
-        .dashboard-container { margin-left: var(--sidebar-width); padding: 40px; }
-        h1 { margin: 0 0 8px; font-size: 28px; }
-        .lead { margin: 0 0 24px; color: var(--text-muted); }
-        .card {
-            padding: 24px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 38px 42px 48px; max-width: 1370px; }
+        .page-heading { margin-bottom: 24px; }
+        .eyebrow { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; color: var(--accent-cyan); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+        .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: #0EA5E9; }
+        h1 { margin: 0; color: #0F172A; font-size: clamp(27px, 3vw, 34px); letter-spacing: -.04em; }
+        .lead { max-width: 680px; margin: 9px 0 0; color: var(--text-muted); font-size: 14px; }
+
+        /* ---------- filter chips (double as counts) ---------- */
+        .chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .chip {
+            display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;
+            border: 1px solid rgba(203, 213, 225, .9); border-radius: 13px; background: rgba(255, 255, 255, .94);
+            color: inherit; text-decoration: none; box-shadow: 0 4px 14px rgba(15, 23, 42, .035);
+            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
         }
-        .summary { margin: 0 0 18px; color: var(--text-muted); }
+        .chip:hover { border-color: #94A3B8; transform: translateY(-1px); }
+        .chip:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .chip-label { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
+        .chip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-cyan); }
+        .chip-count { color: #0F172A; font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+        .chip.success .chip-dot { background: var(--ok); }
+        .chip.failed .chip-dot { background: var(--bad); }
+        .chip.blocked .chip-dot { background: var(--warn); }
+        .chip.logout .chip-dot { background: #94A3B8; }
+        .chip.active { border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .14); }
+        .chip.success.active { border-color: var(--ok); box-shadow: 0 0 0 3px rgba(4, 120, 87, .14); }
+        .chip.failed.active { border-color: var(--bad); box-shadow: 0 0 0 3px rgba(185, 28, 28, .12); }
+        .chip.blocked.active { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(180, 83, 9, .12); }
+        .chip.logout.active { border-color: var(--neutral); box-shadow: 0 0 0 3px rgba(71, 85, 105, .12); }
+
+        /* ---------- toolbar ---------- */
+        .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .search { position: relative; flex: 1 1 280px; max-width: 420px; }
+        .search svg { position: absolute; top: 50%; left: 12px; width: 16px; height: 16px; color: #94A3B8; transform: translateY(-50%); pointer-events: none; }
+        .search input, .toolbar select {
+            width: 100%; height: 40px; border: 1px solid var(--border-color); border-radius: 10px; background: #FFFFFF;
+            color: var(--text-main); font: inherit; font-size: 13px;
+        }
+        .search input { padding: 0 12px 0 36px; }
+        .toolbar select { width: auto; padding: 0 34px 0 12px; cursor: pointer; }
+        .search input:focus, .toolbar select:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .15); }
+        .btn { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border: 1px solid transparent; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
+        .btn-primary { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-primary:hover { background: var(--accent-cyan-hover); }
+        .btn-ghost { border-color: var(--border-color); background: #FFFFFF; color: var(--text-muted); }
+        .btn-ghost:hover { color: #0F172A; border-color: #94A3B8; }
+        .btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+
+        /* ---------- results ---------- */
+        .card { border: 1px solid rgba(203, 213, 225, .8); border-radius: 15px; background: rgba(255, 255, 255, .96); box-shadow: 0 8px 26px rgba(15, 23, 42, .045); overflow: hidden; }
+        .card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 20px; border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 13px; }
+        .card-head strong { color: #0F172A; }
+        .tz-note { font-size: 12px; }
         .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 760px; }
-        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: top; }
-        th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-        td { font-size: 13px; }
-        .event { font-weight: 700; text-transform: capitalize; }
-        .event-success { color: var(--accent-green); }
-        .event-failed { color: var(--accent-red); }
-        .event-blocked { color: var(--accent-yellow); }
-        .event-logout { color: var(--text-muted); }
-        .empty { padding: 28px 12px; text-align: center; color: var(--text-muted); }
-        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
-        .pagination a { color: var(--accent-cyan); font-weight: 600; text-decoration: none; }
-        .pagination .disabled { color: #94A3B8; }
-        @media (max-width: 1024px) {
-            .dashboard-container { margin-left: 0; padding: 24px; }
-        }
-        @media (max-width: 600px) {
+        table { width: 100%; border-collapse: collapse; }
+        th { padding: 11px 16px; background: #F8FAFC; border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+        td { padding: 13px 16px; border-bottom: 1px solid #EEF2F6; font-size: 13px; vertical-align: top; }
+        tr:last-child td { border-bottom: 0; }
+        tbody tr:hover td { background: #F8FAFC; }
+        tr.row-failed td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+        tr.row-blocked td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+        .when { white-space: nowrap; }
+        .when-main { color: #0F172A; font-weight: 600; }
+        .sub { display: block; color: var(--text-muted); font-size: 12px; }
+        .who-name { color: #0F172A; font-weight: 600; }
+        .role { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; background: #E0F2FE; color: #0369A1; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px; }
+        .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .pill.success { border-color: var(--ok-line); background: var(--ok-bg); color: var(--ok); }
+        .pill.failed { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad); }
+        .pill.blocked { border-color: var(--warn-line); background: var(--warn-bg); color: var(--warn); }
+        .pill.logout { border-color: var(--neutral-line); background: var(--neutral-bg); color: var(--neutral); }
+        .mono { font-family: Consolas, 'SFMono-Regular', Menlo, monospace; font-size: 12px; }
+        .muted { color: #94A3B8; }
+        .device { cursor: help; text-decoration: underline dotted #CBD5E1; text-underline-offset: 3px; }
+
+        .empty { padding: 56px 20px; text-align: center; }
+        .empty h3 { margin: 0 0 6px; color: #0F172A; font-size: 16px; }
+        .empty p { margin: 0 0 16px; color: var(--text-muted); font-size: 13px; }
+
+        .pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--border-color); font-size: 13px; }
+        .pagination a { color: var(--accent-cyan); font-weight: 700; text-decoration: none; }
+        .pagination a:hover { text-decoration: underline; }
+        .pagination .disabled { color: #CBD5E1; font-weight: 700; }
+        .page-of { color: var(--text-muted); }
+
+        @media (max-width: 1100px) { .chips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 1024px) { .dashboard-container { margin-left: 0; padding: 24px; } }
+        /* Phones: each event becomes a card */
+        @media (max-width: 720px) {
             .dashboard-container { padding: 20px 16px; }
+            .chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .chip-count { font-size: 20px; }
+            .toolbar select, .toolbar .btn { flex: 1 1 auto; }
+            thead { display: none; }
+            table, tbody, tr, td { display: block; width: 100%; }
+            tr { padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
+            td { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; text-align: right; }
+            td::before { content: attr(data-label); color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-align: left; }
+            tr.row-failed td:first-child, tr.row-blocked td:first-child { box-shadow: none; }
+            tr.row-failed { box-shadow: inset 3px 0 0 var(--bad); }
+            tr.row-blocked { box-shadow: inset 3px 0 0 var(--warn); }
+            .when { white-space: normal; }
         }
+        @media (prefers-reduced-motion: reduce) { .chip { transition: none; } .chip:hover { transform: none; } }
     </style>
 </head>
 <body>
     {% set active_admin_page = 'login_history' %}
     {% include "partials/admin_sidebar.html" %}
+    {% set type_labels = {"all": "All events", "success": "Successful sign-ins", "failed": "Failed attempts", "blocked": "Blocked", "logout": "Sign-outs"} %}
+    {% set event_labels = {"success": "Success", "failed": "Failed", "blocked": "Blocked", "logout": "Logout"} %}
+    {% set period_labels = {"all": "All time", "24h": "Last 24 hours", "7d": "Last 7 days", "30d": "Last 30 days"} %}
 
     <main class="dashboard-container">
-        <h1>User Login History</h1>
-        <p class="lead">Review successful sign-ins, failed credentials, blocked logins, and sign-outs.</p>
+        <header class="page-heading">
+            <span class="eyebrow"><span class="eyebrow-dot"></span>Security</span>
+            <h1>User Login History</h1>
+            <p class="lead">Review sign-ins, failed attempts, blocked accounts, and sign-outs. Repeated failures from the same email or IP address can signal a guessed password.</p>
+        </header>
 
-        <section class="card">
-            <p class="summary">{{ total_count }} recorded events · showing up to 100 per page</p>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date &amp; time (UTC)</th>
-                            <th>Email</th>
-                            <th>Event</th>
-                            <th>Details</th>
-                            <th>IP address</th>
-                            <th>Browser / device</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for event in events %}
+        <nav class="chips" aria-label="Filter by event type">
+            {% for kind in ["all", "success", "failed", "blocked", "logout"] %}
+                <a class="chip {{ kind }} {{ 'active' if filters.type == kind }}" href="{{ page_url(type=kind, page=1) }}" {% if filters.type == kind %}aria-current="true"{% endif %}>
+                    <span class="chip-label"><span class="chip-dot"></span>{{ type_labels[kind] }}</span>
+                    <span class="chip-count">{{ "{:,}".format(type_counts[kind]) }}</span>
+                </a>
+            {% endfor %}
+        </nav>
+
+        <form class="toolbar" method="GET" action="{{ url_for('admin_login_history') }}" role="search">
+            {% if filters.type != "all" %}<input type="hidden" name="type" value="{{ filters.type }}">{% endif %}
+            <label class="search">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
+                <input type="search" id="loginSearch" name="q" value="{{ filters.q }}" placeholder="Search by email" aria-label="Search by email" autocomplete="off">
+            </label>
+            <select id="loginPeriod" name="period" aria-label="Time range" onchange="this.form.submit()">
+                {% for key, label in period_labels.items() %}
+                    <option value="{{ key }}" {{ 'selected' if filters.period == key }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">Search</button>
+            {% if filters_active %}
+                <a class="btn btn-ghost" href="{{ url_for('admin_login_history') }}">Clear filters</a>
+            {% endif %}
+        </form>
+
+        <section class="card" aria-live="polite">
+            <div class="card-head">
+                <span>
+                    {% if total_count %}
+                        Showing <strong>{{ "{:,}".format(first_shown) }}–{{ "{:,}".format(last_shown) }}</strong> of <strong>{{ "{:,}".format(total_count) }}</strong>
+                        {{ type_labels[filters.type]|lower if filters.type != "all" else "events" }}
+                    {% else %}
+                        No matching events
+                    {% endif %}
+                    · {{ period_labels[filters.period] }}{% if filters.q %} · email contains “{{ filters.q }}”{% endif %}
+                </span>
+                <span class="tz-note" id="tzNote">Times shown in your local time</span>
+            </div>
+
+            {% if events %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
                             <tr>
-                                <td>{{ event.created_at or "—" }}</td>
-                                <td>{{ event.email or "Unknown" }}</td>
-                                <td class="event event-{{ event.event_type }}">{{ event.event_type }}</td>
-                                <td>{{ event.reason or "—" }}</td>
-                                <td>{{ event.ip_address or "—" }}</td>
-                                <td>{{ event.user_agent or "—" }}</td>
+                                <th scope="col">When</th>
+                                <th scope="col">User</th>
+                                <th scope="col">Event</th>
+                                <th scope="col">Details</th>
+                                <th scope="col">IP address</th>
+                                <th scope="col">Device</th>
                             </tr>
-                        {% else %}
-                            <tr><td class="empty" colspan="6">No login events have been recorded.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="pagination">
-                {% if page > 1 %}
-                    <a href="{{ url_for('admin_login_history', page=page - 1) }}">← Newer</a>
-                {% else %}
-                    <span class="disabled">← Newer</span>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                                <tr class="row-{{ event.event_type }}">
+                                    <td class="when" data-label="When">
+                                        {% if event.created_at %}
+                                            <span>
+                                                <time class="when-main" datetime="{{ event.created_at }}">{{ event.created_at[:16]|replace("T", " ") }} UTC</time>
+                                                <span class="sub" data-relative="{{ event.created_at }}"></span>
+                                            </span>
+                                        {% else %}<span class="muted">—</span>{% endif %}
+                                    </td>
+                                    <td data-label="User">
+                                        <span>
+                                            {% if event.display_name %}
+                                                <span class="who-name">{{ event.display_name }}</span>{% if event.role %}<span class="role">{{ event.role }}</span>{% endif %}
+                                                <span class="sub">{{ event.email or "No email" }}</span>
+                                            {% else %}
+                                                <span class="who-name">{{ event.email or "Unknown" }}</span>
+                                                {% if not event.user_id %}<span class="sub">No matching account</span>{% endif %}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td data-label="Event"><span class="pill {{ event.event_type }}">{{ event_labels.get(event.event_type, event.event_type|capitalize) }}</span></td>
+                                    <td data-label="Details">{% if event.reason_text %}{{ event.reason_text }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                                    <td data-label="IP address"><span class="mono">{{ event.ip_address or "—" }}</span></td>
+                                    <td data-label="Device">
+                                        {% if event.device %}<span class="device" title="{{ event.user_agent }}">{{ event.device }}</span>{% else %}<span class="muted">—</span>{% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if page_count > 1 %}
+                    <nav class="pagination" aria-label="Pages">
+                        {% if page > 1 %}<a href="{{ page_url(page=page - 1) }}">← Newer</a>{% else %}<span class="disabled">← Newer</span>{% endif %}
+                        <span class="page-of">Page {{ page }} of {{ page_count }}</span>
+                        {% if page < page_count %}<a href="{{ page_url(page=page + 1) }}">Older →</a>{% else %}<span class="disabled">Older →</span>{% endif %}
+                    </nav>
                 {% endif %}
-                <span>Page {{ page }} of {{ page_count }}</span>
-                {% if page < page_count %}
-                    <a href="{{ url_for('admin_login_history', page=page + 1) }}">Older →</a>
-                {% else %}
-                    <span class="disabled">Older →</span>
-                {% endif %}
-            </div>
+            {% else %}
+                <div class="empty">
+                    {% if filters_active %}
+                        <h3>No events match these filters</h3>
+                        <p>Try a longer time range, another event type, or a different email.</p>
+                        <a class="btn btn-ghost" href="{{ url_for('admin_login_history') }}">Clear filters</a>
+                    {% else %}
+                        <h3>No login events yet</h3>
+                        <p>Sign-ins, failed attempts, and sign-outs will appear here as users use DentaLink.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
         </section>
     </main>
+
+    <script>
+        // Show stored UTC times in the viewer's local time, with a relative label ("5 min ago").
+        (function () {
+            const fmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+            const rel = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+            const units = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
+            document.querySelectorAll("time[datetime]").forEach((el) => {
+                const d = new Date(el.getAttribute("datetime"));
+                if (!isNaN(d)) el.textContent = fmt.format(d);
+            });
+            document.querySelectorAll("[data-relative]").forEach((el) => {
+                const d = new Date(el.dataset.relative);
+                if (isNaN(d)) return;
+                const secs = Math.round((d - Date.now()) / 1000);
+                const unit = units.find(([, s]) => Math.abs(secs) >= s);
+                el.textContent = unit ? rel.format(Math.round(secs / unit[1]), unit[0]) : "just now";
+            });
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (tz) document.getElementById("tzNote").textContent = "Times shown in your local time (" + tz + ")";
+            // Press "/" to jump to the search box.
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+                    e.preventDefault();
+                    document.getElementById("loginSearch").focus();
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
