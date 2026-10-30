@@ -245,6 +245,9 @@
             cursor: pointer;
             box-shadow: 0 0 6px rgba(2, 132, 199, 0.4);
         }
+        .btn-action-delete { flex: 0 0 auto; background: transparent; border: 1px solid var(--border-color); color: #B91C1C; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: 0.2s; }
+        .btn-action-delete:hover { background: #FEF2F2; border-color: #FECACA; }
+        .btn-action-delete:focus-visible { outline: 2px solid #B91C1C; outline-offset: 2px; }
     </style>
 </head>
 <body>
@@ -583,6 +586,11 @@
 
                         <div class="k-card-actions">
                             <a href="{{ url_for('edit_dental_case', case_id=case.id) }}" class="btn-action-primary">Resume Prescription →</a>
+                            <button type="button" class="btn-action-delete" aria-label="Delete draft #{{ case.case_number }}"
+                                    data-confirm-action="{{ url_for('delete_draft_case', case_id=case.id) }}"
+                                    data-confirm-title="Delete draft #{{ case.case_number }}?"
+                                    data-confirm-message="The draft{% if case.patient_name %} for {{ case.patient_name }}{% endif %}, its tooth details, and any uploaded files will be permanently removed. It was never sent to the lab."
+                                    data-confirm-label="Delete draft">Delete</button>
                         </div>
                     </div>
                 {% else %}
@@ -1210,5 +1218,7 @@
             }
         });
     </script>
+    {% include 'partials/confirm_dialog.html' %}
+    {% include 'partials/action_notice.html' %}
 </body>
 </html>

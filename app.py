@@ -1620,10 +1620,8 @@ def create_dental_case():
             if not teeth_to_insert:
                 return "Please select at least one tooth.", 400
 
-            # Generate Case Number
-            existing_cases_response = supabase_admin.table("dental_cases").select("id").execute()
-            existing_cases = existing_cases_response.data or []
-            case_number = f"DL-{len(existing_cases) + 1:05d}"
+            # Generate Case Number: highest existing number + 1, so deleted drafts never cause a duplicate
+            case_number = _next_case_number()
 
             # Insert Case including due_date
             case_response = supabase_admin.table("dental_cases").insert({
@@ -2805,6 +2803,69 @@ def edit_dental_case(case_id):
         return f"Edit case error: {str(e)}", 500
 
 # =========================
+# DENTIST: DELETE DRAFT
+# =========================
+@app.route("/dentist/cases/<case_id>/delete", methods=["POST"])
+@role_required("dentist")
+def delete_draft_case(case_id):
+    try:
+        cases = (
+            supabase_admin.table("dental_cases")
+            .select("id, case_number, patient_name, status")
+            .eq("id", case_id)
+            .eq("dentist_id", g.profile["id"])
+            .execute()
+            .data
+            or []
+        )
+        if not cases:
+            flash("This draft was already deleted or isn't yours. Nothing was changed.", "draft-stale")
+            return redirect(url_for("dentist_dashboard"))
+        case = cases[0]
+        if case.get("status") != "draft":
+            flash(f"Case #{case['case_number']} has already been sent to the lab, so it can't be deleted. Contact the laboratory to cancel it.", "draft-stale")
+            return redirect(url_for("dentist_dashboard"))
+
+        # Remove uploaded files from storage first, then the child rows, then the case itself.
+        files = supabase_admin.table("case_files").select("file_path").eq("case_id", case_id).execute().data or []
+        paths = [f["file_path"] for f in files if f.get("file_path")]
+        if paths:
+            try:
+                supabase_admin.storage.from_("dental-case-files").remove(paths)
+            except Exception:
+                app.logger.exception("Unable to remove stored files of draft %s", case_id)
+        for table in ("case_files", "case_teeth", "case_status_history", "material_requests"):
+            supabase_admin.table(table).delete().eq("case_id", case_id).execute()
+        supabase_admin.table("dental_cases").delete().eq("id", case_id).eq("dentist_id", g.profile["id"]).eq("status", "draft").execute()
+
+        patient = f" for {case['patient_name']}" if case.get("patient_name") else ""
+        flash(f"Draft #{case['case_number']}{patient} was deleted.", "draft-deleted")
+        return redirect(url_for("dentist_dashboard"))
+    except Exception:
+        app.logger.exception("Unable to delete draft case")
+        return "Unable to delete this draft. Check the server logs for details.", 500
+
+
+def _next_case_number():
+    """Return the next case number (DL-00001 style) after the highest one in use."""
+    latest = (
+        supabase_admin.table("dental_cases")
+        .select("case_number")
+        .like("case_number", "DL-%")
+        .order("case_number", desc=True)
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    try:
+        highest = int(latest[0]["case_number"].split("-", 1)[1]) if latest else 0
+    except (ValueError, IndexError):
+        highest = 0
+    return f"DL-{highest + 1:05d}"
+
+
+# =========================
 # NOTIFICATION HELPER
 # =========================
 def create_notification(user_id, message, link="#"):
@@ -3466,6 +3527,7 @@ def admin_inventory():
             profile=profile,
             inventory=inventory_items,
             pred_map=pred_map,  # Passed to HTML for forecasting UI display
+            log_counts={item["id"]: sum(1 for log in historical_logs if log.get("inventory_id") == item["id"]) for item in inventory_items},
             notifications=notifications,
             restock_requests=restock_requests,
             unassigned_cases=unassigned_cases,
@@ -3525,6 +3587,36 @@ def add_inventory_item():
         return redirect(url_for("admin_inventory"))
     except Exception as e:
         return f"Add item error: {str(e)}", 500
+
+
+# =========================
+# ADMIN: DELETE INVENTORY ITEM
+# =========================
+@app.route("/admin/inventory/<item_id>/delete", methods=["POST"])
+@role_required("admin")
+def delete_inventory_item(item_id):
+    try:
+        items = supabase_admin.table("inventory").select("id, item_name").eq("id", item_id).execute().data or []
+        if not items:
+            flash("This material was already deleted or no longer exists. Nothing was changed.", "inventory-stale")
+            return redirect(url_for("admin_inventory"))
+        item_name = items[0]["item_name"]
+
+        # Its stock-change records go too, so no log points at a missing material.
+        log_count = (
+            supabase_admin.table("inventory_logs").select("id", count="exact").eq("inventory_id", item_id).limit(1).execute().count
+            or 0
+        )
+        supabase_admin.table("inventory_logs").delete().eq("inventory_id", item_id).execute()
+        supabase_admin.table("inventory").delete().eq("id", item_id).execute()
+        app.logger.info("Inventory item %s (%s) deleted by %s with %s log entries", item_id, item_name, g.profile["id"], log_count)
+
+        records = f" and its {log_count} stock-change record{'s' if log_count != 1 else ''}" if log_count else ""
+        flash(f"'{item_name}'{records} {'were' if log_count else 'was'} removed from inventory.", "inventory-deleted")
+        return redirect(url_for("admin_inventory"))
+    except Exception:
+        app.logger.exception("Unable to delete inventory item")
+        return "Unable to delete this material. Check the server logs for details.", 500
 
 
 # =========================

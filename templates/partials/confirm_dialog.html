@@ -1,0 +1,64 @@
+{# Confirmation dialog for destructive actions.
+   Open it from a button with data attributes:
+     data-confirm-action  form URL to POST to
+     data-confirm-title   heading, e.g. "Delete this material?"
+     data-confirm-message explanation of what will be removed
+     data-confirm-label   confirm button text (default "Delete") #}
+<style>
+    .cd-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: none; align-items: center; justify-content: center; z-index: 2100; padding: 16px; }
+    .cd-overlay.open { display: flex; }
+    .cd-card { background: #FFFFFF; border-radius: 14px; width: 100%; max-width: 420px; padding: 24px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25); font-family: inherit; }
+    .cd-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+    .cd-icon { flex: 0 0 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #FEF2F2; color: #B91C1C; }
+    .cd-title { margin: 0 0 6px; font-size: 17px; font-weight: 700; color: #0F172A; }
+    .cd-text { margin: 0; font-size: 14px; line-height: 1.5; color: #475569; }
+    .cd-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .cd-btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; }
+    .cd-btn.danger { background: #B91C1C; border-color: #B91C1C; color: #FFFFFF; }
+    .cd-btn.danger:hover { background: #991B1B; }
+    .cd-btn:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+</style>
+<div class="cd-overlay" id="confirmDialog" role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+    <div class="cd-card">
+        <div class="cd-head">
+            <div class="cd-icon" aria-hidden="true">
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+            </div>
+            <div>
+                <h2 class="cd-title" id="confirmDialogTitle"></h2>
+                <p class="cd-text" id="confirmDialogText"></p>
+            </div>
+        </div>
+        <form method="POST" id="confirmDialogForm" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="cd-actions">
+                <button type="button" class="cd-btn" id="confirmDialogCancel">Cancel</button>
+                <button type="submit" class="cd-btn danger" id="confirmDialogSubmit">Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    (function () {
+        const dialog = document.getElementById('confirmDialog');
+        const form = document.getElementById('confirmDialogForm');
+        let opener = null;
+        function close() { dialog.classList.remove('open'); if (opener) opener.focus(); }
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-confirm-action]');
+            if (!btn) return;
+            e.preventDefault();
+            opener = btn;
+            form.action = btn.dataset.confirmAction;
+            document.getElementById('confirmDialogTitle').textContent = btn.dataset.confirmTitle || 'Are you sure?';
+            document.getElementById('confirmDialogText').textContent = btn.dataset.confirmMessage || '';
+            document.getElementById('confirmDialogSubmit').textContent = btn.dataset.confirmLabel || 'Delete';
+            dialog.classList.add('open');
+            document.getElementById('confirmDialogCancel').focus();
+        });
+        document.getElementById('confirmDialogCancel').addEventListener('click', close);
+        dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dialog.classList.contains('open')) close(); });
+        form.addEventListener('submit', () => { document.getElementById('confirmDialogSubmit').disabled = true; });
+    })();
+</script>

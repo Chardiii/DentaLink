@@ -275,6 +275,10 @@
             .app-sidebar { display: none; }
             .dashboard-container { margin-left: 0; padding: 20px; }
         }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .btn-delete-item { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: #94A3B8; cursor: pointer; transition: all 0.15s; }
+        .btn-delete-item:hover { color: #B91C1C; border-color: #FECACA; background: #FEF2F2; }
+        .btn-delete-item:focus-visible { outline: 2px solid #B91C1C; outline-offset: 2px; }
     </style>
 </head>
 <body>
@@ -526,6 +530,7 @@
                             <th>Quantity</th>
                             <th>Status & Forecast</th>
                             <th>Quick Stock Adjust</th>
+                            <th><span class="sr-only">Delete</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -565,10 +570,20 @@
                                         <button type="submit" class="btn btn-cyan" style="padding: 6px 10px; font-size: 11px;">Apply</button>
                                     </form>
                                 </td>
+                                <td>
+                                    {% set n_logs = log_counts.get(item.id, 0) %}
+                                    <button type="button" class="btn-delete-item" title="Delete {{ item.item_name }}" aria-label="Delete {{ item.item_name }}"
+                                            data-confirm-action="{{ url_for('delete_inventory_item', item_id=item.id) }}"
+                                            data-confirm-title="Delete {{ item.item_name }}?"
+                                            data-confirm-message="This removes the material from inventory and forecasting{% if n_logs %}, together with its {{ n_logs }} stock-change record{{ 's' if n_logs != 1 }}{% endif %}. This can't be undone; download a backup first if you may need it."
+                                            data-confirm-label="Delete material">
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+                                    </button>
+                                </td>
                             </tr>
                         {% else %}
                             <tr id="emptyRow">
-                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 40px;">No inventory items recorded yet. Use the "+ Add New Item" button above to add supplies.</td>
+                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">No inventory items recorded yet. Use the "+ Add New Item" button above to add supplies.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -1092,6 +1107,7 @@
             }
         }, REFRESH_INTERVAL_MS);
     </script>
+    {% include 'partials/confirm_dialog.html' %}
     {% include 'partials/action_notice.html' %}
 </body>
 </html>
