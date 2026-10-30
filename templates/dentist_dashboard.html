@@ -260,6 +260,8 @@
         .receipt-line svg { flex: 0 0 14px; margin-top: 2px; }
         .receipt-line .muted-note { color: var(--text-muted); }
         .link-btn { background: none; border: 0; color: var(--accent-cyan); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+        .case-tags { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .remake-chip { padding: 2px 7px; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -422,7 +424,7 @@
                 {% for c in action_cases %}
                     <div class="k-card" style="border-left: 3px solid var(--accent-red);">
                         <div class="k-card-header">
-                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                             <span class="k-due-pill danger">Action Required</span>
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
@@ -447,7 +449,7 @@
                 {% for c in pending_cases %}
                     <div class="k-card">
                         <div class="k-card-header">
-                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                             <span class="k-due-pill warning">Due {{ c.due_date or 'TBD' }}</span>
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
@@ -475,7 +477,7 @@
                 {% for c in prod_cases %}
                     <div class="k-card">
                         <div class="k-card-header">
-                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                             <span class="k-due-pill warning">Target: {{ c.due_date or 'TBD' }}</span>
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
@@ -501,7 +503,7 @@
                 {% for c in qc_cases %}
                     <div class="k-card">
                         <div class="k-card-header">
-                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                             <span class="k-due-pill success">Final Polish & QC</span>
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
@@ -528,7 +530,7 @@
                 {% for c in transit_cases %}
                     <div class="k-card">
                         <div class="k-card-header">
-                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                             {% if c.status == 'in_transit' %}
                                 <span class="k-due-pill warning">On its way</span>
                             {% else %}
@@ -579,7 +581,7 @@
                          data-search="{{ (c.case_number ~ ' ' ~ (c.patient_name or '') ~ ' ' ~ (c.patient_reference or ''))|lower }}"
                          data-month="{{ c.month_key }}">
                         <div class="k-card-header">
-                            <span class="k-badge-cyan">#{{ c.case_number }}</span>
+                            <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                             {% if c.issue_open %}
                                 <span class="k-due-pill warning">Issue under review</span>
                             {% elif r and r.tracked and r.late_days %}
