@@ -248,6 +248,18 @@
         .btn-action-delete { flex: 0 0 auto; background: transparent; border: 1px solid var(--border-color); color: #B91C1C; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: 0.2s; }
         .btn-action-delete:hover { background: #FEF2F2; border-color: #FECACA; }
         .btn-action-delete:focus-visible { outline: 2px solid #B91C1C; outline-offset: 2px; }
+        .delivered-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .delivered-search { position: relative; flex: 1 1 260px; max-width: 420px; }
+        .delivered-search svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: #94A3B8; pointer-events: none; }
+        .delivered-search input, #deliveredMonth { width: 100%; height: 38px; border: 1px solid var(--border-color); border-radius: 10px; background: #FFFFFF; color: var(--text-main); font: inherit; font-size: 13px; }
+        .delivered-search input { padding: 0 12px 0 36px; }
+        #deliveredMonth { width: auto; padding: 0 30px 0 12px; cursor: pointer; }
+        .delivered-search input:focus, #deliveredMonth:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .15); }
+        .delivered-count { color: var(--text-muted); font-size: 12px; }
+        .receipt-line { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; color: #047857; background: rgba(16, 185, 129, 0.07); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; }
+        .receipt-line svg { flex: 0 0 14px; margin-top: 2px; }
+        .receipt-line .muted-note { color: var(--text-muted); }
+        .link-btn { background: none; border: 0; color: var(--accent-cyan); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -326,12 +338,6 @@
 
     <main class="container">
 
-        {% set action_cases = dental_cases | selectattr('status', 'equalto', 'needs_revision') | list %}
-        {% set pending_cases = dental_cases | selectattr('status', 'in', ['submitted', 'assigned']) | list %}
-        {% set prod_cases = dental_cases | selectattr('status', 'in', ['in_progress', 'cad_designing', 'wax_up_or_try_in', 'milling_or_printing', 'packing_and_curing']) | list %}
-        {% set qc_cases = dental_cases | selectattr('status', 'equalto', 'finishing_and_quality_check') | list %}
-        {% set completed_cases = dental_cases | selectattr('status', 'equalto', 'completed') | list %}
-        {% set draft_cases = dental_cases | selectattr('status', 'equalto', 'draft') | list %}
 
         <div class="metrics-strip">
             <div class="metric-tile" style="border-left: 3px solid var(--accent-red);">
@@ -481,7 +487,7 @@
                         </div>
 
                         <div class="k-card-actions">
-                            <a href="{{ url_for('edit_dental_case', case_id=c.id) }}" class="btn-action-secondary">Review Rx Record</a>
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">Review Rx Record</a>
                         </div>
                     </div>
                 {% else %}
@@ -553,23 +559,58 @@
         </div>
 
         <div id="sec-completed" class="category-section">
+            {% if completed_cases %}
+            <div class="delivered-tools" role="search">
+                <label class="delivered-search">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
+                    <input type="search" id="deliveredSearch" placeholder="Search patient, reference, or case number" aria-label="Search delivered cases" autocomplete="off">
+                </label>
+                <select id="deliveredMonth" aria-label="Filter by month delivered">
+                    <option value="">All months</option>
+                    {% for m in completed_cases|map(attribute='month_key')|select|unique|sort(reverse=true) %}<option value="{{ m }}" data-month-label="{{ m }}">{{ m }}</option>{% endfor %}
+                </select>
+                <span class="delivered-count" id="deliveredCount" aria-live="polite">{{ completed_cases|length }} case{{ 's' if completed_cases|length != 1 }}</span>
+            </div>
+            {% endif %}
             <div class="cases-grid">
                 {% for c in completed_cases %}
-                    <div class="k-card" style="border-color: rgba(16, 185, 129, 0.3);">
+                    {% set r = c.receipt %}
+                    <div class="k-card delivered-card" style="border-color: rgba(16, 185, 129, 0.3);"
+                         data-search="{{ (c.case_number ~ ' ' ~ (c.patient_name or '') ~ ' ' ~ (c.patient_reference or ''))|lower }}"
+                         data-month="{{ c.month_key }}">
                         <div class="k-card-header">
                             <span class="k-badge-cyan">#{{ c.case_number }}</span>
-                            <span class="k-due-pill success">Delivered</span>
+                            {% if c.issue_open %}
+                                <span class="k-due-pill warning">Issue under review</span>
+                            {% elif r and r.tracked and r.late_days %}
+                                <span class="k-due-pill warning">{{ r.late_days }} day{{ 's' if r.late_days != 1 }} late</span>
+                            {% elif r and r.tracked %}
+                                <span class="k-due-pill success">On time</span>
+                            {% else %}
+                                <span class="k-due-pill success">Delivered</span>
+                            {% endif %}
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
-                        <div class="k-card-subtitle">Received: {{ (c.delivered_at or '')[:10] or 'Before QR tracking' }}</div>
+                        <div class="k-card-subtitle">Ref: {{ c.patient_reference or 'N/A' }} • {{ c.case_type | replace('_', ' ') | title }}</div>
+                        <div class="receipt-line">
+                            {% if r and r.tracked %}
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <span>Received <time datetime="{{ c.delivered_at }}">{{ c.delivered_at[:10] }}</time>{% if r.delivered and r.delivered.received_by %} by {{ r.delivered.received_by }}{% endif %}{% if r.turnaround_days is not none %} · {{ r.turnaround_days }}-day turnaround{% endif %}</span>
+                            {% else %}
+                                <span class="muted-note">Delivered before QR tracking; no receipt recorded</span>
+                            {% endif %}
+                        </div>
 
                         <div class="k-card-actions">
-                            <a href="{{ url_for('edit_dental_case', case_id=c.id) }}" class="btn-action-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-green);">View Final Specs →</a>
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-green);">View Final Specs →</a>
                         </div>
                     </div>
                 {% else %}
                     <div class="empty-grid">No completed case history recorded yet.</div>
                 {% endfor %}
+                {% if completed_cases %}
+                    <div class="empty-grid" id="deliveredNoMatch" hidden>No delivered cases match your search. <button type="button" class="link-btn" id="deliveredClear">Clear search</button></div>
+                {% endif %}
             </div>
         </div>
 
@@ -1021,6 +1062,36 @@
         }, REFRESH_INTERVAL_MS);
 
         // UI Tabs
+        // Delivered tab: search and month filter (client-side; every delivered case is already on the page)
+        (function () {
+            const search = document.getElementById('deliveredSearch');
+            const month = document.getElementById('deliveredMonth');
+            if (!search) return;
+            const cards = Array.from(document.querySelectorAll('.delivered-card'));
+            const noMatch = document.getElementById('deliveredNoMatch');
+            const count = document.getElementById('deliveredCount');
+            const monthName = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+            month.querySelectorAll('option[data-month-label]').forEach((o) => {
+                const [y, m] = o.value.split('-').map(Number);
+                if (y && m) o.textContent = monthName.format(new Date(y, m - 1, 1));
+            });
+            const plural = (n) => n + ' case' + (n === 1 ? '' : 's');
+            function apply() {
+                const q = search.value.trim().toLowerCase();
+                let shown = 0;
+                cards.forEach((card) => {
+                    const ok = (!q || card.dataset.search.includes(q)) && (!month.value || card.dataset.month === month.value);
+                    card.hidden = !ok;
+                    if (ok) shown++;
+                });
+                noMatch.hidden = shown !== 0;
+                count.textContent = (q || month.value) ? shown + ' of ' + plural(cards.length) : plural(cards.length);
+            }
+            search.addEventListener('input', apply);
+            month.addEventListener('change', apply);
+            document.getElementById('deliveredClear').addEventListener('click', () => { search.value = ''; month.value = ''; apply(); search.focus(); });
+        })();
+
         function showCategory(event, sectionId) {
             document.querySelectorAll('.category-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));

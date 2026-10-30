@@ -436,6 +436,14 @@
     </span>
 </a>
 
+                <a href="{{ url_for('admin_delivery_issues') }}" class="nav-pill">
+                    <span class="nav-content">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+                        Delivery Issues
+                    </span>
+                    {% if open_issue_count %}<span class="pill-badge">{{ open_issue_count }}</span>{% endif %}
+                </a>
+
                 <a href="{{ url_for('admin_backup') }}" class="nav-pill">
                     <span class="nav-content">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v3h14v-3"></path></svg>

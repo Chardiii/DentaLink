@@ -8,6 +8,11 @@
     "inventory-stale": ("stale", "Material not found"),
     "draft-deleted": ("dismissed", "Draft deleted"),
     "draft-stale": ("stale", "Draft not deleted"),
+    "issue-reported": ("fulfilled", "Report sent to the lab"),
+    "issue-stale": ("stale", "Report not sent"),
+    "issue-reviewed": ("fulfilled", "Decision saved"),
+    "review-stale": ("stale", "Already reviewed"),
+    "review-note": ("stale", "Add a note first"),
 } %}
 {% with notices = get_flashed_messages(with_categories=true, category_filter=notice_kinds.keys()|list) %}
 {% if notices %}

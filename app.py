@@ -81,6 +81,18 @@ DISPATCH_STATUSES = ("ready_for_dispatch", "in_transit")
 DELIVERED_STATUSES = ("delivered", "completed")
 CLOSED_STATUSES = ("draft", "submitted", "cancelled") + DELIVERED_STATUSES
 
+# The lab and its clinics are in the Philippines (UTC+8, no daylight saving).
+LAB_TZ = timezone(timedelta(hours=8))
+ISSUE_REPORT_WINDOW_DAYS = 14
+ISSUE_TYPES = {
+    "poor_fit": "Poor fit",
+    "wrong_shade": "Wrong shade",
+    "broken": "Broken or chipped",
+    "wrong_case": "Wrong case received",
+    "other": "Other problem",
+}
+ISSUE_DECISIONS = {"remake_accepted": "Remake accepted", "no_action": "No remake needed"}
+
 import urllib.request
 import threading
 
@@ -431,6 +443,7 @@ def admin_dashboard():
             dispatch_cases=dispatch_cases,
             notifications=notifications,
             online_count=online_count,
+            open_issue_count=_open_issue_count(),
             restock_requests=restock_requests
         )
 
@@ -1513,6 +1526,30 @@ def dentist_dashboard():
             tokens_by_case = {label["case_id"]: label["token"] for label in labels}
             for c in transit_cases:
                 c["dispatch_token"] = tokens_by_case.get(c["id"])
+
+        # Delivery receipt and open issue for each delivered case
+        if completed_cases:
+            completed_ids = [c["id"] for c in completed_cases]
+            delivered_events = (
+                supabase_admin.table("case_dispatch_events")
+                .select("case_id, event_type, received_by, courier_name, created_at")
+                .in_("case_id", completed_ids)
+                .eq("event_type", "delivered")
+                .order("created_at")
+                .execute()
+                .data
+                or []
+            )
+            events_by_case = {}
+            for e in delivered_events:
+                events_by_case.setdefault(e["case_id"], []).append(e)
+            open_issues = {r["case_id"] for r in _issue_reports_for(completed_ids) if r["status"] == "open"}
+            for c in completed_cases:
+                c["receipt"] = _delivery_receipt(c, events_by_case.get(c["id"], []))
+                c["issue_open"] = c["id"] in open_issues
+                received = c["receipt"]["delivered_at"] or _parse_timestamp(c.get("created_at"))
+                c["month_key"] = received.astimezone(LAB_TZ).strftime("%Y-%m") if received else ""
+            completed_cases.sort(key=lambda c: c.get("delivered_at") or "", reverse=True)
 
         # =========================
         # 7. GET RECENT NOTIFICATIONS
@@ -2846,6 +2883,74 @@ def delete_draft_case(case_id):
         return "Unable to delete this draft. Check the server logs for details.", 500
 
 
+def _parse_timestamp(value):
+    """Parse a Supabase timestamp string; returns an aware datetime or None."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _delivery_receipt(case, events):
+    """Summarize how a case reached the clinic, from its chain-of-custody events."""
+    by_type = {}
+    for event in events:
+        by_type.setdefault(event.get("event_type"), event)  # events arrive oldest first
+    delivered_at = _parse_timestamp(case.get("delivered_at"))
+    created_at = _parse_timestamp(case.get("created_at"))
+    receipt = {
+        "approved": by_type.get("issued"),
+        "dispatched": by_type.get("dispatched"),
+        "delivered": by_type.get("delivered"),
+        "delivered_at": delivered_at,
+        "tracked": delivered_at is not None,
+        "turnaround_days": None,
+        "late_days": None,
+        "report_until": None,
+    }
+    if delivered_at:
+        delivered_day = delivered_at.astimezone(LAB_TZ).date()
+        if created_at:
+            receipt["turnaround_days"] = (delivered_day - created_at.astimezone(LAB_TZ).date()).days
+        try:
+            due_day = datetime.strptime(str(case.get("due_date"))[:10], "%Y-%m-%d").date()
+            receipt["late_days"] = max(0, (delivered_day - due_day).days)
+        except ValueError:
+            pass
+        receipt["report_until"] = delivered_at + timedelta(days=ISSUE_REPORT_WINDOW_DAYS)
+    return receipt
+
+
+def _issue_reports_for(case_ids):
+    """Issue reports for these cases, newest first; empty if the table isn't migrated yet."""
+    if not case_ids:
+        return []
+    try:
+        return (
+            supabase_admin.table("case_issue_reports")
+            .select("*")
+            .in_("case_id", list(case_ids))
+            .order("created_at", desc=True)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        app.logger.warning("case_issue_reports unavailable; run the issue reports migration")
+        return []
+
+
+def _open_issue_count():
+    """Number of delivery issue reports awaiting review (0 if the table isn't migrated yet)."""
+    try:
+        return supabase_admin.table("case_issue_reports").select("id", count="exact").eq("status", "open").limit(1).execute().count or 0
+    except Exception:
+        return 0
+
+
 def _next_case_number():
     """Return the next case number (DL-00001 style) after the highest one in use."""
     latest = (
@@ -2863,6 +2968,215 @@ def _next_case_number():
     except (ValueError, IndexError):
         highest = 0
     return f"DL-{highest + 1:05d}"
+
+
+# =========================
+# DENTIST: CASE SUMMARY, DELIVERY RECEIPT, ISSUE REPORTS
+# =========================
+@app.route("/dentist/cases/<case_id>")
+@role_required("dentist")
+def dentist_case_summary(case_id):
+    try:
+        cases = supabase_admin.table("dental_cases").select("*").eq("id", case_id).eq("dentist_id", g.profile["id"]).execute().data or []
+        if not cases:
+            return "Case not found.", 404
+        case = cases[0]
+        if case.get("status") in ("draft", "needs_revision"):
+            return redirect(url_for("edit_dental_case", case_id=case_id))
+
+        case["teeth"] = supabase_admin.table("case_teeth").select("*").eq("case_id", case_id).order("tooth_number").execute().data or []
+        files = supabase_admin.table("case_files").select("*").eq("case_id", case_id).execute().data or []
+        for f in files:
+            try:
+                signed = supabase_admin.storage.from_("dental-case-files").create_signed_url(f["file_path"], 3600)
+                f["download_url"] = signed.get("signedURL") or signed.get("signed_url") if isinstance(signed, dict) else signed
+            except Exception:
+                f["download_url"] = None
+        history = (
+            supabase_admin.table("case_status_history").select("status, notes, created_at, changed_by")
+            .eq("case_id", case_id).order("created_at").execute().data or []
+        )
+        events = (
+            supabase_admin.table("case_dispatch_events")
+            .select("event_type, actor_id, courier_name, received_by, notes, created_at")
+            .eq("case_id", case_id).in_("event_type", ["issued", "dispatched", "delivered"])
+            .order("created_at").execute().data or []
+        )
+        people_ids = {pid for pid in [case.get("technician_id")] + [h.get("changed_by") for h in history] + [e.get("actor_id") for e in events] if pid}
+        people = (
+            supabase_admin.table("profiles").select("id, display_name, first_name, role").in_("id", list(people_ids)).execute().data or []
+        ) if people_ids else []
+        names = {p["id"]: _display_name(p) for p in people}
+        for item in history + events:
+            item["actor_name"] = names.get(item.get("changed_by") or item.get("actor_id"), "Laboratory")
+
+        receipt = _delivery_receipt(case, events)
+        reports = _issue_reports_for([case_id])
+        has_open_report = any(r["status"] == "open" for r in reports)
+        can_report = (
+            case.get("status") == "delivered"
+            and receipt["report_until"] is not None
+            and datetime.now(timezone.utc) <= receipt["report_until"]
+            and not has_open_report
+        )
+        return render_template(
+            "dentist_case_summary.html",
+            profile=g.profile,
+            case=case,
+            files=files,
+            history=history,
+            receipt=receipt,
+            technician_name=names.get(case.get("technician_id")),
+            reports=reports,
+            can_report=can_report,
+            has_open_report=has_open_report,
+            issue_types=ISSUE_TYPES,
+            issue_decisions=ISSUE_DECISIONS,
+            window_days=ISSUE_REPORT_WINDOW_DAYS,
+        )
+    except Exception:
+        app.logger.exception("Unable to load case summary")
+        return "Unable to load this case. Check the server logs for details.", 500
+
+
+@app.route("/dentist/cases/<case_id>/report-issue", methods=["POST"])
+@role_required("dentist")
+def report_case_issue(case_id):
+    back = url_for("dentist_case_summary", case_id=case_id)
+    try:
+        issue_type = request.form.get("issue_type")
+        details = request.form.get("details", "").strip()[:1000]
+        if issue_type not in ISSUE_TYPES:
+            flash("Choose what went wrong before sending the report.", "issue-stale")
+            return redirect(back)
+        if issue_type == "other" and not details:
+            flash("Describe the problem when you choose \"Other problem\".", "issue-stale")
+            return redirect(back)
+
+        cases = (
+            supabase_admin.table("dental_cases").select("id, case_number, status, delivered_at, created_at, due_date")
+            .eq("id", case_id).eq("dentist_id", g.profile["id"]).execute().data or []
+        )
+        if not cases or cases[0].get("status") != "delivered":
+            flash("Issues can only be reported on cases that were delivered to your clinic.", "issue-stale")
+            return redirect(back if cases else url_for("dentist_dashboard"))
+        case = cases[0]
+        receipt = _delivery_receipt(case, [])
+        if receipt["report_until"] is None or datetime.now(timezone.utc) > receipt["report_until"]:
+            flash(f"Issues can be reported within {ISSUE_REPORT_WINDOW_DAYS} days of delivery. Please contact the laboratory directly.", "issue-stale")
+            return redirect(back)
+        if any(r["status"] == "open" for r in _issue_reports_for([case_id])):
+            flash("You already reported an issue on this case. The laboratory is reviewing it.", "issue-stale")
+            return redirect(back)
+
+        supabase_admin.table("case_issue_reports").insert({
+            "case_id": case_id,
+            "dentist_id": g.profile["id"],
+            "issue_type": issue_type,
+            "details": details or None,
+            "status": "open",
+        }).execute()
+        dentist = _display_name(g.profile, "A dentist")
+        _notify_admins(
+            f"Delivery issue: {dentist} reported '{ISSUE_TYPES[issue_type]}' on Case {case['case_number']}. Review it and decide whether to remake.",
+            link=url_for("admin_delivery_issues"),
+        )
+        flash(f"Your report on Case #{case['case_number']} was sent. The laboratory will review it and notify you of its decision.", "issue-reported")
+        return redirect(back)
+    except Exception:
+        app.logger.exception("Unable to report case issue")
+        return "Unable to send the report. Check the server logs for details.", 500
+
+
+@app.route("/admin/delivery-issues")
+@role_required("admin")
+def admin_delivery_issues():
+    try:
+        view = request.args.get("view", "open")
+        if view not in ("open", "resolved", "all"):
+            view = "open"
+        try:
+            reports = supabase_admin.table("case_issue_reports").select("*").order("created_at", desc=True).execute().data or []
+            migrated = True
+        except Exception:
+            reports, migrated = [], False
+        counts = {
+            "open": sum(1 for r in reports if r["status"] == "open"),
+            "resolved": sum(1 for r in reports if r["status"] != "open"),
+            "all": len(reports),
+        }
+        if view == "open":
+            reports = [r for r in reports if r["status"] == "open"]
+        elif view == "resolved":
+            reports = [r for r in reports if r["status"] != "open"]
+
+        case_ids = list({r["case_id"] for r in reports})
+        cases = (
+            supabase_admin.table("dental_cases").select("id, case_number, patient_name, case_type, technician_id, dentist_id, delivered_at, due_date, created_at")
+            .in_("id", case_ids).execute().data or []
+        ) if case_ids else []
+        cases_by_id = {c["id"]: c for c in cases}
+        people_ids = {pid for c in cases for pid in (c.get("technician_id"), c.get("dentist_id")) if pid} | {r["reviewed_by"] for r in reports if r.get("reviewed_by")}
+        people = (
+            supabase_admin.table("profiles").select("id, display_name, first_name, clinic_name").in_("id", list(people_ids)).execute().data or []
+        ) if people_ids else []
+        people_by_id = {p["id"]: p for p in people}
+        for r in reports:
+            c = cases_by_id.get(r["case_id"], {})
+            r["case"] = c
+            r["dentist"] = people_by_id.get(c.get("dentist_id"), {})
+            r["technician_name"] = _display_name(people_by_id.get(c.get("technician_id")), "Unassigned")
+            r["reviewer_name"] = _display_name(people_by_id.get(r.get("reviewed_by")), "an administrator")
+            r["issue_label"] = ISSUE_TYPES.get(r["issue_type"], r["issue_type"])
+            r["decision_label"] = ISSUE_DECISIONS.get(r["status"])
+        return render_template(
+            "admin_delivery_issues.html",
+            profile=g.profile,
+            reports=reports,
+            counts=counts,
+            view=view,
+            migrated=migrated,
+        )
+    except Exception:
+        app.logger.exception("Unable to load delivery issues")
+        return "Unable to load delivery issues. Check the server logs for details.", 500
+
+
+@app.route("/admin/delivery-issues/<report_id>/review", methods=["POST"])
+@role_required("admin")
+def admin_review_delivery_issue(report_id):
+    back = url_for("admin_delivery_issues")
+    try:
+        decision = request.form.get("decision")
+        note = request.form.get("admin_note", "").strip()[:1000]
+        if decision not in ISSUE_DECISIONS:
+            return "Invalid decision.", 400
+        if decision == "no_action" and not note:
+            flash("Add a short note for the dentist explaining why no remake is needed.", "review-note")
+            return redirect(back)
+        rows = (
+            supabase_admin.table("case_issue_reports")
+            .update({"status": decision, "admin_note": note or None, "reviewed_by": g.profile["id"], "reviewed_at": _now_iso()})
+            .eq("id", report_id).eq("status", "open").execute().data or []
+        )
+        if not rows:
+            flash("This report was already reviewed, possibly by another administrator. Nothing was changed.", "review-stale")
+            return redirect(back)
+        report = rows[0]
+        cases = supabase_admin.table("dental_cases").select("case_number").eq("id", report["case_id"]).execute().data or []
+        case_number = cases[0]["case_number"] if cases else "your case"
+        if decision == "remake_accepted":
+            message = f"Remake accepted: the laboratory will remake Case {case_number}."
+        else:
+            message = f"Issue reviewed on Case {case_number}: no remake needed."
+        if note:
+            message += f" Note from the lab: {note}"
+        create_notification(user_id=report["dentist_id"], message=message, link=url_for("dentist_case_summary", case_id=report["case_id"]))
+        flash(f"Case {case_number}: {ISSUE_DECISIONS[decision].lower()}. The dentist has been notified.", "issue-reviewed")
+        return redirect(back)
+    except Exception:
+        app.logger.exception("Unable to review delivery issue")
+        return "Unable to save the decision. Check the server logs for details.", 500
 
 
 # =========================
