@@ -1,7 +1,7 @@
 {# The one admin sidebar, used by every admin page.
 
    Set `active_admin_page` before including it to highlight the current page:
-   dashboard, inventory, audit_logs, forecast, delivery_issues, backup, login_history.
+   dashboard, inventory, audit_logs, job_orders, forecast, delivery_issues, backup, login_history.
    Incoming Cases, Restock Requests and System Settings open their dialog in place when the
    page has it (dashboard, inventory, audit logs); elsewhere they go to the dashboard and open
    it there. Counts come from admin_sidebar_counts() and refresh with live updates. #}
@@ -114,6 +114,8 @@
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>') }}
             {{ nav_link('audit_logs', url_for('admin_inventory_logs'), 'Audit Logs',
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9v10a2 2 0 01-2 2z"/>') }}
+            {{ nav_link('job_orders', url_for('admin_job_orders'), 'Job Order History',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9v10a2 2 0 01-2 2z"/>') }}
             {{ nav_link('forecast', url_for('admin_forecast_analytics'), 'Forecast Analytics',
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>') }}
             {{ nav_link('delivery_issues', url_for('admin_delivery_issues'), 'Delivery Issues',
