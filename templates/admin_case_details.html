@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job order #{{ case.case_number }} - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --bg-soft: #F8FAFC;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-strong: #0F172A;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --ok: #047857;   --ok-bg: #ECFDF5;   --ok-line: #A7F3D0;
+            --warn: #B45309; --warn-bg: #FFFBEB; --warn-line: #FDE68A;
+            --crit: #B91C1C; --crit-bg: #FEF2F2; --crit-line: #FECACA;
+            --sidebar-width: 260px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; background-color: var(--bg-main); color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5;
+            background-image: radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%), radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+        }
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 30px 36px 48px; max-width: 1340px; }
+        .crumb { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; color: var(--text-muted); font-size: 13px; font-weight: 600; text-decoration: none; }
+        .crumb:hover { color: var(--accent-cyan); }
+
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 14px; border-radius: 9px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; }
+        .btn-primary { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-primary:hover { background: var(--accent-cyan-hover); }
+        .btn-ghost { background: #FFFFFF; border-color: var(--border-color); color: var(--text-main); }
+        .btn-ghost:hover { border-color: #94A3B8; }
+        .btn-danger { background: #FFFFFF; border-color: var(--crit-line); color: var(--crit); }
+        .btn-danger:hover { background: var(--crit-bg); }
+        .btn-sm { padding: 6px 11px; font-size: 12px; }
+        .btn-block { width: 100%; }
+        .btn:focus-visible, a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .hint { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+        .note-box { padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: 9px; font-size: 12.5px; color: var(--text-muted); }
+        input[type="text"], textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-soft); font: inherit; font-size: 13px; color: var(--text-main); }
+        input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .12); background: #FFFFFF; }
+        form.stack-form { display: grid; gap: 8px; }
+
+        .summary { background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 16px; padding: 22px 24px; box-shadow: 0 4px 12px rgba(15, 23, 42, .04); margin-bottom: 20px; }
+        .summary-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: flex-start; }
+        .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-cyan); }
+        .summary h1 { margin: 4px 0 6px; font-size: 26px; color: var(--text-strong); letter-spacing: -.02em; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .chip.type, .chip.info { color: var(--accent-cyan); background: #F0F9FF; border-color: #BAE6FD; }
+        .chip.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+        .chip.warn, .chip.due-today, .chip.due-soon { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+        .chip.rush, .chip.due-overdue { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
+        .chip.remake { color: #92400E; background: #FEF3C7; border-color: #FDE68A; }
+        .chip.due-later, .chip.due-none { color: #475569; background: #F1F5F9; border-color: #E2E8F0; }
+        .chip.status { font-size: 13px; padding: 5px 12px; }
+        .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .facts dt { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+        .facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+        .facts dd span { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
+        .links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+        .link-row { padding: 5px 11px; border-radius: 9px; background: #FEF3C7; color: #92400E; font-size: 12.5px; font-weight: 600; }
+        .link-row a { color: #92400E; }
+        .stages { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; margin: 18px 0 0; list-style: none; padding: 0; }
+        .stages li { position: relative; padding-top: 14px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-align: center; }
+        .stages li::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; border-radius: 3px; background: #E2E8F0; }
+        .stages li.done::before { background: #7DD3FC; }
+        .stages li.current::before { background: var(--accent-cyan); }
+        .stages li.current { color: var(--text-strong); font-weight: 800; }
+        .banner { padding: 12px 14px; border: 1px solid; border-radius: 11px; font-size: 13.5px; margin-top: 16px; white-space: pre-wrap; }
+        .banner.warn { color: #92400E; background: var(--warn-bg); border-color: var(--warn-line); }
+
+        .layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+        .stack { display: grid; gap: 20px; }
+        .panel { background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 16px; padding: 20px 22px; box-shadow: 0 4px 12px rgba(15, 23, 42, .04); display: grid; gap: 14px; }
+        .panel.action { border-left: 3px solid var(--accent-cyan); }
+        .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .panel h2 { margin: 0; font-size: 15px; color: var(--text-strong); display: flex; align-items: center; gap: 9px; }
+        .panel h2 svg { color: var(--accent-cyan); flex: 0 0 auto; }
+        .instructions { padding: 14px 16px; border-left: 3px solid var(--accent-cyan); background: #F0F9FF; border-radius: 0 10px 10px 0; font-size: 14px; white-space: pre-wrap; color: #1E293B; }
+        .instructions.empty { color: var(--text-muted); font-style: italic; border-left-color: #CBD5E1; background: var(--bg-soft); }
+        .mix { display: flex; flex-wrap: wrap; gap: 8px; }
+        .mix span { padding: 6px 12px; border-radius: 10px; background: var(--bg-soft); border: 1px solid var(--border-color); font-size: 13px; }
+        .mix strong { color: var(--text-strong); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+        th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+        td { padding: 11px 12px; border-bottom: 1px solid #EEF2F6; }
+        tr:last-child td { border-bottom: 0; }
+        .tooth { font-weight: 800; color: var(--accent-cyan); }
+        .shade { display: inline-block; min-width: 34px; padding: 2px 8px; border-radius: 6px; background: #F0F9FF; border: 1px solid #BAE6FD; color: var(--accent-cyan); font-size: 12px; font-weight: 800; text-align: center; }
+
+        .timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; max-height: 380px; overflow-y: auto; }
+        .timeline.expanded { max-height: none; }
+        .timeline::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; background: var(--border-color); }
+        .timeline li { position: relative; padding-bottom: 14px; }
+        .timeline li::before { content: ''; position: absolute; left: -18px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-cyan); border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px #BAE6FD; }
+        .timeline li:last-child::before { background: var(--ok); box-shadow: 0 0 0 1px var(--ok-line); }
+        .tl-status { display: block; font-size: 13px; font-weight: 700; color: var(--text-strong); }
+        .tl-meta { font-size: 12px; color: var(--text-muted); }
+        .tl-note { margin-top: 3px; font-size: 12px; color: #475569; background: var(--bg-soft); border-radius: 6px; padding: 4px 8px; }
+        .steps { list-style: none; margin: 0; padding: 0; display: grid; }
+        .steps li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding-bottom: 14px; position: relative; }
+        .steps li:last-child { padding-bottom: 0; }
+        .steps li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; margin: 4px 0 0 5px; background: var(--border-color); border: 2px solid var(--border-color); }
+        .steps li.done::before { background: var(--ok); border-color: var(--ok); }
+        .steps li:not(:last-child)::after { content: ""; position: absolute; left: 10px; top: 20px; bottom: 2px; width: 2px; background: var(--border-color); }
+        .steps strong { color: var(--text-strong); display: block; }
+        .steps span { color: var(--text-muted); font-size: 12.5px; }
+        .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .list li { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-soft); font-size: 13px; }
+        .list li strong { color: var(--text-strong); }
+        .list li span { display: block; font-size: 12px; color: var(--text-muted); }
+        .list li.open { background: var(--warn-bg); border-color: var(--warn-line); }
+
+        @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 1024px) { .dashboard-container { margin-left: 0; padding: 22px; } }
+        @media (max-width: 700px) { .dashboard-container { padding: 18px 16px 40px; } .stages { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 10px; } }
+    </style>
+</head>
+<body>
+    {% from 'partials/case_files.html' import file_grid, file_viewer %}
+    {% from 'partials/tooth_chart.html' import tooth_chart as draw_tooth_chart %}
+    {% set active_admin_page = 'job_orders' if case.status in ['delivered', 'completed'] else 'dashboard' %}
+    {% include "partials/admin_sidebar.html" %}
+    {% set status = case.status %}
+    {% set status_labels = {
+        "draft": "Draft (not sent)", "submitted": "Waiting for assignment", "assigned": "Assigned", "in_progress": "In progress",
+        "cad_designing": "CAD designing", "wax_up_or_try_in": "Wax-up / setup", "milling_or_printing": "Milling / printing",
+        "packing_and_curing": "Packing & curing", "finishing_and_quality_check": "Finishing & QC", "pending_admin_review": "Awaiting your QC",
+        "ready_for_dispatch": "Ready for dispatch", "in_transit": "In transit", "delivered": "Delivered", "completed": "Completed",
+        "needs_revision": "Returned to the dentist", "cancelled": "Cancelled"} %}
+    {% set stage_of = {
+        "submitted": 0, "assigned": 1, "in_progress": 2, "cad_designing": 2, "wax_up_or_try_in": 2,
+        "milling_or_printing": 3, "packing_and_curing": 4, "finishing_and_quality_check": 5,
+        "pending_admin_review": 6, "ready_for_dispatch": 7, "in_transit": 7, "delivered": 8, "completed": 8} %}
+    {% set stages = ['Submitted', 'Assigned', 'Setup & CAD', 'Milling', 'Packing', 'Finishing', 'Admin QC', 'Dispatch', 'Delivered'] %}
+    {% set current = stage_of.get(status, -1) %}
+
+    <main class="dashboard-container">
+        <a class="crumb" href="{{ url_for('admin_job_orders') if status in ['delivered', 'completed'] else url_for('admin_dashboard') }}">← {{ 'Job Order History' if status in ['delivered', 'completed'] else 'Admin Command' }}</a>
+
+        <section class="summary" aria-labelledby="caseTitle">
+            <div class="summary-top">
+                <div>
+                    <span class="eyebrow">Job order</span>
+                    <h1 id="caseTitle">#{{ case.case_number }}</h1>
+                    <div class="chips">
+                        <span class="chip type">{{ (case.case_type or 'Restoration') | replace('_', ' ') | title }}</span>
+                        {% if status not in ['delivered', 'completed', 'cancelled', 'in_transit', 'draft'] %}<span class="chip due-{{ case.due_state }}">{{ case.due_label }}</span>{% endif %}
+                        {% if case.is_rush %}<span class="chip rush">Rush</span>{% endif %}
+                        {% if case.remake_of %}<span class="chip remake">Remake</span>{% endif %}
+                    </div>
+                </div>
+                {% set tone = 'ok' if status in ['delivered', 'completed'] else ('warn' if status in ['pending_admin_review', 'needs_revision', 'submitted'] else 'info') %}
+                <span class="chip status {{ tone }}">{{ status_labels.get(status, status | replace('_', ' ') | capitalize) }}</span>
+            </div>
+
+            <dl class="facts">
+                <div><dt>Patient</dt><dd>{{ case.patient_name or '—' }}<span>Ref {{ case.patient_reference or 'not given' }}</span></dd></div>
+                <div><dt>Dentist</dt><dd>{{ dentist.display_name or 'Unknown' }}<span>{{ dentist.clinic_name or 'Independent practice' }}{% if dentist.phone %} · {{ dentist.phone }}{% endif %}</span></dd></div>
+                <div><dt>Technician</dt><dd>{{ technician_name or 'Not yet assigned' }}<span>{{ case.teeth | length }} unit{{ 's' if case.teeth | length != 1 }}</span></dd></div>
+                <div><dt>Due</dt><dd>{% if case.due_date %}<time data-date datetime="{{ case.due_date }}">{{ case.due_date }}</time>{% else %}Not set{% endif %}<span>Received <time data-date datetime="{{ (case.created_at or '')[:10] }}">{{ (case.created_at or '')[:10] }}</time></span></dd></div>
+            </dl>
+
+            {% if parent or remakes %}
+                <div class="links">
+                    {% if parent %}<span class="link-row">Remake of <a href="{{ url_for('admin_case_details', case_id=parent.id) }}">#{{ parent.case_number }}</a>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>{% endif %}
+                    {% for rm in remakes %}<span class="link-row">Remake <a href="{{ url_for('admin_case_details', case_id=rm.id) }}">#{{ rm.case_number }}</a> · {{ status_labels.get(rm.status, rm.status) }} · due {{ rm.due_date }}</span>{% endfor %}
+                </div>
+            {% endif %}
+
+            {% if status == 'needs_revision' %}
+                <div class="banner warn"><strong>Returned to the dentist.</strong> {{ case.revision_notes or 'Waiting for the dentist to resubmit.' }}</div>
+            {% elif status in ['cancelled', 'draft'] %}
+                <div class="banner warn">{{ 'This job order was cancelled.' if status == 'cancelled' else 'The dentist has not sent this job order yet.' }}</div>
+            {% else %}
+                <ol class="stages" aria-label="Progress">
+                    {% for name in stages %}<li class="{{ 'current' if loop.index0 == current else ('done' if loop.index0 < current else '') }}"{% if loop.index0 == current %} aria-current="step"{% endif %}>{{ name }}</li>{% endfor %}
+                </ol>
+            {% endif %}
+        </section>
+
+        <div class="layout">
+            <div class="stack">
+                <section class="panel" aria-labelledby="rxTitle">
+                    <div class="panel-head"><h2 id="rxTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Dentist's instructions</h2></div>
+                    <div class="instructions {{ 'empty' if not case.instructions }}">{{ case.instructions or 'No special instructions.' }}</div>
+                    {% if material_summary %}
+                        <div class="mix">{% for m in material_summary %}<span><strong>{{ m.units }} × {{ m.material }}</strong>{% if m.shade %} · shade {{ m.shade }}{% endif %}</span>{% endfor %}</div>
+                    {% endif %}
+                    {% if case.revision_notes and status != 'needs_revision' %}<div class="banner warn" style="margin-top: 0;"><strong>Earlier revision request:</strong> {{ case.revision_notes }}</div>{% endif %}
+                </section>
+
+                <section class="panel" aria-labelledby="teethTitle">
+                    <div class="panel-head"><h2 id="teethTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>Teeth</h2><span class="hint">FDI numbering</span></div>
+                    {{ draw_tooth_chart(tooth_chart, teeth_off_chart, case.teeth) }}
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th scope="col">Tooth</th><th scope="col">Restoration</th><th scope="col">Material</th><th scope="col">Shade</th><th scope="col">Notes</th></tr></thead>
+                            <tbody>
+                                {% for t in case.teeth %}
+                                    <tr><td><span class="tooth">#{{ t.tooth_number }}</span></td><td>{{ (t.restoration_type or case.case_type or '—') | replace('_', ' ') | title }}</td><td><strong>{{ (t.material or 'Not specified') | replace('_', ' ') | title }}</strong></td><td>{% if t.shade %}<span class="shade">{{ t.shade }}</span>{% else %}—{% endif %}</td><td style="color: var(--text-muted);">{{ t.notes or '—' }}</td></tr>
+                                {% else %}
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 26px;">No teeth recorded on this job order.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="panel" aria-labelledby="filesTitle">
+                    <div class="panel-head"><h2 id="filesTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>Scans &amp; photos</h2><span class="hint">{{ files | length }} file{{ 's' if files | length != 1 }}</span></div>
+                    {{ file_grid(files, 'The dentist attached no scans or photos to this job order.') }}
+                </section>
+            </div>
+
+            <aside class="stack">
+                {# ---- What the admin can do at this stage ---- #}
+                {% if status == 'submitted' %}
+                    <section class="panel action"><h2>Assign a technician</h2><p class="hint">This job order is waiting in Incoming Cases.</p><a class="btn btn-primary btn-block" href="{{ url_for('admin_dashboard', open_modal='incoming') }}">Open Incoming Cases</a></section>
+                {% elif status == 'pending_admin_review' %}
+                    <section class="panel action" aria-labelledby="qcTitle">
+                        <h2 id="qcTitle">Final quality check</h2>
+                        <p class="hint">Approving creates the QR delivery label and opens it for printing. Pack the case and attach the label.</p>
+                        <form method="POST" action="{{ url_for('admin_approve_qc', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-primary btn-block">Approve QC and print the label</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin_reject_qc', case_id=case.id) }}" class="stack-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <label for="qcNotes" class="hint">Or send it back to the technician</label>
+                            <input type="text" id="qcNotes" name="qc_notes" maxlength="1000" placeholder="What needs fixing?" required>
+                            <button type="submit" class="btn btn-danger btn-block">Return to Finishing &amp; QC</button>
+                        </form>
+                    </section>
+                {% elif status in ['ready_for_dispatch', 'in_transit'] %}
+                    <section class="panel action" aria-labelledby="labelTitle">
+                        <h2 id="labelTitle">QR delivery label</h2>
+                        <p class="hint">{% if status == 'ready_for_dispatch' %}Pack the case, attach this label, and scan it when the courier takes it. The clinic scans it on arrival to confirm receipt.{% else %}With the courier. The clinic confirms receipt by scanning the label.{% endif %}</p>
+                        {% if label %}<a class="btn btn-primary btn-block" href="{{ url_for('dispatch_slip', case_id=case.id) }}">Print the QR label</a>{% endif %}
+                        <form method="POST" action="{{ url_for('admin_reissue_dispatch_label', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-ghost btn-sm btn-block" title="Use if the label was lost or damaged; the old QR stops working">Replace the label (old QR stops working)</button>
+                        </form>
+                    </section>
+                {% elif status in ['assigned', 'in_progress', 'cad_designing', 'wax_up_or_try_in', 'milling_or_printing', 'packing_and_curing', 'finishing_and_quality_check'] %}
+                    <section class="panel action" aria-labelledby="benchTitle">
+                        <h2 id="benchTitle">On the bench</h2>
+                        <p class="hint">{{ technician_name or 'The technician' }} is working on it. You can mark it as a rush job so it moves to the top of their pipeline.</p>
+                        <form method="POST" action="{{ url_for('admin_set_rush', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="rush" value="{{ '0' if case.is_rush else '1' }}">
+                            <button type="submit" class="btn {{ 'btn-ghost' if case.is_rush else 'btn-danger' }} btn-block">{{ 'Remove rush' if case.is_rush else 'Mark as rush' }}</button>
+                        </form>
+                    </section>
+                {% endif %}
+
+                {% if status in ['ready_for_dispatch', 'in_transit', 'delivered', 'completed'] %}
+                    <section class="panel" aria-labelledby="receiptTitle">
+                        <h2 id="receiptTitle">Delivery</h2>
+                        <ol class="steps">
+                            <li class="{{ 'done' if receipt.approved }}"><div><strong>Passed QC</strong><span>{% if receipt.approved %}{{ receipt.approved.actor_name }} · <time datetime="{{ receipt.approved.created_at }}">{{ receipt.approved.created_at[:16] | replace('T', ' ') }}</time>{% else %}Not recorded{% endif %}</span></div></li>
+                            <li class="{{ 'done' if receipt.dispatched }}"><div><strong>Handed to courier</strong><span>{% if receipt.dispatched %}{{ receipt.dispatched.courier_name or 'Courier' }} · scanned by {{ receipt.dispatched.actor_name }} · <time datetime="{{ receipt.dispatched.created_at }}">{{ receipt.dispatched.created_at[:16] | replace('T', ' ') }}</time>{% elif status == 'ready_for_dispatch' %}Waiting for pickup{% else %}Not scanned out{% endif %}</span></div></li>
+                            <li class="{{ 'done' if receipt.delivered or receipt.tracked or status == 'completed' }}"><div><strong>Received by the clinic</strong><span>{% if receipt.delivered %}{{ receipt.delivered.received_by or receipt.delivered.actor_name }} · <time datetime="{{ receipt.delivered.created_at }}">{{ receipt.delivered.created_at[:16] | replace('T', ' ') }}</time>{% elif receipt.tracked %}<time datetime="{{ case.delivered_at }}">{{ case.delivered_at[:16] | replace('T', ' ') }}</time>{% elif status == 'completed' %}Before QR tracking{% else %}Not yet{% endif %}</span></div></li>
+                        </ol>
+                        {% if receipt.late_days is not none %}<p class="hint">{{ 'Delivered on time.' if not receipt.late_days else 'Delivered ' ~ receipt.late_days ~ ' day' ~ ('s' if receipt.late_days != 1 else '') ~ ' late.' }}{% if receipt.turnaround_days is not none %} {{ receipt.turnaround_days }} day{{ 's' if receipt.turnaround_days != 1 }} from order to delivery.{% endif %}</p>{% endif %}
+                    </section>
+                {% endif %}
+
+                {% if reports %}
+                    <section class="panel" aria-labelledby="issuesTitle">
+                        <div class="panel-head"><h2 id="issuesTitle">Reported problems</h2><a class="btn btn-ghost btn-sm" href="{{ url_for('admin_delivery_issues') }}">Delivery Issues</a></div>
+                        <ul class="list">
+                            {% for r in reports %}
+                                <li class="{{ 'open' if r.status == 'open' }}"><strong>{{ issue_types.get(r.issue_type, r.issue_type) }}</strong> · {{ 'Needs review' if r.status == 'open' else issue_decisions.get(r.status, r.status) }}
+                                    <span>Reported <time data-date datetime="{{ r.created_at[:10] }}">{{ r.created_at[:10] }}</time>{% if r.details %} · {{ r.details }}{% endif %}</span></li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                {% endif %}
+
+                <section class="panel" aria-labelledby="usedTitle">
+                    <h2 id="usedTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Materials used</h2>
+                    {% if materials_used %}
+                        <ul class="list">{% for u in materials_used %}<li><strong>{{ u.portion }}</strong> · {{ u.item_name }}<span>{% if u.stage %}{{ u.stage }} · {% endif %}<time datetime="{{ u.created_at }}">{{ (u.created_at or '')[:16] | replace('T', ' ') }}</time></span></li>{% endfor %}</ul>
+                    {% else %}
+                        <div class="note-box">No material use logged for this job order.</div>
+                    {% endif %}
+                </section>
+
+                <section class="panel" aria-labelledby="historyTitle">
+                    <div class="panel-head">
+                        <h2 id="historyTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>History</h2>
+                        {% if history | length > 6 %}<button type="button" class="btn btn-ghost btn-sm" id="historyToggle" aria-expanded="false">Show all</button>{% endif %}
+                    </div>
+                    {% if history %}
+                        <ol class="timeline" id="historyList">
+                            {% for h in history %}
+                                {% set label_text = (h.status or '') | replace('_', ' ') %}
+                                {% set label_text = label_text[3:] if label_text.startswith('in ') else label_text %}
+                                <li><span class="tl-status">{{ label_text[:1] | upper }}{{ label_text[1:] }}</span>
+                                    <span class="tl-meta"><time datetime="{{ h.created_at }}">{{ (h.created_at or '')[:16] | replace('T', ' ') }}</time> · {{ h.actor_name }}</span>
+                                    {% if h.notes and not h.notes.startswith('Updated by technician') %}<div class="tl-note">{{ h.notes }}</div>{% endif %}</li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <div class="note-box">No stage changes recorded yet.</div>
+                    {% endif %}
+                </section>
+            </aside>
+        </div>
+    </main>
+
+    {{ file_viewer() }}
+    {% include 'partials/action_notice.html' %}
+    <script>
+        document.querySelectorAll('time[datetime]').forEach((el) => {
+            const raw = el.getAttribute('datetime');
+            if (!raw) return;
+            const dateOnly = el.hasAttribute('data-date') || raw.length <= 10;
+            const d = new Date(dateOnly ? raw.slice(0, 10) + 'T00:00:00' : raw);
+            if (isNaN(d)) return;
+            el.textContent = dateOnly
+                ? d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+                : d.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+        });
+        const historyToggle = document.getElementById('historyToggle');
+        if (historyToggle) historyToggle.addEventListener('click', () => {
+            const expanded = document.getElementById('historyList').classList.toggle('expanded');
+            historyToggle.textContent = expanded ? 'Show less' : 'Show all';
+            historyToggle.setAttribute('aria-expanded', String(expanded));
+        });
+    </script>
+    <script>
+        window.LIVE_REGIONS = ['.sidebar-nav', '.notif-wrapper'];
+        window.liveHooks = {};
+    </script>
+    {% include 'partials/live_updates.html' %}
+</body>
+</html>

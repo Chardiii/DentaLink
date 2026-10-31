@@ -516,7 +516,7 @@
                     {% for c in cases_list %}
                         <div class="k-card{% if c.is_rush %} is-rush{% endif %}">
                             <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.is_rush %}<span class="rush-chip">Rush</span>{% endif %}{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
+                                <span class="case-tags"><a class="k-badge-cyan" href="{{ url_for('admin_case_details', case_id=c.id) }}" title="Open job order #{{ c.case_number }}" style="text-decoration: none;">#{{ c.case_number }} →</a>{% if c.is_rush %}<span class="rush-chip">Rush</span>{% endif %}{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
                             </div>
 
@@ -591,7 +591,7 @@
                     {% for c in review_cases %}
                         <div class="k-card">
                             <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
+                                <span class="case-tags"><a class="k-badge-cyan" href="{{ url_for('admin_case_details', case_id=c.id) }}" title="Open job order #{{ c.case_number }}" style="text-decoration: none;">#{{ c.case_number }} →</a>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 <span class="k-due-chip">Due: {{ c.due_date or 'N/A' }}</span>
                             </div>
                             <div>
@@ -638,7 +638,7 @@
                     {% for c in dispatch_cases %}
                         <div class="k-card">
                             <div class="k-card-header">
-                                <span class="case-tags"><span class="k-badge-cyan">#{{ c.case_number }}</span>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
+                                <span class="case-tags"><a class="k-badge-cyan" href="{{ url_for('admin_case_details', case_id=c.id) }}" title="Open job order #{{ c.case_number }}" style="text-decoration: none;">#{{ c.case_number }} →</a>{% if c.remake_of %}<span class="remake-chip" title="Remake of an earlier case">Remake</span>{% endif %}</span>
                                 {% if c.status == 'in_transit' %}
                                     <span class="k-due-chip">In transit</span>
                                 {% else %}
@@ -765,7 +765,7 @@
                                 {% for case in unassigned_cases %}
                                     <tr>
                                         <td>
-                                            <span style="color: var(--accent-cyan); font-weight: 700;">#{{ case.case_number }}</span>{% if case.is_rush %} <span class="rush-chip">Rush</span>{% endif %}{% if case.remake_of %} <span class="remake-chip">Remake</span>{% endif %}
+                                            <a href="{{ url_for('admin_case_details', case_id=case.id) }}" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none;" title="Open job order">#{{ case.case_number }} →</a>{% if case.is_rush %} <span class="rush-chip">Rush</span>{% endif %}{% if case.remake_of %} <span class="remake-chip">Remake</span>{% endif %}
                                             <div style="margin-top: 6px;">{{ rush_toggle(case) }}</div>
                                         </td>
                                         <td><strong>{{ case.patient_name }}</strong></td>
