@@ -36,7 +36,30 @@ SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
-APP_URL = os.getenv("APP_URL")
+def _normalize_app_url(raw):
+    """The public address DentaLink links to (QR labels, emails), always with http(s)://.
+
+    "dentalink.up.railway.app" becomes "https://dentalink.up.railway.app": without a scheme,
+    phone cameras read a QR code as plain text instead of a link.
+    """
+    raw = (raw or "").strip().rstrip("/")
+    if raw and "://" not in raw:
+        local = raw.startswith(("localhost", "127.", "0.0.0.0", "192.168.", "10."))
+        raw = f"{'http' if local else 'https'}://{raw}"
+    return raw or None
+
+
+def _is_local_url(url):
+    """True for addresses a phone on another network can't reach (this computer, home Wi-Fi)."""
+    from urllib.parse import urlparse
+    host = (urlparse(url or "").hostname or "").lower()
+    if host in ("localhost", "0.0.0.0") or host.startswith(("127.", "192.168.", "10.")):
+        return True
+    parts = host.split(".")
+    return len(parts) == 4 and parts[0] == "172" and parts[1].isdigit() and 16 <= int(parts[1]) <= 31
+
+
+APP_URL = _normalize_app_url(os.getenv("APP_URL"))
 supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
@@ -113,7 +136,7 @@ def send_email_in_background(recipient_email, user_name, action_type):
     try:
         api_key = os.getenv("BREVO_SMTP_PASS") 
         sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-        app_url = os.getenv("APP_URL", "http://localhost:5000").rstrip("/")
+        app_url = _normalize_app_url(os.getenv("APP_URL")) or "http://localhost:5000"
 
         if not api_key or not recipient_email:
             print("⚠️ Brevo API key or recipient email missing.")
@@ -3975,6 +3998,7 @@ def dispatch_slip(case_id):
             label=label,
             qr_svg=_qr_svg(scan_url),
             scan_url=scan_url,
+            scan_url_is_local=_is_local_url(scan_url),
             patient_initials=_patient_initials(case.get("patient_name")),
             back_url=url_for("admin_dashboard" if g.profile["role"] == "admin" else "technician_dashboard"),
         )
