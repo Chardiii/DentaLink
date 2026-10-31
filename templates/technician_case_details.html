@@ -125,6 +125,33 @@
         .panel.danger { border-left: 3px solid #EF4444; }
         .panel.danger h3, .panel.danger h3 svg { color: #B91C1C; }
 
+        /* Tooth chart */
+        .chart-wrap { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 14px; }
+        .tooth-chart { width: 100%; height: auto; display: block; }
+        .tooth-chart circle { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1.2; }
+        .tooth-chart text { font-size: 9.5px; font-weight: 700; fill: #94A3B8; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
+        .tooth-chart g.marked circle { fill: var(--accent-cyan); stroke: #0369A1; }
+        .tooth-chart g.marked text { fill: #FFFFFF; }
+        .tooth-chart .arch-label { font-size: 10px; font-weight: 800; fill: #94A3B8; letter-spacing: .08em; }
+        .chart-key { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+        .chart-key span { display: inline-flex; align-items: center; gap: 8px; }
+        .chart-key i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1.2px solid #CBD5E1; background: #F8FAFC; }
+        .chart-key i.on { background: var(--accent-cyan); border-color: #0369A1; }
+
+        /* Move + material log */
+        .field-label { display: block; font-size: 12px; font-weight: 700; color: var(--text-strong); margin-bottom: 5px; }
+        select.input { appearance: auto; }
+        .mat-log { margin: 12px 0; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-soft); }
+        .mat-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 32px; gap: 6px; align-items: end; margin-bottom: 8px; }
+        .mat-row small { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 3px; }
+        .mat-row .input { padding: 7px 9px; font-size: 12.5px; background: #FFFFFF; }
+        .row-remove { width: 32px; height: 34px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; }
+        .row-remove:hover { color: #B91C1C; border-color: var(--crit-line); }
+        .used-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .used-list li { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-soft); font-size: 13px; }
+        .used-list strong { color: var(--text-strong); }
+        .used-list span { display: block; font-size: 12px; color: var(--text-muted); }
+
         /* Viewer dialog */
         .viewer { position: fixed; inset: 0; z-index: 300; display: none; background: rgba(8, 13, 24, .94); padding: 20px; }
         .viewer.open { display: flex; flex-direction: column; }
@@ -234,6 +261,26 @@
                         <h3 id="teethTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>Teeth</h3>
                         <span class="hint" style="margin: 0;">FDI numbering</span>
                     </div>
+                    <div class="chart-wrap">
+                        <svg class="tooth-chart" viewBox="0 0 360 300" role="img" aria-label="Tooth chart: {{ teeth | map(attribute='tooth_number') | join(', ') or 'no teeth marked' }}">
+                            <text class="arch-label" x="180" y="122">UPPER</text>
+                            <text class="arch-label" x="180" y="178">LOWER</text>
+                            <text class="arch-label" x="14" y="150" style="text-anchor: start;">R</text>
+                            <text class="arch-label" x="346" y="150" style="text-anchor: end;">L</text>
+                            {% for t in tooth_chart %}
+                                <g class="{{ 'marked' if t.marked }}"><title>#{{ t.num }}{% if t.marked %}: {{ t.label }}{% endif %}</title>
+                                    <circle cx="{{ t.x }}" cy="{{ t.y }}" r="12.5"></circle>
+                                    <text x="{{ t.x }}" y="{{ t.y }}">{{ t.num }}</text>
+                                </g>
+                            {% endfor %}
+                        </svg>
+                        <div class="chart-key">
+                            <span><i class="on"></i>In this job order</span>
+                            <span><i></i>Not included</span>
+                            <span>Seen from the front: the patient's right is on your left.</span>
+                            {% if teeth_off_chart %}<span>Also: #{{ teeth_off_chart | join(', #') }} (not on the adult chart)</span>{% endif %}
+                        </div>
+                    </div>
                     <div class="table-wrap">
                         <table>
                             <thead><tr><th>Tooth</th><th>Restoration</th><th>Material</th><th>Shade</th><th>Notes</th></tr></thead>
@@ -300,6 +347,72 @@
             </div>
 
             <aside class="stack">
+                <section class="panel" aria-labelledby="moveTitle">
+                    <div class="panel-head">
+                        <h3 id="moveTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>Move this job order</h3>
+                    </div>
+                    {% if case.status == 'finishing_and_quality_check' %}
+                        <p class="hint">Finished? Send it to the admin for the final quality check before dispatch.</p>
+                        <form method="POST" action="{{ url_for('submit_for_admin_review', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">Submit for QC review</button>
+                        </form>
+                    {% elif next_stages %}
+                        <form method="POST" action="/technician/cases/{{ case.id }}/update-status" id="moveForm" data-materials="{{ case.material_mix }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <label class="field-label" for="moveStage">Move to</label>
+                            <select class="input" id="moveStage" name="status">
+                                {% for value, label in next_stages %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                            </select>
+                            <div class="mat-log" id="matLog" hidden>
+                                <span class="field-label">Material used <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></span>
+                                <p class="hint" id="matHint" style="margin-bottom: 8px;">Portion = how much of one disc, block or bottle this job order used.</p>
+                                <div id="matRows"></div>
+                                <button type="button" class="btn btn-ghost btn-sm" id="addMatRow">+ Add material</button>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Move job order</button>
+                        </form>
+                        <template id="matRowTpl">
+                            <div class="mat-row">
+                                <label><small class="mat-label">Material</small>
+                                    <select class="input" name="logged_materials">
+                                        {% if inventory_items %}
+                                            <option value="">Choose from Inventory…</option>
+                                            {% for category, items in inventory_items | groupby('category') %}
+                                                <optgroup label="{{ category }}">
+                                                    {% for item in items %}<option value="{{ item.id }}" data-name="{{ item.item_name | lower }}">{{ item.item_name }} ({{ '%g' | format((item.quantity or 0) | float) }} {{ item.unit or '' }} left)</option>{% endfor %}
+                                                </optgroup>
+                                            {% endfor %}
+                                        {% else %}
+                                            <option value="">No materials in Inventory yet</option>
+                                        {% endif %}
+                                    </select>
+                                </label>
+                                <label><small>Portion %</small><input class="input" type="number" name="logged_percentages" min="1" max="100" step="1" placeholder="5"></label>
+                                <button type="button" class="row-remove" aria-label="Remove this material">×</button>
+                            </div>
+                        </template>
+                    {% else %}
+                        <div class="note-box">{% if case.status == 'needs_revision' %}Waiting for the dentist to resubmit.{% else %}This job order has left the bench, so there's nothing to move here.{% endif %}</div>
+                    {% endif %}
+                </section>
+
+                <section class="panel" aria-labelledby="usedTitle">
+                    <div class="panel-head">
+                        <h3 id="usedTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Materials used</h3>
+                    </div>
+                    {% if materials_used %}
+                        <ul class="used-list">
+                            {% for u in materials_used %}
+                                <li><strong>{{ u.portion }}</strong> · {{ u.item_name }}
+                                    <span>{% if u.stage %}{{ u.stage }} · {% endif %}<time datetime="{{ u.created_at }}">{{ (u.created_at or '')[:16] | replace('T', ' ') }}</time></span></li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="note-box">No material use logged yet. It's recorded when the job order moves to Milling, Packing or Finishing.</div>
+                    {% endif %}
+                </section>
+
                 <section class="panel" aria-labelledby="historyTitle">
                     <div class="panel-head">
                         <h3 id="historyTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>History</h3>
@@ -378,6 +491,7 @@
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
         } }
     </script>
+    {% include 'partials/material_pick.html' %}
     <script>
         document.querySelectorAll('time[datetime]').forEach((el) => {
             const raw = el.getAttribute('datetime');
@@ -388,6 +502,51 @@
                 ? d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
                 : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
         });
+
+        // Move this job order: at Milling, Packing and Finishing, offer material rows. At Milling,
+        // each prescribed material and shade gets a row with its stock pre-picked and ~5% of a
+        // disc per unit filled in. Empty rows are dropped before sending.
+        const moveForm = document.getElementById('moveForm');
+        if (moveForm) {
+            const LOG_STAGES = {{ material_log_stages | list | tojson }};
+            const stage = document.getElementById('moveStage');
+            const matLog = document.getElementById('matLog');
+            const rows = document.getElementById('matRows');
+            const tpl = document.getElementById('matRowTpl');
+            const addRow = (label) => {
+                rows.append(tpl.content.cloneNode(true));
+                const row = rows.lastElementChild;
+                if (label) row.querySelector('.mat-label').textContent = label;
+                return row;
+            };
+            const refresh = () => {
+                rows.replaceChildren();
+                matLog.hidden = !LOG_STAGES.includes(stage.value);
+                if (matLog.hidden) return;
+                const prescribed = stage.value === 'milling_or_printing'
+                    ? (moveForm.dataset.materials || '').split(',').filter(Boolean) : [];
+                prescribed.forEach((part) => {
+                    const [material, shade, units] = part.split(':');
+                    const n = parseInt(units, 10) || 1;
+                    const pretty = material.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+                    const row = addRow(`${pretty}${shade ? ' · ' + shade : ''} · ${n} unit${n === 1 ? '' : 's'}`);
+                    const picked = pickStockFor(row.querySelector('select'), material, shade);
+                    if (picked && /zircon|sagemax/.test(picked)) {
+                        row.querySelector('input').value = Math.min(100, Math.max(1, Math.round(n / 21.5 * 100)));
+                    }
+                });
+                if (!prescribed.length) addRow();
+            };
+            stage.addEventListener('change', refresh);
+            document.getElementById('addMatRow').addEventListener('click', () => addRow());
+            rows.addEventListener('click', (e) => { if (e.target.closest('.row-remove')) e.target.closest('.mat-row').remove(); });
+            moveForm.addEventListener('submit', () => {
+                rows.querySelectorAll('.mat-row').forEach((row) => {
+                    if (!row.querySelector('select').value || !row.querySelector('input').value) row.remove();
+                });
+            });
+            refresh();
+        }
 
         const historyToggle = document.getElementById('historyToggle');
         if (historyToggle) historyToggle.addEventListener('click', () => {
