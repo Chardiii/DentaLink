@@ -97,16 +97,6 @@
         .tooth { font-weight: 800; color: var(--accent-cyan); }
         .shade { display: inline-block; min-width: 34px; padding: 2px 8px; border-radius: 6px; background: #F0F9FF; border: 1px solid #BAE6FD; color: var(--accent-cyan); font-size: 12px; font-weight: 800; text-align: center; }
 
-        /* Files */
-        .files { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-        .file { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
-        .file-thumb { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #E0F2FE; color: var(--accent-cyan); overflow: hidden; border: 1px solid #BAE6FD; }
-        .file-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .file-name { font-weight: 700; color: var(--text-strong); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .file-meta { font-size: 12px; color: var(--text-muted); }
-        .file-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
-        .file-actions .btn { flex: 1; }
-
         /* Side column */
         .timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; max-height: 360px; overflow-y: auto; }
         .timeline.expanded { max-height: none; }
@@ -125,19 +115,6 @@
         .panel.danger { border-left: 3px solid #EF4444; }
         .panel.danger h3, .panel.danger h3 svg { color: #B91C1C; }
 
-        /* Tooth chart */
-        .chart-wrap { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 14px; }
-        .tooth-chart { width: 100%; height: auto; display: block; }
-        .tooth-chart circle { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1.2; }
-        .tooth-chart text { font-size: 9.5px; font-weight: 700; fill: #94A3B8; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
-        .tooth-chart g.marked circle { fill: var(--accent-cyan); stroke: #0369A1; }
-        .tooth-chart g.marked text { fill: #FFFFFF; }
-        .tooth-chart .arch-label { font-size: 10px; font-weight: 800; fill: #94A3B8; letter-spacing: .08em; }
-        .chart-key { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
-        .chart-key span { display: inline-flex; align-items: center; gap: 8px; }
-        .chart-key i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1.2px solid #CBD5E1; background: #F8FAFC; }
-        .chart-key i.on { background: var(--accent-cyan); border-color: #0369A1; }
-
         /* Move + material log */
         .field-label { display: block; font-size: 12px; font-weight: 700; color: var(--text-strong); margin-bottom: 5px; }
         select.input { appearance: auto; }
@@ -152,19 +129,6 @@
         .used-list strong { color: var(--text-strong); }
         .used-list span { display: block; font-size: 12px; color: var(--text-muted); }
 
-        /* Viewer dialog */
-        .viewer { position: fixed; inset: 0; z-index: 300; display: none; background: rgba(8, 13, 24, .94); padding: 20px; }
-        .viewer.open { display: flex; flex-direction: column; }
-        .viewer-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #FFFFFF; padding: 0 4px 12px; }
-        .viewer-title { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .viewer-hint { font-size: 12px; color: #CBD5E1; }
-        .viewer-body { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; overflow: hidden; background: #0B1220; }
-        .viewer-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .viewer-body canvas { width: 100% !important; height: 100% !important; display: block; }
-        .viewer-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #CBD5E1; font-size: 14px; text-align: center; padding: 20px; }
-        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #FFFFFF; cursor: pointer; }
-        .icon-btn:hover { background: rgba(255, 255, 255, .18); }
-
         @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 700px) {
             .app-header { padding: 10px 16px; }
@@ -175,6 +139,8 @@
     </style>
 </head>
 <body>
+    {% from 'partials/case_files.html' import file_grid, file_viewer %}
+    {% from 'partials/tooth_chart.html' import tooth_chart as draw_tooth_chart %}
     {% set status_labels = {
         'assigned': 'Assigned', 'pending': 'Assigned', 'new': 'Assigned',
         'in_progress': 'In progress', 'cad_designing': 'CAD designing', 'wax_up_or_try_in': 'Wax-up / setup',
@@ -261,26 +227,7 @@
                         <h3 id="teethTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>Teeth</h3>
                         <span class="hint" style="margin: 0;">FDI numbering</span>
                     </div>
-                    <div class="chart-wrap">
-                        <svg class="tooth-chart" viewBox="0 0 360 300" role="img" aria-label="Tooth chart: {{ teeth | map(attribute='tooth_number') | join(', ') or 'no teeth marked' }}">
-                            <text class="arch-label" x="180" y="122">UPPER</text>
-                            <text class="arch-label" x="180" y="178">LOWER</text>
-                            <text class="arch-label" x="14" y="150" style="text-anchor: start;">R</text>
-                            <text class="arch-label" x="346" y="150" style="text-anchor: end;">L</text>
-                            {% for t in tooth_chart %}
-                                <g class="{{ 'marked' if t.marked }}"><title>#{{ t.num }}{% if t.marked %}: {{ t.label }}{% endif %}</title>
-                                    <circle cx="{{ t.x }}" cy="{{ t.y }}" r="12.5"></circle>
-                                    <text x="{{ t.x }}" y="{{ t.y }}">{{ t.num }}</text>
-                                </g>
-                            {% endfor %}
-                        </svg>
-                        <div class="chart-key">
-                            <span><i class="on"></i>In this job order</span>
-                            <span><i></i>Not included</span>
-                            <span>Seen from the front: the patient's right is on your left.</span>
-                            {% if teeth_off_chart %}<span>Also: #{{ teeth_off_chart | join(', #') }} (not on the adult chart)</span>{% endif %}
-                        </div>
-                    </div>
+                    {{ draw_tooth_chart(tooth_chart, teeth_off_chart, teeth) }}
                     <div class="table-wrap">
                         <table>
                             <thead><tr><th>Tooth</th><th>Restoration</th><th>Material</th><th>Shade</th><th>Notes</th></tr></thead>
@@ -306,43 +253,7 @@
                         <h3 id="filesTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>Scans &amp; photos</h3>
                         <span class="hint" style="margin: 0;">{{ files | length }} file{{ 's' if files | length != 1 }}</span>
                     </div>
-                    {% if files %}
-                        <div class="files">
-                            {% for f in files %}
-                                <div class="file">
-                                    <div class="file-thumb" aria-hidden="true">
-                                        {% if f.kind == 'image' and f.view_url %}<img src="{{ f.view_url }}" alt="" loading="lazy">
-                                        {% elif f.kind == 'stl' %}<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                                        {% else %}<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>{% endif %}
-                                    </div>
-                                    <div style="min-width: 0;">
-                                        <div class="file-name" title="{{ f.file_name }}">{{ f.file_name }}</div>
-                                        <div class="file-meta">{{ {'stl': '3D scan (STL)', 'image': 'Photo', 'pdf': 'PDF'}.get(f.kind, 'File') }}{% if f.size_label %} · {{ f.size_label }}{% endif %}</div>
-                                    </div>
-                                    <div class="file-actions">
-                                        {% if not f.view_url %}
-                                            <span class="file-meta">This file couldn't be loaded. Try again later.</span>
-                                        {% else %}
-                                            {% if f.kind in ['image', 'stl'] %}
-                                                <button type="button" class="btn btn-primary btn-sm" data-view-kind="{{ f.kind }}" data-view-url="{{ f.view_url }}" data-view-name="{{ f.file_name }}">
-                                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                                    {{ 'View 3D' if f.kind == 'stl' else 'View' }}
-                                                </button>
-                                            {% elif f.kind == 'pdf' %}
-                                                <a class="btn btn-primary btn-sm" href="{{ f.view_url }}" target="_blank" rel="noopener">View</a>
-                                            {% endif %}
-                                            <a class="btn btn-ghost btn-sm" href="{{ f.download_url }}">
-                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                                Download
-                                            </a>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="note-box">The dentist attached no scans or photos to this job order.</div>
-                    {% endif %}
+                    {{ file_grid(files, 'The dentist attached no scans or photos to this job order.') }}
                 </section>
             </div>
 
@@ -468,30 +379,6 @@
         </div>
     </main>
 
-    <!-- File viewer: photos inline, STL scans in an interactive 3D view -->
-    <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
-        <div class="viewer-bar">
-            <div style="min-width: 0;">
-                <div class="viewer-title" id="viewerTitle"></div>
-                <div class="viewer-hint" id="viewerHint"></div>
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <a class="btn btn-ghost btn-sm" id="viewerDownload" href="#">Download</a>
-                <button type="button" class="icon-btn" id="viewerClose" aria-label="Close viewer">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-        </div>
-        <div class="viewer-body" id="viewerBody"></div>
-    </div>
-
-    <script type="importmap">
-        { "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-        } }
-    </script>
-    {% include 'partials/material_pick.html' %}
     <script>
         document.querySelectorAll('time[datetime]').forEach((el) => {
             const raw = el.getAttribute('datetime');
@@ -555,114 +442,6 @@
             historyToggle.setAttribute('aria-expanded', String(expanded));
         });
     </script>
-    <script type="module">
-        const viewer = document.getElementById('viewer');
-        const body = document.getElementById('viewerBody');
-        let cleanup = null;
-        let opener = null;
-
-        function message(text) {
-            const m = document.createElement('div');
-            m.className = 'viewer-msg';
-            m.textContent = text;
-            body.append(m);
-            return m;
-        }
-
-        function close() {
-            if (cleanup) { cleanup(); cleanup = null; }
-            body.replaceChildren();
-            viewer.classList.remove('open');
-            if (opener) opener.focus();
-        }
-
-        async function showStl(url) {
-            const loading = message('Loading 3D scan…');
-            let THREE, STLLoader, OrbitControls;
-            try {
-                THREE = await import('three');
-                ({ STLLoader } = await import('three/addons/loaders/STLLoader.js'));
-                ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
-            } catch (e) {
-                loading.textContent = "The 3D viewer couldn't load (it needs an internet connection). Use Download instead.";
-                return;
-            }
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setClearColor(0x0b1220);
-            body.append(renderer.domElement);
-            const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
-            scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.1));
-            const key = new THREE.DirectionalLight(0xffffff, 1.4);
-            key.position.set(1, 1.5, 2);
-            camera.add(key);
-            scene.add(camera);
-            const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-
-            let frame = 0;
-            const resize = () => {
-                const w = body.clientWidth, h = body.clientHeight;
-                renderer.setSize(w, h, false);
-                camera.aspect = w / h;
-                camera.updateProjectionMatrix();
-            };
-            const loop = () => { frame = requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); };
-            resize();
-            window.addEventListener('resize', resize);
-            cleanup = () => { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); controls.dispose(); renderer.dispose(); };
-
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(response.status);
-                const geometry = new STLLoader().parse(await response.arrayBuffer());
-                geometry.computeVertexNormals();
-                geometry.center();
-                geometry.computeBoundingSphere();
-                const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.55, metalness: 0.05 }));
-                scene.add(mesh);
-                const r = geometry.boundingSphere.radius || 10;
-                camera.position.set(0, -r * 0.6, r * 2.6);
-                camera.near = r / 100; camera.far = r * 20; camera.updateProjectionMatrix();
-                controls.target.set(0, 0, 0);
-                loading.remove();
-                loop();
-            } catch (e) {
-                loading.textContent = "This scan couldn't be opened. Download it and open it in exocad or another STL viewer.";
-            }
-        }
-
-        function open(button) {
-            opener = button;
-            const { viewKind, viewUrl, viewName } = button.dataset;
-            document.getElementById('viewerTitle').textContent = viewName;
-            document.getElementById('viewerHint').textContent = viewKind === 'stl'
-                ? 'Drag to rotate · scroll or pinch to zoom · right-drag to move'
-                : '';
-            const download = button.parentElement.querySelector('a.btn-ghost');
-            document.getElementById('viewerDownload').href = download ? download.href : viewUrl;
-            body.replaceChildren();
-            viewer.classList.add('open');
-            document.getElementById('viewerClose').focus();
-            if (viewKind === 'image') {
-                const img = document.createElement('img');
-                img.src = viewUrl;
-                img.alt = viewName;
-                img.onerror = () => { img.remove(); message("This photo couldn't be loaded. Try Download."); };
-                body.append(img);
-            } else {
-                showStl(viewUrl);
-            }
-        }
-
-        document.addEventListener('click', (e) => {
-            const button = e.target.closest('[data-view-kind]');
-            if (button) open(button);
-        });
-        document.getElementById('viewerClose').addEventListener('click', close);
-        viewer.addEventListener('click', (e) => { if (e.target === viewer) close(); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && viewer.classList.contains('open')) close(); });
-    </script>
+    {{ file_viewer() }}
 </body>
 </html>
