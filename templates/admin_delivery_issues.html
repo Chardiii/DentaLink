@@ -114,7 +114,7 @@
                 <article class="report {{ 'open' if r.status == 'open' }}">
                     <div>
                         <div class="report-top">
-                            <span class="case-no">Case #{{ r.case.case_number or '—' }}</span>
+                            {% if r.case.id %}<a class="case-no" href="{{ url_for('admin_case_details', case_id=r.case.id) }}" style="text-decoration: none;">Case #{{ r.case.case_number }} →</a>{% else %}<span class="case-no">Case #—</span>{% endif %}
                             <span class="issue">{{ r.issue_label }}</span>
                         </div>
                         <h2>{{ r.case.patient_name or 'Unknown patient' }}</h2>

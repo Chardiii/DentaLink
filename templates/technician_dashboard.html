@@ -439,7 +439,7 @@
                         <button type="submit" class="btn-card-save block">Submit for QC review</button>
                     </form>
                 {% elif c.status == 'ready_for_dispatch' %}
-                    <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn-card-save block">Print dispatch label</a>
+                    <div class="k-card-note">Passed QC. The admin is packing it for dispatch</div>
                 {% elif c.status == 'pending_admin_review' %}
                     <div class="k-card-note">Admin is checking this case</div>
                 {% else %}
