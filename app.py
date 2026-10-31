@@ -1086,68 +1086,42 @@ def update_case_status(case_id):
             print(f"History log error: {str(hist_err)}")
 
         # ==========================================
-        # JIT MATERIAL INVENTORY DEDUCTION & AUTO-CREATE LOGIC
+        # MATERIAL USE: deduct the logged portion from the chosen Inventory items
         # ==========================================
+        # The form sends Inventory item ids (from the technician's material picker) and the
+        # portion of one unit used, e.g. 5 = 5% of a zirconia disc. Unknown items are skipped,
+        # never created, and stock never goes below zero.
         logged_materials = request.form.getlist("logged_materials")
         logged_percentages = request.form.getlist("logged_percentages")
-
-        if logged_materials and logged_percentages:
-            for item_name, percent_str in zip(logged_materials, logged_percentages):
-                try:
-                    # Safely parse percentage as float (e.g., 25 -> 0.25)
-                    deduct_amount = float(percent_str) / 100.0  
-                    
-                    # Check if the item exists in the inventory table (case-insensitive search)
-                    inv_res = supabase_admin.table("inventory").select("*").ilike("item_name", item_name.strip()).execute()
-                    
-                    if inv_res.data:
-                        # SCENARIO A: Item exists. Deduct exact decimal amount.
-                        item = inv_res.data[0]
-                        item_id = item["id"]
-                        current_qty = float(item["quantity"])
-                        new_qty = round(current_qty - deduct_amount, 2)
-                        
-                        # Update stock level safely (Requires NUMERIC column in Supabase)
-                        supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
-                        
-                        # Log into audit logs
-                        supabase_admin.table("inventory_logs").insert({
-                            "inventory_id": item_id,
-                            "user_id": user_id,
-                            "action_type": "case_deduction",
-                            "quantity_changed": -deduct_amount,
-                            "previous_quantity": current_qty,
-                            "new_quantity": new_qty,
-                            "notes": f"Deducted {percent_str}% at [{new_status}] stage for Case {case_number}"
-                        }).execute()
-                    
-                    else:
-                        # SCENARIO B: Item is missing. Auto-create it cleanly!
-                        initial_qty = 1.0
-                        new_qty = round(initial_qty - deduct_amount, 2)
-                        
-                        new_item_res = supabase_admin.table("inventory").insert({
-                            "item_name": item_name.strip(),
-                            "category": "Auto-Added", 
-                            "quantity": new_qty, 
-                            "unit": "Piece"      
-                        }).execute()
-                        
-                        if new_item_res.data:
-                            new_item_id = new_item_res.data[0]["id"]
-                            
-                            supabase_admin.table("inventory_logs").insert({
-                                "inventory_id": new_item_id,
-                                "user_id": user_id,
-                                "action_type": "auto_created_and_deducted",
-                                "quantity_changed": -deduct_amount,
-                                "previous_quantity": initial_qty,
-                                "new_quantity": new_qty,
-                                "notes": f"Missing item auto-created. Deducted {percent_str}% for Case {case_number}."
-                            }).execute()
-
-                except Exception as mat_err:
-                    print(f"Material deduction error for {item_name}: {str(mat_err)}")
+        for item_ref, percent_str in zip(logged_materials, logged_percentages):
+            try:
+                percent = float(percent_str)
+            except (TypeError, ValueError):
+                continue
+            if not 0 < percent <= 100:
+                continue
+            try:
+                rows = supabase_admin.table("inventory").select("*").eq("id", item_ref).execute().data or []
+                if not rows:
+                    app.logger.warning("Material log for case %s skipped: no inventory item %r", case_number, item_ref)
+                    continue
+                item = rows[0]
+                current_qty = float(item.get("quantity") or 0)
+                new_qty = round(max(current_qty - percent / 100.0, 0.0), 2)
+                supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item["id"]).execute()
+                supabase_admin.table("inventory_logs").insert({
+                    "inventory_id": item["id"],
+                    "user_id": user_id,
+                    "action_type": "case_deduction",
+                    "quantity_changed": round(new_qty - current_qty, 2),
+                    "previous_quantity": current_qty,
+                    "new_quantity": new_qty,
+                    "notes": f"Used {percent:g}% of a {item.get('unit') or 'unit'} at "
+                             f"{status_labels.get(new_status, new_status).replace('in ', '', 1)} for Case {case_number}"
+                             + (" (stock was already 0; count it in Inventory)" if current_qty <= 0 else ""),
+                }).execute()
+            except Exception:
+                app.logger.exception("Material deduction error for %r", item_ref)
 
         # 1. Notify the Dentist
         create_notification(
@@ -2644,6 +2618,24 @@ def technician_dashboard():
                 case["teeth"] = []
                 case["case_teeth"] = []
 
+        # What each case is milled from, for the material log at Milling: "material:shade:units"
+        # per distinct material and shade, e.g. "zirconia:A2:3,emax:A1:1".
+        for case in assigned_cases:
+            mix = {}
+            for tooth in case.get("case_teeth") or []:
+                key = ((tooth.get("material") or "").strip(), (tooth.get("shade") or "").strip())
+                if key[0]:
+                    mix[key] = mix.get(key, 0) + 1
+            case["material_mix"] = ",".join(f"{m}:{s}:{n}" for (m, s), n in mix.items())
+
+        # Stock the technician can log material use against (the material picker).
+        try:
+            inventory_items = (supabase_admin.table("inventory").select("id, item_name, category, quantity, unit")
+                               .order("category").order("item_name").execute().data or [])
+        except Exception:
+            app.logger.exception("Unable to load inventory for the material picker")
+            inventory_items = []
+
         # Due-date urgency for the pipeline cards (lab time). Within a stage, rush cases come
         # first, then the soonest due date; cases without a due date go last.
         today = datetime.now(LAB_TZ).date()
@@ -2708,7 +2700,8 @@ def technician_dashboard():
             qc_cases=qc_cases,
             completed_cases=completed_cases,
             restock_requests=my_restock_requests,
-            notifications=notifications
+            notifications=notifications,
+            inventory_items=inventory_items,
         )
 
     except Exception as e:
