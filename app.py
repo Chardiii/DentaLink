@@ -72,7 +72,11 @@ LOGIN_REASON_TEXT = {
     "account_rejected": "Account application rejected",
     "account_not_approved": "Account not approved",
     "invalid_account_role": "Account has an invalid role",
+    "signed_in_elsewhere": "Signed out: the account signed in on another device",
 }
+
+# Roles limited to one signed-in device at a time; a new sign-in signs the other device out.
+SINGLE_SESSION_ROLES = ("admin",)
 
 # Case lifecycle after the bench stages:
 # finishing_and_quality_check -> pending_admin_review -> ready_for_dispatch -> in_transit -> delivered
@@ -489,6 +493,57 @@ def _valid_csrf_token():
     token = session.get("csrf_token")
     submitted = request.form.get("csrf_token", "")
     return bool(token and submitted and secrets.compare_digest(token, submitted))
+
+
+@app.before_request
+def enforce_single_device_sessions():
+    """Sign out an admin browser whose sign-in was replaced by a newer one on another device."""
+    user_id = session.get("user_id")
+    if not user_id or request.endpoint in (None, "static", "login", "logout"):
+        return None
+    role = session.get("role")
+    if role and role not in SINGLE_SESSION_ROLES:
+        return None  # dentists and technicians may use several devices
+    try:
+        rows = (supabase_admin.table("profiles").select("role, active_session_id")
+                .eq("id", user_id).execute().data or [])
+    except Exception:
+        return None  # e.g. before migration 20261101020000: never lock anyone out over this
+    if not rows:
+        return None
+    profile = rows[0]
+    session["role"] = profile.get("role")
+    active = profile.get("active_session_id")
+    if profile.get("role") not in SINGLE_SESSION_ROLES or not active or active == session.get("login_session_id"):
+        return None
+
+    _record_login_event("logout", session.get("login_email"), user_id, "signed_in_elsewhere")
+    session.clear()
+    flash("You were signed out because your admin account signed in on another device. "
+          "If that wasn't you, sign in again and change your password.", "session")
+    if request.path.startswith("/api/"):
+        # Background checks (live updates) get JSON, so the page can send the user to sign in
+        # without the fetch using up the message above.
+        return app.response_class(json.dumps({"signed_out": True, "redirect": url_for("login")}),
+                                  status=401, mimetype="application/json")
+    return redirect(url_for("login"))
+
+
+def admin_sidebar_counts():
+    """Badge counts for the admin sidebar; called only by pages that render it."""
+    counts = {"incoming": 0, "restock": 0, "issues": 0}
+    try:
+        counts["incoming"] = _count("dental_cases", status="submitted")
+        counts["restock"] = _count("material_requests", status="pending")
+        counts["issues"] = _open_issue_count()
+    except Exception:
+        app.logger.exception("Unable to load sidebar counts")
+    return counts
+
+
+@app.context_processor
+def inject_admin_sidebar_counts():
+    return {"admin_sidebar_counts": admin_sidebar_counts}
 
 
 @app.context_processor
@@ -1966,7 +2021,18 @@ def login():
             session["user_id"] = user_id
             session["login_session_id"] = str(uuid.uuid4())
             session["login_email"] = email
+            session["role"] = profile["role"]
             _record_login_event("success", email, user_id)
+
+            # One device per admin: this sign-in becomes the account's only valid session,
+            # so any other browser signed in as this admin is signed out on its next request.
+            if profile["role"] in SINGLE_SESSION_ROLES:
+                try:
+                    supabase_admin.table("profiles").update(
+                        {"active_session_id": session["login_session_id"]}
+                    ).eq("id", user_id).execute()
+                except Exception:
+                    app.logger.exception("Unable to record the active admin session (run migration 20261101020000)")
 
             # =========================
             # UPDATE LAST SEEN TIMESTAMP
@@ -2234,6 +2300,14 @@ def logout():
     user_id = session.get("user_id")
     if user_id:
         _record_login_event("logout", session.get("login_email"), user_id)
+        # Free the admin's one-device slot, unless a newer sign-in already holds it.
+        if session.get("role") in SINGLE_SESSION_ROLES and session.get("login_session_id"):
+            try:
+                supabase_admin.table("profiles").update({"active_session_id": None}).eq("id", user_id).eq(
+                    "active_session_id", session["login_session_id"]
+                ).execute()
+            except Exception:
+                app.logger.exception("Unable to clear the active admin session")
 
     try:
 
