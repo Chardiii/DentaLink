@@ -1543,6 +1543,18 @@ def dentist_dashboard():
             for case in dental_cases:
                 case["teeth"] = []
 
+        # Technician names for the case cards.
+        tech_ids = list({c["technician_id"] for c in dental_cases if c.get("technician_id")})
+        tech_names = {}
+        if tech_ids:
+            try:
+                rows = supabase_admin.table("profiles").select("id, display_name, first_name, last_name").in_("id", tech_ids).execute().data or []
+                tech_names = {r["id"]: _display_name(r, "Technician") for r in rows}
+            except Exception:
+                app.logger.exception("Unable to load technician names")
+        for case in dental_cases:
+            case["technician_name"] = tech_names.get(case.get("technician_id"))
+
         # ========================================================
         # 6. STAGE SLICES FOR SUMMARY STRIP & SOUND ALERT TRIGGERS
         # ========================================================
@@ -3153,17 +3165,19 @@ def dentist_case_summary(case_id):
             return redirect(url_for("edit_dental_case", case_id=case_id))
 
         case["teeth"] = supabase_admin.table("case_teeth").select("*").eq("case_id", case_id).order("tooth_number").execute().data or []
-        files = supabase_admin.table("case_files").select("*").eq("case_id", case_id).execute().data or []
-        for f in files:
-            try:
-                signed = supabase_admin.storage.from_("dental-case-files").create_signed_url(f["file_path"], 3600)
-                f["download_url"] = signed.get("signedURL") or signed.get("signed_url") if isinstance(signed, dict) else signed
-            except Exception:
-                f["download_url"] = None
+        files = _case_file_links(supabase_admin.table("case_files").select("*").eq("case_id", case_id).execute().data or [])
         history = (
             supabase_admin.table("case_status_history").select("status, notes, created_at, changed_by")
             .eq("case_id", case_id).order("created_at").execute().data or []
         )
+        # Lab-internal scheduling (rush flags) isn't the clinic's concern.
+        history = [h for h in history if not str(h.get("status") or "").startswith(("Marked as rush", "Rush flag removed"))]
+        case["due_state"], case["due_label"] = _due_status(case.get("due_date"), datetime.now(LAB_TZ).date())
+        tooth_chart, teeth_off_chart = _tooth_chart(case["teeth"])
+        materials = {}
+        for t in case["teeth"]:
+            key = ((t.get("material") or "Not specified").replace("_", " ").title(), t.get("shade") or "")
+            materials[key] = materials.get(key, 0) + 1
         events = (
             supabase_admin.table("case_dispatch_events")
             .select("event_type, actor_id, courier_name, received_by, notes, created_at")
@@ -3215,6 +3229,9 @@ def dentist_case_summary(case_id):
             window_days=ISSUE_REPORT_WINDOW_DAYS,
             parent=parent,
             remakes=remakes,
+            tooth_chart=tooth_chart,
+            teeth_off_chart=teeth_off_chart,
+            material_summary=[{"material": m, "shade": s, "units": n} for (m, s), n in materials.items()],
         )
     except Exception:
         app.logger.exception("Unable to load case summary")

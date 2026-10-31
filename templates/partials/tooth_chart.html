@@ -1,0 +1,38 @@
+{# FDI tooth chart: both arches, the job order's teeth highlighted. Data from app._tooth_chart().
+   Usage: {% from 'partials/tooth_chart.html' import tooth_chart as draw_tooth_chart %} {{ draw_tooth_chart(chart, outside, teeth) }} #}
+{% macro tooth_chart(chart, outside, teeth) %}
+<style>
+    /* Tooth chart */
+    .chart-wrap { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 14px; }
+    .tooth-chart { width: 100%; height: auto; display: block; }
+    .tooth-chart circle { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1.2; }
+    .tooth-chart text { font-size: 9.5px; font-weight: 700; fill: #94A3B8; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
+    .tooth-chart g.marked circle { fill: var(--accent-cyan); stroke: #0369A1; }
+    .tooth-chart g.marked text { fill: #FFFFFF; }
+    .tooth-chart .arch-label { font-size: 10px; font-weight: 800; fill: #94A3B8; letter-spacing: .08em; }
+    .chart-key { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+    .chart-key span { display: inline-flex; align-items: center; gap: 8px; }
+    .chart-key i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1.2px solid #CBD5E1; background: #F8FAFC; }
+    .chart-key i.on { background: var(--accent-cyan); border-color: #0369A1; }
+</style>
+    <div class="chart-wrap">
+        <svg class="tooth-chart" viewBox="0 0 360 300" role="img" aria-label="Tooth chart: {{ teeth | map(attribute='tooth_number') | join(', ') or 'no teeth marked' }}">
+            <text class="arch-label" x="180" y="122">UPPER</text>
+            <text class="arch-label" x="180" y="178">LOWER</text>
+            <text class="arch-label" x="14" y="150" style="text-anchor: start;">R</text>
+            <text class="arch-label" x="346" y="150" style="text-anchor: end;">L</text>
+            {% for t in chart %}
+                <g class="{{ 'marked' if t.marked }}"><title>#{{ t.num }}{% if t.marked %}: {{ t.label }}{% endif %}</title>
+                    <circle cx="{{ t.x }}" cy="{{ t.y }}" r="12.5"></circle>
+                    <text x="{{ t.x }}" y="{{ t.y }}">{{ t.num }}</text>
+                </g>
+            {% endfor %}
+        </svg>
+        <div class="chart-key">
+            <span><i class="on"></i>In this job order</span>
+            <span><i></i>Not included</span>
+            <span>Seen from the front: the patient's right is on your left.</span>
+            {% if outside %}<span>Also: #{{ outside | join(', #') }} (not on the adult chart)</span>{% endif %}
+        </div>
+    </div>
+{% endmacro %}
