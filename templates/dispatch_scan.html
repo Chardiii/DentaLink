@@ -195,6 +195,14 @@
                 {% endif %}
             </section>
 
+            {# ---------- Full job order (files, tooth chart, history) ---------- #}
+            {% set full_url = url_for('dentist_case_summary', case_id=case.id) if role == 'dentist'
+                else url_for('admin_case_details', case_id=case.id) if role == 'admin'
+                else url_for('view_case_details', case_id=case.id) if case.technician_id == profile.id else none %}
+            {% if full_url %}
+                <a class="btn" href="{{ full_url }}" style="display: flex; justify-content: center; border: 1px solid var(--border, #E2E8F0); background: #FFFFFF; color: var(--ink, #0F172A); text-decoration: none;">View full job order: scans, photos and tooth chart →</a>
+            {% endif %}
+
             {# ---------- Actions ---------- #}
             {% if role in ['admin', 'technician'] and status == 'ready_for_dispatch' %}
                 <section class="card">
