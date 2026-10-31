@@ -99,6 +99,12 @@
         <button type="button" class="btn btn-cyan" onclick="window.print()">Print label</button>
     </div>
     <p class="hint">Print at 100 × 150 mm (4 × 6 in) with scaling off, and attach the label to the outside of the delivery box.</p>
+    {% if scan_url_is_local %}
+        <p class="hint" role="alert" style="color: #92400E; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 12px;">
+            <strong>This QR code only works on this computer or its Wi-Fi.</strong> It points to {{ scan_url.split('/d/')[0] }}, which phones on other networks can't reach.
+            Set APP_URL to the public site (for example https://your-app.up.railway.app) and print the label from there.
+        </p>
+    {% endif %}
 
     <article class="label">
         <header class="label-head">
