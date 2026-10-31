@@ -63,7 +63,9 @@
         .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
         .pill.done { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
         .pill.remake { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
-        td.work { min-width: 280px; }
+        .table-wrap { position: relative; }   /* keeps the hidden 'Actions' label inside the scroll area */
+        td.work { min-width: 210px; }
+        tbody td:nth-child(2) { min-width: 150px; }
         td.team { min-width: 130px; }
         .notes { margin-top: 4px; font-size: 12.5px; color: #475569; }
         .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: var(--text-muted); cursor: pointer; }
@@ -73,6 +75,22 @@
         .empty h3 { margin: 0 0 6px; color: var(--text-strong); }
         .empty p { margin: 0 auto; max-width: 520px; color: var(--text-muted); font-size: 13.5px; }
         .warning { padding: 13px 15px; border: 1px solid var(--warn-line); border-radius: 11px; background: var(--warn-bg); color: #92400E; font-size: 13px; margin-bottom: 16px; }
+
+        .list-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+        .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .seg { display: inline-flex; padding: 3px; border: 1px solid var(--border-color); border-radius: 10px; background: #F8FAFC; }
+        .seg-btn { border: 0; background: none; padding: 6px 11px; border-radius: 8px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text-muted); cursor: pointer; }
+        .seg-btn span { margin-left: 4px; font-variant-numeric: tabular-nums; opacity: .75; }
+        .seg-btn[aria-pressed="true"] { background: #FFFFFF; color: var(--text-strong); box-shadow: 0 1px 3px rgba(15, 23, 42, .1); }
+        .seg-btn:focus-visible, #monthFilter:focus-visible, #jobSearch:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        #monthFilter, #jobSearch { height: 36px; border: 1px solid var(--border-color); border-radius: 10px; padding: 0 10px; font: inherit; font-size: 13px; background: #FFFFFF; color: var(--text-main); }
+        #jobSearch { width: 240px; }
+        a.ref { text-decoration: none; }
+        a.ref:hover { text-decoration: underline; }
+        .src { display: inline-block; margin-top: 4px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .03em; }
+        .src.paper { background: #F1F5F9; color: #475569; }
+        .src.dentalink { background: #E0F2FE; color: #0369A1; }
+        tr.job-row[hidden] { display: none; }
 
         @media (max-width: 1100px) { .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 1024px) { .dashboard-container { margin-left: 0; padding: 24px; } }
@@ -87,7 +105,7 @@
         <header class="page-heading">
             <span class="eyebrow"><span class="eyebrow-dot"></span>Records</span>
             <h1>Job Order History</h1>
-            <p class="lead">The lab's paper job orders from before DentaLink, transcribed and imported. All are completed work. They also count as real demand in Forecast Analytics. Patient names are not stored.</p>
+            <p class="lead">Every finished job order in one place: the lab's paper job orders (imported) and cases delivered through DentaLink. Both count as real demand in Forecast Analytics. Paper job orders store no patient names.</p>
         </header>
 
         {% if not migrated %}
@@ -111,14 +129,29 @@
 
         {% if orders %}
             <section class="figures" aria-label="Summary">
-                <div class="figure"><div class="label">Job orders</div><div class="value">{{ orders | length }}</div><div class="note">from {{ clinics }} clinic{{ 's' if clinics != 1 }}</div></div>
-                <div class="figure"><div class="label">Units</div><div class="value">{{ total_units }}</div><div class="note">{{ by_material | map('join', ' ') | join(' · ') }}</div></div>
+                <div class="figure"><div class="label">Job orders</div><div class="value">{{ orders | length }}</div><div class="note">{{ digital_count }} DentaLink · {{ paper_count }} paper · {{ clinics }} clinic{{ 's' if clinics != 1 }}</div></div>
+                <div class="figure"><div class="label">Units</div><div class="value">{{ total_units }}</div><div class="note">{% for name, n in by_material %}{{ name }} {{ n }}{{ ' · ' if not loop.last }}{% endfor %}</div></div>
                 <div class="figure"><div class="label">Average turnaround</div><div class="value">{% if avg_turnaround is not none %}{{ avg_turnaround }} <span style="font-size: 14px; color: var(--text-muted);">days</span>{% else %}—{% endif %}</div><div class="note">from received to sent out</div></div>
                 <div class="figure"><div class="label">Remakes / warranty</div><div class="value">{{ orders | selectattr('is_remake', 'in', ['yes', 'Yes', 'YES']) | list | length }}</div><div class="note">of {{ orders | length }} job orders</div></div>
             </section>
 
             <section class="card" aria-labelledby="listTitle">
-                <h2 id="listTitle" style="margin-bottom: 10px;">Completed job orders</h2>
+                <div class="list-head">
+                    <h2 id="listTitle">Completed job orders</h2>
+                    <div class="filters">
+                        <div class="seg" role="group" aria-label="Source">
+                            <button type="button" class="seg-btn" data-source="all" aria-pressed="true">All <span>{{ orders | length }}</span></button>
+                            <button type="button" class="seg-btn" data-source="dentalink" aria-pressed="false">DentaLink <span>{{ digital_count }}</span></button>
+                            <button type="button" class="seg-btn" data-source="paper" aria-pressed="false">Paper <span>{{ paper_count }}</span></button>
+                        </div>
+                        <select id="monthFilter" aria-label="Month received">
+                            <option value="">All months</option>
+                            {% for mo in months %}<option value="{{ mo }}">{{ mo }}</option>{% endfor %}
+                        </select>
+                        <input type="search" id="jobSearch" placeholder="Search clinic, dentist, job order…" aria-label="Search job orders">
+                    </div>
+                </div>
+                <p class="hint" id="filterCount" aria-live="polite" style="margin: 4px 0 10px;"></p>
                 <div class="table-wrap">
                     <table>
                         <thead>
@@ -127,8 +160,7 @@
                                 <th>Clinic</th>
                                 <th>Work</th>
                                 <th>Material · shade</th>
-                                <th>Received → out</th>
-                                <th>Due</th>
+                                <th>Received → out · due</th>
                                 <th>Lab team</th>
                                 <th>Status</th>
                                 <th><span class="sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Actions</span></th>
@@ -136,45 +168,98 @@
                         </thead>
                         <tbody>
                             {% for o in orders %}
-                                <tr>
-                                    <td><span class="ref">{{ o.jo_ref }}</span>{% if o.clinic_ref %}<span class="sub">Clinic ref {{ o.clinic_ref }}</span>{% endif %}</td>
+                                {% set is_paper = o.source == 'paper' %}
+                                <tr class="job-row" data-source="{{ o.source }}" data-month="{{ o.month }}"
+                                    data-search="{{ [o.jo_ref, o.clinic, o.dentist_name, o.clinic_ref, o.case_type, o.material, o.technician, o.cad_designer, o.porcelain_technician] | select | join(' ') | lower }}">
+                                    <td>
+                                        {% if is_paper %}<span class="ref">{{ o.jo_ref }}</span>{% else %}<a class="ref" href="{{ url_for('admin_case_details', case_id=o.id) }}" title="Open job order">#{{ o.jo_ref }} →</a>{% endif %}
+                                        <span class="src {{ o.source }}">{{ 'Paper' if is_paper else 'DentaLink' }}</span>
+                                        {% if o.clinic_ref %}<span class="sub">Clinic ref {{ o.clinic_ref }}</span>{% endif %}
+                                    </td>
                                     <td><span class="strong">{{ o.clinic or '—' }}</span>{% if o.dentist_name %}<span class="sub">{{ o.dentist_name }}</span>{% endif %}</td>
                                     <td class="work"><span class="strong">{{ o.units }} unit{{ 's' if o.units != 1 }}</span> {{ (o.case_type or '') }}
                                         {% if o.teeth %}<span class="sub">Teeth: {{ o.teeth }}</span>{% endif %}
                                         {% if o.notes %}<span class="sub notes">Note: {{ o.notes }}</span>{% endif %}</td>
                                     <td>{{ o.material }}{% if o.shade %}<span class="sub">Shade {{ o.shade }}</span>{% endif %}</td>
                                     <td class="num">{% if o.lab_in %}<time data-date datetime="{{ o.lab_in }}">{{ o.lab_in }}</time>{% else %}—{% endif %} → {% if o.lab_out %}<time data-date datetime="{{ o.lab_out }}">{{ o.lab_out }}</time>{% else %}<span class="sub" style="display: inline;">not recorded</span>{% endif %}
-                                        {% if o.turnaround is not none %}<span class="sub">{{ o.turnaround }} day{{ 's' if o.turnaround != 1 }}</span>{% endif %}</td>
-                                    <td class="num">{% if o.due_date %}<time data-date datetime="{{ o.due_date }}">{{ o.due_date }}</time>{% else %}—{% endif %}</td>
-                                    <td class="team">{% if o.cad_designer %}<span>CAD: {{ o.cad_designer }}</span>{% endif %}{% if o.porcelain_technician %}<span class="sub">Porcelain: {{ o.porcelain_technician }}</span>{% endif %}{% if not o.cad_designer and not o.porcelain_technician %}<span class="sub">—</span>{% endif %}</td>
+                                        <span class="sub">{% if o.turnaround is not none %}{{ o.turnaround }} day{{ 's' if o.turnaround != 1 }}{% endif %}{% if o.turnaround is not none and o.due_date %} · {% endif %}{% if o.due_date %}due <time data-date datetime="{{ o.due_date }}">{{ o.due_date }}</time>{% endif %}</span></td>
+                                    <td class="team">
+                                        {% if is_paper %}
+                                            {% if o.cad_designer %}<span>CAD: {{ o.cad_designer }}</span>{% endif %}{% if o.porcelain_technician %}<span class="sub">Porcelain: {{ o.porcelain_technician }}</span>{% endif %}{% if not o.cad_designer and not o.porcelain_technician %}<span class="sub">—</span>{% endif %}
+                                        {% else %}
+                                            <span>{{ o.technician or '—' }}</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
-                                        <span class="pill done"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M5 13l4 4L19 7"/></svg>Completed</span>
+                                        {% if not is_paper and o.status == 'delivered' %}
+                                            <span class="pill done"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M5 13l4 4L19 7"/></svg>Delivered</span>
+                                            {% if o.delivered_on %}<span class="sub"><time data-date datetime="{{ o.delivered_on }}">{{ o.delivered_on }}</time></span>{% endif %}
+                                        {% else %}
+                                            <span class="pill done"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M5 13l4 4L19 7"/></svg>Completed</span>
+                                        {% endif %}
                                         {% if (o.is_remake or '') | lower == 'yes' %}<span class="pill remake" style="margin-top: 4px;">Remake / warranty</span>{% elif (o.is_remake or '') | lower == 'maybe' %}<span class="sub">Possibly an adjustment</span>{% endif %}
                                     </td>
                                     <td>
+                                        {% if is_paper %}
                                         <button type="button" class="icon-btn" aria-label="Remove {{ o.jo_ref }}" title="Remove from history"
                                                 data-confirm-action="{{ url_for('admin_delete_job_order', order_id=o.id) }}"
                                                 data-confirm-title="Remove {{ o.jo_ref }}?"
-                                                data-confirm-message="This removes the job order from Job Order History and from the forecast's real data. Your CSV file and photos are not affected, so you can import it again."
+                                                data-confirm-message="This removes the paper job order from Job Order History and from the forecast's real data. Your CSV file and photos are not affected, so you can import it again."
                                                 data-confirm-label="Remove">
                                             <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
                                         </button>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
+                    <div class="empty" id="noMatch" hidden style="margin-top: 10px;"><h3>No job orders match</h3><p>Try another month or search.</p></div>
                 </div>
             </section>
-        {% elif migrated %}
+        {% else %}
             <div class="empty">
-                <h3>No job orders imported yet</h3>
-                <p>Import <code>job_orders.csv</code> from your DentaLink_data\extracted folder to add the 9 job orders you photographed.</p>
+                <h3>No finished job orders yet</h3>
+                <p>Cases appear here once they're delivered. You can also import <code>job_orders.csv</code> from your DentaLink_data\extracted folder to add the 9 paper job orders you photographed.</p>
             </div>
         {% endif %}
     </main>
 
     {% include 'partials/confirm_dialog.html' %}
+    <script>
+        (function () {
+            const rows = Array.from(document.querySelectorAll('tr.job-row'));
+            if (!rows.length) return;
+            const state = { source: 'all' };
+            const month = document.getElementById('monthFilter');
+            const search = document.getElementById('jobSearch');
+            function apply() {
+                const q = search.value.trim().toLowerCase();
+                let shown = 0;
+                rows.forEach((r) => {
+                    const ok = (state.source === 'all' || r.dataset.source === state.source)
+                        && (!month.value || r.dataset.month === month.value)
+                        && (!q || r.dataset.search.includes(q));
+                    r.hidden = !ok;
+                    if (ok) shown++;
+                });
+                document.getElementById('noMatch').hidden = shown > 0;
+                document.getElementById('filterCount').textContent = shown === rows.length ? '' : `Showing ${shown} of ${rows.length} job orders`;
+            }
+            document.querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', () => {
+                state.source = b.dataset.source;
+                document.querySelectorAll('.seg-btn').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+                apply();
+            }));
+            month.addEventListener('change', apply);
+            search.addEventListener('input', apply);
+            month.querySelectorAll('option[value]').forEach((o) => {
+                if (!o.value) return;
+                const d = new Date(o.value + '-01T00:00:00');
+                if (!isNaN(d)) o.textContent = d.toLocaleDateString([], { month: 'long', year: 'numeric' });
+            });
+        })();
+    </script>
     {% include 'partials/action_notice.html' %}
     <script>
         document.querySelectorAll('time[data-date]').forEach((el) => {

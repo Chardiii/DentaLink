@@ -517,9 +517,8 @@
                         {% endif %}
 
                         <div class="k-card-actions">
-                            {% if c.dispatch_token %}
-                                <a href="{{ url_for('scan_dispatch_label', token=c.dispatch_token) }}" class="btn-action-primary">Confirm receipt →</a>
-                            {% endif %}
+                            {# Receipt is confirmed only by scanning the QR label on the box (proof it arrived). #}
+                            <span style="font-size: 11px; color: var(--text-muted); padding: 6px 0;">Scan the QR on the box to confirm receipt</span>
                             <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">View job order</a>
                         </div>
                     </div>

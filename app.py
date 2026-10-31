@@ -3168,6 +3168,101 @@ def _next_case_number():
 # =========================
 # DENTIST: CASE SUMMARY, DELIVERY RECEIPT, ISSUE REPORTS
 # =========================
+def _job_order_context(case, include_internal=True):
+    """Everything a job order page shows besides the case row itself (dentist and admin pages).
+
+    Sets case["teeth"], due-date urgency, and returns files, history (with names), dispatch
+    events, delivery receipt, issue reports, remake links, technician name, tooth chart and
+    materials summary. include_internal=False hides lab-only scheduling (rush flags).
+    """
+    case_id = case["id"]
+    case["teeth"] = supabase_admin.table("case_teeth").select("*").eq("case_id", case_id).order("tooth_number").execute().data or []
+    files = _case_file_links(supabase_admin.table("case_files").select("*").eq("case_id", case_id).execute().data or [])
+    history = (
+        supabase_admin.table("case_status_history").select("status, notes, created_at, changed_by")
+        .eq("case_id", case_id).order("created_at").execute().data or []
+    )
+    if not include_internal:
+        history = [h for h in history if not str(h.get("status") or "").startswith(("Marked as rush", "Rush flag removed"))]
+    events = (
+        supabase_admin.table("case_dispatch_events")
+        .select("event_type, actor_id, courier_name, received_by, notes, created_at")
+        .eq("case_id", case_id).in_("event_type", ["issued", "dispatched", "delivered"])
+        .order("created_at").execute().data or []
+    )
+    people_ids = {pid for pid in [case.get("technician_id")] + [h.get("changed_by") for h in history] + [e.get("actor_id") for e in events] if pid}
+    people = (
+        supabase_admin.table("profiles").select("id, display_name, first_name, role").in_("id", list(people_ids)).execute().data or []
+    ) if people_ids else []
+    names = {p["id"]: _display_name(p) for p in people}
+    for item in history + events:
+        item["actor_name"] = names.get(item.get("changed_by") or item.get("actor_id"), "Laboratory")
+
+    parent, remakes = None, []
+    try:
+        if case.get("remake_of"):
+            parents = supabase_admin.table("dental_cases").select("id, case_number").eq("id", case["remake_of"]).execute().data or []
+            parent = parents[0] if parents else None
+        remakes = (
+            supabase_admin.table("dental_cases").select("id, case_number, status, due_date")
+            .eq("remake_of", case_id).order("created_at").execute().data or []
+        )
+    except Exception:
+        app.logger.warning("Remake columns unavailable; run the remakes migration")
+
+    case["due_state"], case["due_label"] = _due_status(case.get("due_date"), datetime.now(LAB_TZ).date())
+    tooth_chart, teeth_off_chart = _tooth_chart(case["teeth"])
+    materials = {}
+    for t in case["teeth"]:
+        key = ((t.get("material") or "Not specified").replace("_", " ").title(), t.get("shade") or "")
+        materials[key] = materials.get(key, 0) + 1
+    return {
+        "files": files,
+        "history": history,
+        "events": events,
+        "receipt": _delivery_receipt(case, events),
+        "reports": _issue_reports_for([case_id]),
+        "parent": parent,
+        "remakes": remakes,
+        "technician_name": names.get(case.get("technician_id")),
+        "tooth_chart": tooth_chart,
+        "teeth_off_chart": teeth_off_chart,
+        "material_summary": [{"material": m, "shade": sh, "units": n} for (m, sh), n in materials.items()],
+    }
+
+
+@app.route("/admin/cases/<case_id>")
+@role_required("admin")
+def admin_case_details(case_id):
+    """The admin's job order page: everything about one case, from any stage."""
+    try:
+        cases = supabase_admin.table("dental_cases").select("*").eq("id", case_id).execute().data or []
+        if not cases:
+            return "Job order not found.", 404
+        case = cases[0]
+        ctx = _job_order_context(case, include_internal=True)
+        dentist = {}
+        if case.get("dentist_id"):
+            rows = (supabase_admin.table("profiles").select("display_name, first_name, last_name, clinic_name, phone")
+                    .eq("id", case["dentist_id"]).execute().data or [])
+            dentist = rows[0] if rows else {}
+        label = _active_dispatch_label(case_id) if case.get("status") in DISPATCH_STATUSES + DELIVERED_STATUSES else None
+        return render_template(
+            "admin_case_details.html",
+            profile=g.profile,
+            case=case,
+            dentist=dentist,
+            label=label,
+            materials_used=_materials_used(case["case_number"]),
+            issue_types=ISSUE_TYPES,
+            issue_decisions=ISSUE_DECISIONS,
+            **ctx,
+        )
+    except Exception:
+        app.logger.exception("Unable to load admin job order page")
+        return "Unable to load this job order. Check the server logs for details.", 500
+
+
 @app.route("/dentist/cases/<case_id>")
 @role_required("dentist")
 def dentist_case_summary(case_id):
@@ -3179,48 +3274,8 @@ def dentist_case_summary(case_id):
         if case.get("status") in ("draft", "needs_revision"):
             return redirect(url_for("edit_dental_case", case_id=case_id))
 
-        case["teeth"] = supabase_admin.table("case_teeth").select("*").eq("case_id", case_id).order("tooth_number").execute().data or []
-        files = _case_file_links(supabase_admin.table("case_files").select("*").eq("case_id", case_id).execute().data or [])
-        history = (
-            supabase_admin.table("case_status_history").select("status, notes, created_at, changed_by")
-            .eq("case_id", case_id).order("created_at").execute().data or []
-        )
-        # Lab-internal scheduling (rush flags) isn't the clinic's concern.
-        history = [h for h in history if not str(h.get("status") or "").startswith(("Marked as rush", "Rush flag removed"))]
-        case["due_state"], case["due_label"] = _due_status(case.get("due_date"), datetime.now(LAB_TZ).date())
-        tooth_chart, teeth_off_chart = _tooth_chart(case["teeth"])
-        materials = {}
-        for t in case["teeth"]:
-            key = ((t.get("material") or "Not specified").replace("_", " ").title(), t.get("shade") or "")
-            materials[key] = materials.get(key, 0) + 1
-        events = (
-            supabase_admin.table("case_dispatch_events")
-            .select("event_type, actor_id, courier_name, received_by, notes, created_at")
-            .eq("case_id", case_id).in_("event_type", ["issued", "dispatched", "delivered"])
-            .order("created_at").execute().data or []
-        )
-        people_ids = {pid for pid in [case.get("technician_id")] + [h.get("changed_by") for h in history] + [e.get("actor_id") for e in events] if pid}
-        people = (
-            supabase_admin.table("profiles").select("id, display_name, first_name, role").in_("id", list(people_ids)).execute().data or []
-        ) if people_ids else []
-        names = {p["id"]: _display_name(p) for p in people}
-        for item in history + events:
-            item["actor_name"] = names.get(item.get("changed_by") or item.get("actor_id"), "Laboratory")
-
-        receipt = _delivery_receipt(case, events)
-        reports = _issue_reports_for([case_id])
-        # Links between an original case and its remakes (empty until the remake migration runs)
-        parent, remakes = None, []
-        try:
-            if case.get("remake_of"):
-                parents = supabase_admin.table("dental_cases").select("id, case_number").eq("id", case["remake_of"]).execute().data or []
-                parent = parents[0] if parents else None
-            remakes = (
-                supabase_admin.table("dental_cases").select("id, case_number, status, due_date")
-                .eq("remake_of", case_id).order("created_at").execute().data or []
-            )
-        except Exception:
-            app.logger.warning("Remake columns unavailable; run the remakes migration")
+        ctx = _job_order_context(case, include_internal=False)
+        receipt, reports = ctx["receipt"], ctx["reports"]
         has_open_report = any(r["status"] == "open" for r in reports)
         can_report = (
             case.get("status") == "delivered"
@@ -3232,21 +3287,12 @@ def dentist_case_summary(case_id):
             "dentist_case_summary.html",
             profile=g.profile,
             case=case,
-            files=files,
-            history=history,
-            receipt=receipt,
-            technician_name=names.get(case.get("technician_id")),
-            reports=reports,
             can_report=can_report,
             has_open_report=has_open_report,
             issue_types=ISSUE_TYPES,
             issue_decisions=ISSUE_DECISIONS,
             window_days=ISSUE_REPORT_WINDOW_DAYS,
-            parent=parent,
-            remakes=remakes,
-            tooth_chart=tooth_chart,
-            teeth_off_chart=teeth_off_chart,
-            material_summary=[{"material": m, "shade": s, "units": n} for (m, s), n in materials.items()],
+            **ctx,
         )
     except Exception:
         app.logger.exception("Unable to load case summary")
@@ -3898,8 +3944,8 @@ def admin_approve_qc(case_id):
         if case.get("technician_id"):
             create_notification(
                 user_id=case["technician_id"],
-                message=f"QC passed: Case {case['case_number']} is ready for dispatch. Print the label and pack the case.",
-                link=url_for("dispatch_slip", case_id=case_id),
+                message=f"QC passed: Case {case['case_number']} passed the final check. The admin will pack and dispatch it.",
+                link=f"/technician/cases/{case_id}",
             )
         if case.get("dentist_id"):
             create_notification(
@@ -3976,14 +4022,13 @@ def admin_set_rush(case_id):
 
 
 @app.route("/cases/<case_id>/dispatch-slip")
-@role_required("admin", "technician")
+@role_required("admin")
 def dispatch_slip(case_id):
+    """The printable QR label. The admin packs the case and prints it; the clinic scans it."""
     try:
         case = _case_for_dispatch(case_id)
         if not case:
             return "Case not found.", 404
-        if g.profile["role"] == "technician" and case.get("technician_id") != g.profile["id"]:
-            return "Access denied.", 403
         if case.get("status") not in DISPATCH_STATUSES:
             return "A dispatch label is only available after the case passes QC.", 409
 
@@ -4000,7 +4045,7 @@ def dispatch_slip(case_id):
             scan_url=scan_url,
             scan_url_is_local=_is_local_url(scan_url),
             patient_initials=_patient_initials(case.get("patient_name")),
-            back_url=url_for("admin_dashboard" if g.profile["role"] == "admin" else "technician_dashboard"),
+            back_url=url_for("admin_dashboard"),
         )
     except Exception:
         app.logger.exception("Unable to render dispatch slip")
@@ -4104,8 +4149,8 @@ def dispatch_case(token):
         log_case_status_change(case["id"], "Dispatched (in transit)", g.profile["id"], f"Handed to courier {courier_name} by {staff_name}")
         create_notification(
             user_id=case["dentist_id"],
-            message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. Scan the label when it arrives to confirm receipt.",
-            link=url_for("scan_dispatch_label", token=token),
+            message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. Scan the QR label on the box when it arrives to confirm receipt.",
+            link=f"/dentist/cases/{case['id']}",
         )
         _notify_admins(f"Dispatched: Case {case['case_number']} was handed to {courier_name} by {staff_name}.")
         flash(f"Handed to {courier_name}. The clinic has been notified.", "success")
@@ -4668,32 +4713,101 @@ def _job_orders_from_csv(upload):
     return rows
 
 
+def _completed_case_rows():
+    """Delivered and completed DentaLink cases, shaped like Job Order History rows."""
+    cases = _fetch_all(lambda: supabase_admin.table("dental_cases").select("*")
+                       .in_("status", list(DELIVERED_STATUSES)).order("created_at"))
+    if not cases:
+        return []
+    ids = [c["id"] for c in cases]
+    teeth = _fetch_all(lambda: supabase_admin.table("case_teeth").select("case_id, tooth_number, material, shade")
+                       .in_("case_id", ids).order("case_id"))
+    history = _fetch_all(lambda: supabase_admin.table("case_status_history").select("case_id, created_at")
+                         .in_("case_id", ids).order("created_at"))
+    people_ids = list({pid for c in cases for pid in (c.get("dentist_id"), c.get("technician_id")) if pid})
+    people = {p["id"]: p for p in (supabase_admin.table("profiles").select("id, display_name, first_name, last_name, clinic_name")
+                                   .in_("id", people_ids).execute().data or [])} if people_ids else {}
+    teeth_by_case, first_event = {}, {}
+    for t in teeth:
+        teeth_by_case.setdefault(t["case_id"], []).append(t)
+    for h in history:
+        first_event.setdefault(h["case_id"], h["created_at"])
+    rows = []
+    for c in cases:
+        dentist = people.get(c.get("dentist_id"), {})
+        case_teeth = teeth_by_case.get(c["id"], [])
+        mix = {}
+        for t in case_teeth:
+            key = ((t.get("material") or "not specified").replace("_", " "), t.get("shade") or "")
+            mix[key] = mix.get(key, 0) + 1
+        out = c.get("dispatched_at") or c.get("delivered_at")
+        rows.append({
+            "source": "dentalink",
+            "id": c["id"],
+            "jo_ref": c["case_number"],
+            "clinic": dentist.get("clinic_name") or "Independent practice",
+            "dentist_name": _display_name(dentist, "") if dentist else None,
+            "case_type": (c.get("case_type") or "").replace("_", " "),
+            "units": len(case_teeth),
+            "teeth": ", ".join(str(t.get("tooth_number")) for t in case_teeth),
+            "material": ", ".join(f"{n} × {m}{' ' + sh if sh else ''}" for (m, sh), n in mix.items()) or "Not specified",
+            "material_units": {m: sum(n for (mm, _sh), n in mix.items() if mm == m) for (m, _sh) in mix},
+            "shade": None,
+            # The lab's "IN" date: its first record of the case (usually assignment); "out": left with the courier.
+            "lab_in": str(first_event.get(c["id"]) or c.get("created_at") or "")[:10] or None,
+            "lab_out": str(out)[:10] if out else None,
+            "delivered_on": str(c.get("delivered_at") or "")[:10] or None,
+            "due_date": c.get("due_date"),
+            "technician": _display_name(people.get(c.get("technician_id")), "") if c.get("technician_id") in people else None,
+            "is_remake": "yes" if c.get("remake_of") else "no",
+            "status": c.get("status"),
+            "notes": None,
+        })
+    return rows
+
+
 @app.route("/admin/job-orders")
 @role_required("admin")
 def admin_job_orders():
+    """Every finished job order: the lab's imported paper ones and DentaLink's delivered cases."""
     try:
         supabase_admin.table("job_order_history").select("id").limit(1).execute()
         migrated = True
     except Exception:
         migrated = False
-    orders = _job_orders() if migrated else []
+    paper = [dict(o, source="paper") for o in (_job_orders() if migrated else [])]
+    try:
+        digital = _completed_case_rows()
+    except Exception:
+        app.logger.exception("Unable to load completed DentaLink cases")
+        digital = []
+    orders = sorted(paper + digital, key=lambda r: (r.get("lab_in") or r.get("date_sent") or "", r["jo_ref"]), reverse=True)
     for o in orders:
         start, end = _parse_timestamp(o.get("lab_in")), _parse_timestamp(o.get("lab_out"))
         o["turnaround"] = (end - start).days if start and end else None
+        o["month"] = (o.get("lab_in") or o.get("date_sent") or "")[:7]
     turnarounds = [o["turnaround"] for o in orders if o["turnaround"] is not None]
     by_material = {}
-    for o in orders:
+    for o in paper:
         family = (o.get("material") or "Other").split(" (")[0].strip().capitalize()
         by_material[family] = by_material.get(family, 0) + int(o.get("units") or 0)
+    for o in digital:
+        for material, n in o["material_units"].items():
+            family = material.strip().capitalize()
+            by_material[family] = by_material.get(family, 0) + n
+    months = sorted({o["month"] for o in orders if o["month"]}, reverse=True)
     return render_template(
         "admin_job_orders.html",
         profile=g.profile,
         migrated=migrated,
         orders=orders,
+        paper_count=len(paper),
+        digital_count=len(digital),
         total_units=sum(int(o.get("units") or 0) for o in orders),
         clinics=len({o.get("clinic") for o in orders if o.get("clinic")}),
         avg_turnaround=round(sum(turnarounds) / len(turnarounds), 1) if turnarounds else None,
         by_material=sorted(by_material.items(), key=lambda kv: -kv[1]),
+        months=months,
     )
 
 
