@@ -734,6 +734,7 @@
         </div>
     </div>
 
+    {% include 'partials/material_pick.html' %}
     <script>
         // ==========================================
         // USER-SCOPED STORAGE KEY CONFIGURATION
@@ -1080,35 +1081,6 @@
 
         function addMaterialRow() {
             lockedContainer.insertAdjacentHTML('beforeend', rowTemplate);
-        }
-
-        // Pre-select the Inventory item a prescribed material is made from. Zirconia goes to the
-        // disc for its shade (B1 is milled from A1, C1 from A2, BL/OM shades from an OM disc,
-        // darker shades from A3), mirroring ml_models/lab_profile.py. Returns the picked name.
-        function discToken(shade) {
-            const s = (shade || '').toUpperCase().replace(/\s/g, '');
-            if (['A1', 'B1'].includes(s)) return 'a1';
-            if (['A2', 'B2', 'C1'].includes(s)) return 'a2';
-            if (/^(BL|OM)/.test(s)) return 'om';
-            return 'a3';
-        }
-        function pickStockFor(select, material, shade) {
-            const m = (material || '').toLowerCase();
-            const options = Array.from(select.options).filter((o) => o.value);
-            const name = (o) => o.dataset.name || '';
-            const isZirconia = (o) => /zircon|sagemax/.test(name(o));
-            let pick = null;
-            if (/zircon/.test(m)) {
-                const token = discToken(shade);
-                pick = options.find((o) => isZirconia(o) && name(o).split(/[\s/()-]+/).some((t) => t.startsWith(token)))
-                    || options.find(isZirconia);
-            } else if (/e\.?max|lithium/.test(m)) {
-                pick = options.find((o) => /e\.max|emax/.test(name(o)) && !isZirconia(o));
-            } else if (m) {
-                pick = options.find((o) => name(o).includes(m));
-            }
-            if (pick) select.value = pick.value;
-            return pick ? name(pick) : null;
         }
 
         function closeMaterialModal() {

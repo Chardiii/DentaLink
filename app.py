@@ -2619,26 +2619,9 @@ def technician_dashboard():
                 case["teeth"] = []
                 case["case_teeth"] = []
 
-        # What each case is milled from, for the material log at Milling: "material:shade:units"
-        # per distinct material and shade, e.g. "zirconia:A2:3,emax:A1:1".
         for case in assigned_cases:
-            mix = {}
-            for tooth in case.get("case_teeth") or []:
-                key = ((tooth.get("material") or "").strip(), (tooth.get("shade") or "").strip())
-                if key[0]:
-                    mix[key] = mix.get(key, 0) + 1
-            case["material_mix"] = ",".join(f"{m}:{s}:{n}" for (m, s), n in mix.items())
-
-        # Stock the technician can log material use against (the material picker).
-        try:
-            inventory_items = (supabase_admin.table("inventory").select("id, item_name, category, quantity, unit")
-                               .order("category").order("item_name").execute().data or [])
-        except Exception:
-            app.logger.exception("Unable to load inventory for the material picker")
-            inventory_items = []
-        # The picker groups by category; a blank one would break the grouping's sort.
-        for item in inventory_items:
-            item["category"] = item.get("category") or "Uncategorized"
+            case["material_mix"] = _material_mix(case.get("case_teeth"))
+        inventory_items = _picker_inventory()
 
         # Due-date urgency for the pipeline cards (lab time). Within a stage, rush cases come
         # first, then the soonest due date; cases without a due date go last.
@@ -2717,6 +2700,98 @@ def technician_dashboard():
 
 CASE_FILES_BUCKET = "dental-case-files"
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+# Bench stages in order; a technician moves a case forward through them.
+BENCH_FLOW = (
+    ("assigned", "Assigned"), ("in_progress", "In progress"), ("cad_designing", "CAD designing"),
+    ("wax_up_or_try_in", "Wax-up / setup"), ("milling_or_printing", "Milling / printing"),
+    ("packing_and_curing", "Packing & curing"), ("finishing_and_quality_check", "Finishing & QC"),
+)
+# Stages where the technician logs the material used.
+MATERIAL_LOG_STAGES = ("milling_or_printing", "packing_and_curing", "finishing_and_quality_check")
+
+
+def _material_mix(teeth):
+    """What a case is made from, for the material log: "material:shade:units" per distinct
+    material and shade, e.g. "zirconia:A2:3,emax:A1:1"."""
+    mix = {}
+    for tooth in teeth or []:
+        key = ((tooth.get("material") or "").strip(), (tooth.get("shade") or "").strip())
+        if key[0]:
+            mix[key] = mix.get(key, 0) + 1
+    return ",".join(f"{m}:{s}:{n}" for (m, s), n in mix.items())
+
+
+def _picker_inventory():
+    """Inventory items a technician can log material use against, grouped by category."""
+    try:
+        items = (supabase_admin.table("inventory").select("id, item_name, category, quantity, unit")
+                 .order("category").order("item_name").execute().data or [])
+    except Exception:
+        app.logger.exception("Unable to load inventory for the material picker")
+        return []
+    for item in items:  # the picker groups by category; a blank one would break the grouping's sort
+        item["category"] = item.get("category") or "Uncategorized"
+    return sorted(items, key=lambda i: (i["category"].lower(), (i.get("item_name") or "").lower()))
+
+
+def _tooth_chart(teeth):
+    """Positions for an FDI tooth chart: two arches of 16 teeth, the case's teeth marked.
+
+    Upper arch reads 18..11 | 21..28 left to right (the patient's right on the viewer's left),
+    lower arch 48..41 | 31..38, front teeth at the outer edge of each arch.
+    """
+    import math
+    marked = {}
+    for t in teeth or []:
+        num = str(t.get("tooth_number") or "").strip()
+        marked.setdefault(num, []).append(t)
+    upper = [f"1{i}" for i in range(8, 0, -1)] + [f"2{i}" for i in range(1, 9)]
+    lower = [f"4{i}" for i in range(8, 0, -1)] + [f"3{i}" for i in range(1, 9)]
+    chart = []
+    for row, cy, sign in ((upper, 128, -1), (lower, 172, 1)):
+        for i, num in enumerate(row):
+            angle = math.pi - (i + 0.5) * math.pi / 16
+            info = marked.get(num, [])
+            chart.append({
+                "num": num,
+                "x": round(180 + 152 * math.cos(angle), 1),
+                "y": round(cy + sign * 104 * math.sin(angle), 1),
+                "marked": bool(info),
+                "label": ", ".join(
+                    f"{(t.get('material') or 'material not set').replace('_', ' ')} {t.get('shade') or ''}".strip() for t in info
+                ),
+            })
+    outside = sorted(n for n in marked if n not in upper + lower)
+    return chart, outside
+
+
+def _materials_used(case_number):
+    """Material use logged against a job order (the log notes name its case number)."""
+    try:
+        logs = (supabase_admin.table("inventory_logs").select("*")
+                .ilike("notes", f"%Case {case_number}%").order("created_at").execute().data or [])
+    except Exception:
+        app.logger.exception("Unable to load material use for %s", case_number)
+        return []
+    import re
+    exact = re.compile(rf"Case {re.escape(case_number)}(?![\w-])")   # DL-0001 must not match DL-00018
+    logs = [l for l in logs if exact.search(l.get("notes") or "")
+            and (l.get("action_type") in ("case_deduction", "auto_created_and_deducted") or float(l.get("quantity_changed") or 0) < 0)]
+    ids = list({l["inventory_id"] for l in logs if l.get("inventory_id")})
+    items = {}
+    if ids:
+        rows = supabase_admin.table("inventory").select("id, item_name, unit").in_("id", ids).execute().data or []
+        items = {r["id"]: r for r in rows}
+    for l in logs:
+        item = items.get(l.get("inventory_id"), {})
+        l["item_name"] = item.get("item_name") or "A deleted material"
+        unit = item.get("unit") or "unit"
+        # The note records the portion used even when stock was already 0 (no quantity change).
+        portion = re.search(r"(?:Used|Deducted) ([\d.]+)%", l.get("notes") or "")
+        l["portion"] = f"{float(portion.group(1)):g}% of a {unit}" if portion else f"{abs(float(l.get('quantity_changed') or 0)):g} {unit}"
+        stage = re.search(r" at (.+?) (?:stage )?for Case", l.get("notes") or "")
+        l["stage"] = stage.group(1).strip("[]").replace("_", " ") if stage else ""
+    return logs
 
 
 def _case_file_links(files):
@@ -2774,6 +2849,10 @@ def view_case_details(case_id):
 
         today = datetime.now(LAB_TZ).date()
         case["due_state"], case["due_label"] = _due_status(case.get("due_date"), today)
+        case["material_mix"] = _material_mix(teeth)
+        tooth_chart, teeth_off_chart = _tooth_chart(teeth)
+        current = next((i for i, (value, _) in enumerate(BENCH_FLOW) if value == case.get("status")), None)
+        next_stages = list(BENCH_FLOW[current + 1:]) if current is not None else []
         materials = {}
         for t in teeth:
             key = ((t.get("material") or "Not specified").replace("_", " ").title(), t.get("shade") or "")
@@ -2789,6 +2868,12 @@ def view_case_details(case_id):
             case_history=case_history,
             material_summary=[{"material": m, "shade": s, "units": n} for (m, s), n in materials.items()],
             bench_statuses=BENCH_STATUSES,
+            next_stages=next_stages,
+            material_log_stages=MATERIAL_LOG_STAGES,
+            inventory_items=_picker_inventory() if next_stages else [],
+            tooth_chart=tooth_chart,
+            teeth_off_chart=teeth_off_chart,
+            materials_used=_materials_used(case["case_number"]),
         )
     except Exception:
         app.logger.exception("Unable to load case details")
@@ -3702,6 +3787,9 @@ def submit_for_admin_review(case_id):
         case_number = rows[0]["case_number"]
         log_case_status_change(case_id, "Submitted for admin QC", g.profile["id"], f"Submitted by technician {tech_name}")
         _notify_admins(f"QC review needed: {tech_name} finished Case {case_number}. Inspect it and approve it for dispatch.")
+        # Submitted from the job order page: stay there.
+        if request.referrer and f"/technician/cases/{case_id}" in request.referrer:
+            return redirect(url_for("view_case_details", case_id=case_id))
         return redirect(url_for("technician_dashboard"))
     except Exception:
         app.logger.exception("Unable to submit case for QC review")
