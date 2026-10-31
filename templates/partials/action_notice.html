@@ -24,6 +24,9 @@
     "rush-stale": ("stale", "Rush flag not changed"),
     "forecast-started": ("fulfilled", "Forecast started"),
     "forecast-stale": ("stale", "Forecast not started"),
+    "joborders-imported": ("fulfilled", "Job orders imported"),
+    "joborders-input": ("stale", "Check the file"),
+    "joborder-deleted": ("dismissed", "Job order removed"),
 } %}
 {% with notices = get_flashed_messages(with_categories=true, category_filter=notice_kinds.keys()|list) %}
 {% if notices %}
