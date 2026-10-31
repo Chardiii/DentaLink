@@ -451,7 +451,7 @@
                     {% set ns = namespace(after=c.status not in dict(flow)) %}
                     <form class="status-update-form" method="POST" action="/technician/cases/{{ c.id }}/update-status"
                           data-case-id="{{ c.id }}"
-                          data-materials="{{ c.case_teeth | map(attribute='material') | select('string') | unique | join(',') if c.case_teeth else '' }}">
+                          data-materials="{{ c.material_mix or '' }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="k-card-action-bar">
                             <select name="status" class="select-dark status-dropdown" aria-label="Move case {{ c.case_number }} to">
@@ -703,23 +703,20 @@
         <div class="material-row">
             <div>
                 <label class="info-label">Material Consumed</label>
+                {# Options come from Inventory; the value is the item id the server deducts from. #}
                 <select class="select-dark material-select" name="modal_material[]">
-                    <option value="" disabled selected>Select from laboratory inventory...</option>
-                    <optgroup label="Acrylics & Resins">
-                        <option value="Vertex Acrylic Powder (Pink)">Vertex Acrylic Powder (Pink)</option>
-                        <option value="Vertex Monomer Liquid">Vertex Monomer Liquid</option>
-                        <option value="3D Printing Resin">3D Printing Resin</option>
-                    </optgroup>
-                    <optgroup label="Finishing & QC">
-                        <option value="VITA Ceramic Glaze Paste">VITA Ceramic Glaze Paste</option>
-                        <option value="VITA Akzent Stain Kit">VITA Akzent Stain Kit</option>
-                        <option value="Polishing Paste">Polishing Paste</option>
-                        <option value="Articulating Paper">Articulating Paper</option>
-                    </optgroup>
-                    <optgroup label="Processing Materials">
-                        <option value="Dental Stone">Dental Stone/Plaster</option>
-                        <option value="Separating Medium">Separating Medium</option>
-                    </optgroup>
+                    {% if inventory_items %}
+                        <option value="" disabled selected>Select from laboratory inventory...</option>
+                        {% for category, items in inventory_items | groupby('category') %}
+                            <optgroup label="{{ category or 'Uncategorized' }}">
+                                {% for item in items %}
+                                    <option value="{{ item.id }}" data-name="{{ item.item_name | lower }}">{{ item.item_name }} ({{ '%g' | format((item.quantity or 0) | float) }} {{ item.unit or '' }} left)</option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endfor %}
+                    {% else %}
+                        <option value="" disabled selected>No materials in Inventory yet: ask an admin to add them</option>
+                    {% endif %}
                 </select>
             </div>
             <div>
@@ -1049,37 +1046,27 @@
                     lockedContainer.innerHTML = '';
 
                     if (newStatus === 'milling_or_printing') {
-                        modalInstructions.innerHTML = `Advancing to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. Prescribed materials for this order are listed below. Enter portion percentage utilized.`;
-                        addMaterialBtn.style.display = 'none';
+                        modalInstructions.innerHTML = `Advancing to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. The stock each prescribed material is milled from is picked for you; check it and the portion of the disc or block used.`;
+                        addMaterialBtn.style.display = 'block';
 
-                        if (rawMaterials && rawMaterials.trim() !== '') {
-                            const materialsArray = rawMaterials.split(',');
-                            materialsArray.forEach(mat => {
-                                const formattedMat = mat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                                const row = document.createElement('div');
-                                row.className = 'material-row';
-                                row.style.gridTemplateColumns = '1fr 110px'; 
-                                row.innerHTML = `
-                                    <div>
-                                        <label class="info-label">Prescribed Substrate</label>
-                                        <div style="font-size: 13px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 8px;">
-                                            <svg width="15" height="15" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                            ${formattedMat}
-                                        </div>
-                                        <input type="hidden" name="modal_material[]" value="${mat}">
-                                    </div>
-                                    <div>
-                                        <label class="info-label">Used (%)</label>
-                                        <div class="percent-wrapper">
-                                            <input type="number" name="modal_percentage[]" class="input-dark" placeholder="15" min="1" max="100" required>
-                                            <span class="percent-symbol">%</span>
-                                        </div>
-                                    </div>
-                                `;
-                                lockedContainer.appendChild(row);
+                        const prescribed = (rawMaterials || '').split(',').filter(Boolean).map((part) => {
+                            const [material, shade, units] = part.split(':');
+                            return { material, shade, units: parseInt(units, 10) || 1 };
+                        });
+                        if (prescribed.length) {
+                            prescribed.forEach((p) => {
+                                lockedContainer.insertAdjacentHTML('beforeend', rowTemplate);
+                                const row = lockedContainer.lastElementChild;
+                                const label = row.querySelector('.info-label');
+                                const pretty = p.material.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+                                label.textContent = `Prescribed: ${pretty}${p.shade ? ' · ' + p.shade : ''} · ${p.units} unit${p.units === 1 ? '' : 's'}`;
+                                const picked = pickStockFor(row.querySelector('select'), p.material, p.shade);
+                                // A disc fits about 18-25 units (21.5 typical), so each unit uses ~5% of one.
+                                const pct = row.querySelector('input[name="modal_percentage[]"]');
+                                if (picked && /zircon|sagemax/.test(picked)) pct.value = Math.min(100, Math.max(1, Math.round(p.units / 21.5 * 100)));
                             });
                         } else {
-                            lockedContainer.innerHTML = `<div style="padding: 14px; border: 1px dashed var(--border-color); border-radius: 8px; text-align: center; color: var(--text-muted); font-size: 12px;">No prescribed materials mapped to this case.</div>`;
+                            addMaterialRow();
                         }
                     } else {
                         modalInstructions.innerHTML = `Advancing to <strong style="color: var(--accent-cyan);">${niceStatusName}</strong>. Select lab consumables consumed from stock:`;
@@ -1093,6 +1080,35 @@
 
         function addMaterialRow() {
             lockedContainer.insertAdjacentHTML('beforeend', rowTemplate);
+        }
+
+        // Pre-select the Inventory item a prescribed material is made from. Zirconia goes to the
+        // disc for its shade (B1 is milled from A1, C1 from A2, BL/OM shades from an OM disc,
+        // darker shades from A3), mirroring ml_models/lab_profile.py. Returns the picked name.
+        function discToken(shade) {
+            const s = (shade || '').toUpperCase().replace(/\s/g, '');
+            if (['A1', 'B1'].includes(s)) return 'a1';
+            if (['A2', 'B2', 'C1'].includes(s)) return 'a2';
+            if (/^(BL|OM)/.test(s)) return 'om';
+            return 'a3';
+        }
+        function pickStockFor(select, material, shade) {
+            const m = (material || '').toLowerCase();
+            const options = Array.from(select.options).filter((o) => o.value);
+            const name = (o) => o.dataset.name || '';
+            const isZirconia = (o) => /zircon|sagemax/.test(name(o));
+            let pick = null;
+            if (/zircon/.test(m)) {
+                const token = discToken(shade);
+                pick = options.find((o) => isZirconia(o) && name(o).split(/[\s/()-]+/).some((t) => t.startsWith(token)))
+                    || options.find(isZirconia);
+            } else if (/e\.?max|lithium/.test(m)) {
+                pick = options.find((o) => /e\.max|emax/.test(name(o)) && !isZirconia(o));
+            } else if (m) {
+                pick = options.find((o) => name(o).includes(m));
+            }
+            if (pick) select.value = pick.value;
+            return pick ? name(pick) : null;
         }
 
         function closeMaterialModal() {
