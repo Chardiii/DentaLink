@@ -5,6 +5,7 @@ import tempfile
 import uuid
 import zipfile
 from functools import wraps
+from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
@@ -2635,6 +2636,9 @@ def technician_dashboard():
         except Exception:
             app.logger.exception("Unable to load inventory for the material picker")
             inventory_items = []
+        # The picker groups by category; a blank one would break the grouping's sort.
+        for item in inventory_items:
+            item["category"] = item.get("category") or "Uncategorized"
 
         # Due-date urgency for the pipeline cards (lab time). Within a stage, rush cases come
         # first, then the soonest due date; cases without a due date go last.
@@ -2711,143 +2715,84 @@ def technician_dashboard():
 # TECHNICIAN CASE DETAILS
 # =========================
 
+CASE_FILES_BUCKET = "dental-case-files"
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+
+
+def _case_file_links(files):
+    """Add view_url (opens in the browser) and download_url (saves the file) to case file rows,
+    plus kind: "stl", "image", "pdf" or "other" for choosing a viewer."""
+    for f in files:
+        name = (f.get("file_name") or "").lower()
+        mime = (f.get("mime_type") or "").lower()
+        if f.get("file_type") == "stl" or name.endswith(".stl"):
+            f["kind"] = "stl"
+        elif mime.startswith("image/") or name.endswith(IMAGE_EXTENSIONS):
+            f["kind"] = "image"
+        elif mime == "application/pdf" or name.endswith(".pdf"):
+            f["kind"] = "pdf"
+        else:
+            f["kind"] = "other"
+        try:
+            signed = supabase_admin.storage.from_(CASE_FILES_BUCKET).create_signed_url(f["file_path"], 3600)
+            url = signed.get("signedURL") or signed.get("signedUrl") if isinstance(signed, dict) else signed
+        except Exception:
+            app.logger.exception("Unable to sign case file %s", f.get("file_path"))
+            url = None
+        f["view_url"] = url
+        # Supabase sends the file as an attachment when the URL carries ?download=<name>.
+        f["download_url"] = f"{url}{'&' if '?' in url else '?'}download={quote(f.get('file_name') or 'file')}" if url else None
+        size = f.get("file_size") or 0
+        f["size_label"] = f"{size / 1048576:.1f} MB" if size >= 1048576 else (f"{max(size // 1024, 1)} KB" if size else "")
+    return files
+
+
 @app.route("/technician/cases/<case_id>")
+@role_required("technician")
 def view_case_details(case_id):
-
-    # =========================
-    # CHECK LOGIN
-    # =========================
-
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return redirect(url_for("login"))
-
-
+    """A technician's view of one of their job orders: prescription, teeth, files, history."""
+    user_id = g.profile["id"]
     try:
-
-        # =========================
-        # VERIFY TECHNICIAN
-        # =========================
-
-        profile_response = (
-            supabase_admin
-            .table("profiles")
-            .select("role, status")
-            .eq("id", user_id)
-            .execute()
-        )
-
-        profiles = profile_response.data or []
-
-        if not profiles or profiles[0]["role"] != "technician":
-            return "Access denied.", 403
-
-
-        # =========================
-        # GET CASE DATA
-        # =========================
-
-        case_response = (
-            supabase_admin
-            .table("dental_cases")
-            .select("*")
-            .eq("id", case_id)
-            .execute()
-        )
-
-        cases = case_response.data or []
-
+        cases = (supabase_admin.table("dental_cases").select("*")
+                 .eq("id", case_id).eq("technician_id", user_id).execute().data or [])
         if not cases:
-            return "Case not found.", 404
-
+            return "This job order isn't assigned to you, or it no longer exists.", 404
         case = cases[0]
 
-
-        # =========================
-        # GET TEETH DATA
-        # =========================
-
-        teeth_response = (
-            supabase_admin
-            .table("case_teeth")
-            .select("*")
-            .eq("case_id", case_id)
-            .order("tooth_number")
-            .execute()
+        teeth = (supabase_admin.table("case_teeth").select("*").eq("case_id", case_id)
+                 .order("tooth_number").execute().data or [])
+        files = _case_file_links(
+            supabase_admin.table("case_files").select("*").eq("case_id", case_id).execute().data or []
         )
+        dentist = {}
+        if case.get("dentist_id"):
+            rows = (supabase_admin.table("profiles").select("display_name, first_name, last_name, clinic_name, phone")
+                    .eq("id", case["dentist_id"]).execute().data or [])
+            dentist = rows[0] if rows else {}
+        case_history = (supabase_admin.table("case_status_history").select("*, profiles(display_name)")
+                        .eq("case_id", case_id).order("created_at").execute().data or [])
 
-        teeth = teeth_response.data or []
-
-
-        # =========================
-        # GET FILE RECORDS
-        # =========================
-
-        files_response = (
-            supabase_admin
-            .table("case_files")
-            .select("*")
-            .eq("case_id", case_id)
-            .execute()
-        )
-
-        files = files_response.data or []
-
-
-        # =========================
-        # GENERATE DOWNLOAD URLS
-        # =========================
-
-        CASE_FILES_BUCKET = "dental-case-files"
-
-        for file_record in files:
-
-            signed_url = (
-                supabase_admin
-                .storage
-                .from_(CASE_FILES_BUCKET)
-                .create_signed_url(file_record["file_path"], 3600)
-            )
-            
-            if isinstance(signed_url, dict):
-                file_record["download_url"] = signed_url.get("signedURL")
-            else:
-                file_record["download_url"] = signed_url
-
-
-        # ==========================================
-        # GET STATUS TIMELINE HISTORY
-        # ==========================================
-
-        history_response = (
-            supabase_admin
-            .table("case_status_history")
-            .select("*, profiles(display_name)")
-            .eq("case_id", case_id)
-            .order("created_at")
-            .execute()
-        )
-
-        case_history = history_response.data or []
-
-
-        # =========================
-        # RENDER TEMPLATE
-        # =========================
+        today = datetime.now(LAB_TZ).date()
+        case["due_state"], case["due_label"] = _due_status(case.get("due_date"), today)
+        materials = {}
+        for t in teeth:
+            key = ((t.get("material") or "Not specified").replace("_", " ").title(), t.get("shade") or "")
+            materials[key] = materials.get(key, 0) + 1
 
         return render_template(
             "technician_case_details.html",
+            profile=g.profile,
             case=case,
             teeth=teeth,
             files=files,
-            case_history=case_history
+            dentist=dentist,
+            case_history=case_history,
+            material_summary=[{"material": m, "shade": s, "units": n} for (m, s), n in materials.items()],
+            bench_statuses=BENCH_STATUSES,
         )
-
-
-    except Exception as e:
-
-        return f"Case details error: {str(e)}", 500
+    except Exception:
+        app.logger.exception("Unable to load case details")
+        return "Unable to load this job order. Check the server logs for details.", 500
 
 # =========================
 # EDIT DENTAL CASE (DRAFT)

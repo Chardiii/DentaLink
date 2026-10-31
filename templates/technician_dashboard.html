@@ -476,7 +476,7 @@
                     <div class="k-card-note">On the way to the clinic</div>
                 {% endif %}
                 </div>
-                <a href="/technician/cases/{{ c.id }}" class="view-link-btn">Inspect Rx Specs →</a>
+                <a href="/technician/cases/{{ c.id }}" class="view-link-btn">View job order →</a>
             </article>
         {% endmacro %}
 
@@ -585,7 +585,7 @@
                         <span>{{ c.case_type | replace('_', ' ') | title }}</span>
                         <span>Delivered: {{ (c.delivered_at or '')[:10] or 'Before QR tracking' }}</span>
                     </div>
-                    <a href="/technician/cases/{{ c.id }}" class="btn btn-outline" style="margin-top: 10px; font-size: 12px; color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">View Archived Case →</a>
+                    <a href="/technician/cases/{{ c.id }}" class="btn btn-outline" style="margin-top: 10px; font-size: 12px; color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3);">View job order →</a>
                 </div>
             {% else %}
                 <div class="empty-column" style="grid-column: 1 / -1; padding: 48px;">
