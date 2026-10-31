@@ -3410,6 +3410,16 @@ def _count(table, **filters):
     return query.limit(1).execute().count or 0
 
 
+def _forecast_stamp():
+    """Latest forecast run and its status; '' before the forecast_runs migration has run."""
+    try:
+        rows = (supabase_admin.table("forecast_runs").select("id, status")
+                .order("created_at", desc=True).limit(1).execute().data or [])
+        return f"{rows[0]['id']}:{rows[0]['status']}" if rows else ""
+    except Exception:
+        return ""
+
+
 @app.route("/api/live")
 @role_required("admin", "technician", "dentist")
 def live_status():
@@ -3435,6 +3445,7 @@ def live_status():
                 _latest("profiles", "created_at"),
                 str(_count("profiles", status="pending")),
                 str(_open_issue_count()),
+                _forecast_stamp(),
             ]
         latest = (
             supabase_admin.table("notifications").select("id, message, created_at")
@@ -4374,199 +4385,214 @@ def update_inventory_stock(item_id):
 
 
 # =========================
-# MACHINE LEARNING
+# MACHINE LEARNING: MATERIAL DEMAND FORECAST
 # =========================
-@app.route('/admin/inventory/forecast')
-def inventory_forecast():
-    # 1. Fetch your actual inventory items and logs from your database
-    # (Adjust query according to your SQLAlchemy models, e.g., Inventory.query.all())
-    inventory_items = [
-        {"id": item.id, "item_name": item.item_name, "quantity": item.quantity} 
-        for item in Inventory.query.all()
-    ]
-    
-    historical_logs = [
-        {
-            "inventory_id": log.inventory_id, 
-            "quantity_changed": log.quantity_changed, 
-            "created_at": log.created_at
-        } 
-        for log in InventoryLog.query.all()
-    ]
+# The engine (ml_models/engine.py) rebuilds material demand from job orders, backtests six
+# models, and forecasts the next 4 weeks per zirconia disc shade and for e.max. A run takes
+# about a minute, so it runs in a background thread and stores its result in forecast_runs;
+# the page shows the latest result and compares it with the current inventory.
+FORECAST_RUN_TIMEOUT = timedelta(minutes=10)
+FORECAST_SOURCES = {"simulated", "real"}
 
-    # 2. Run the forecaster class we just created
-    forecaster = InventoryForecaster(inventory_items, historical_logs)
-    predictions = forecaster.predict_stockouts()
 
-    # 3. Pass predictions to your admin inventory HTML page
-    return render_template('admin_inventory.html', predictions=predictions, inventory=Inventory.query.all(), profile=...)
+def _fetch_all(query_fn, page_size=1000):
+    """Every row of a Supabase select, page by page (one request returns at most 1,000)."""
+    rows, start = [], 0
+    while True:
+        batch = query_fn().range(start, start + page_size - 1).execute().data or []
+        rows.extend(batch)
+        if len(batch) < page_size:
+            return rows
+        start += page_size
+
+
+def _real_case_units():
+    """One row per tooth of every real (non-draft) DentaLink case: date, material, shade, units=1."""
+    cases = _fetch_all(lambda: supabase_admin.table("dental_cases").select("id, created_at, status")
+                       .not_.in_("status", ["draft", "cancelled"]).order("created_at"))
+    dates = {c["id"]: str(c["created_at"])[:10] for c in cases if c.get("created_at")}
+    if not dates:
+        return []
+    teeth = _fetch_all(lambda: supabase_admin.table("case_teeth").select("case_id, material, shade").order("case_id"))
+    return [{"date": dates[t["case_id"]], "material": t.get("material"), "shade": t.get("shade"), "units": 1}
+            for t in teeth if t.get("case_id") in dates]
+
+
+def _real_history_weeks(rows):
+    if not rows:
+        return 0
+    first = datetime.strptime(min(r["date"] for r in rows), "%Y-%m-%d").date()
+    today = datetime.now(LAB_TZ).date()
+    return max(((today - timedelta(days=today.weekday())) - (first - timedelta(days=first.weekday()))).days // 7, 0)
+
+
+def _forecast_runs(limit=5):
+    """Latest forecast runs, newest first, or None if the forecast_runs table doesn't exist yet."""
+    try:
+        return (supabase_admin.table("forecast_runs").select("id, created_at, finished_at, status, source, error, requested_by")
+                .order("created_at", desc=True).limit(limit).execute().data or [])
+    except Exception:
+        return None
+
+
+def _run_is_stale(run):
+    started = _parse_timestamp(run.get("created_at"))
+    return run.get("status") == "running" and (not started or datetime.now(timezone.utc) - started > FORECAST_RUN_TIMEOUT)
+
+
+def _forecast_worker(run_id, source, requested_by):
+    """Background thread: run the engine and store the result (or the error) on the run row."""
+    from ml_models.engine import run_forecast, stock_plan
+    try:
+        cases = _real_case_units() if source == "real" else None
+        result = run_forecast(cases=cases, source=source)
+        supabase_admin.table("forecast_runs").update({
+            "status": "done", "result": result, "finished_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", run_id).execute()
+
+        inventory = supabase_admin.table("inventory").select("item_name, quantity").execute().data or []
+        urgent = [r for r in stock_plan(result, inventory) if r["status"] == "order_now"]
+        if urgent:
+            items = ", ".join(f"{r['order_qty']} × {r['label']}" for r in urgent)
+            message = f"Forecast ready: order now to avoid running out: {items}."
+        else:
+            message = "Forecast ready: stock on hand covers the next order window."
+        create_notification(requested_by, message, link="/admin/forecast-analytics")
+    except Exception as exc:
+        app.logger.exception("Forecast run failed")
+        try:
+            supabase_admin.table("forecast_runs").update({
+                "status": "failed", "error": str(exc)[:500], "finished_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", run_id).execute()
+        except Exception:
+            app.logger.exception("Unable to record the failed forecast run")
+
+
+def _latest_forecast():
+    """(latest finished run with its result, latest run of any status, runs list or None)."""
+    runs = _forecast_runs()
+    if runs is None:
+        return None, None, None
+    done_id = next((r["id"] for r in runs if r["status"] == "done"), None)
+    done = None
+    if done_id:
+        rows = supabase_admin.table("forecast_runs").select("*").eq("id", done_id).execute().data or []
+        done = rows[0] if rows and isinstance(rows[0].get("result"), dict) else None
+    latest = runs[0] if runs else None
+    if latest and _run_is_stale(latest):
+        latest = dict(latest, status="failed", error="The run took too long or the server restarted. Run it again.")
+    return done, latest, runs
+
 
 @app.route("/admin/forecast-analytics")
+@role_required("admin")
 def admin_forecast_analytics():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-
+    from ml_models.engine import MIN_REAL_WEEKS, profile_summary, stock_plan
     try:
-        # 1. Verify admin access & profile
-        profile_res = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
-        profiles = profile_res.data or []
-        if not profiles or profiles[0].get("role") != "admin" or profiles[0].get("status") != "approved":
-            return "Access denied.", 403
-
-        profile = profiles[0]
-
-        # 2. Fetch inventory items and historical logs
-        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
-        inventory_items = inv_res.data or []
-
-        logs_res = supabase_admin.table("inventory_logs").select("*").execute()
-        historical_logs = logs_res.data or []
-
-        # 3. Fetch active Kanban cases (Pipeline-Awareness)
-        active_statuses = [
-            "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
-            "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
-        ]
-        cases_res = (
-            supabase_admin.table("dental_cases")
-            .select("*")
-            .in_("status", active_statuses)
-            .execute()
-        )
-        active_cases = cases_res.data or []
-
-        # 4. Run ML Forecaster
-        from ml_models.forecaster import InventoryForecaster
-        forecaster = InventoryForecaster(inventory_items, historical_logs)
-        predictions = forecaster.predict_stockouts(active_cases=active_cases)
-
-        # 5. Automated Database Notification Trigger for Urgent Shortages
-        for p in predictions:
-            if p['needs_urgent_reorder']:
-                msg = f"Critical Stock Alert: '{p['item_name']}' is projected to run out in {p['estimated_days_left']} days (Lead time: {p['lead_time_days']}d)."
-                
-                # Check if a similar notification already exists recently to avoid spamming
-                existing_notif = (
-                    supabase_admin.table("notifications")
-                    .select("id")
-                    .eq("user_id", user_id)
-                    .ilike("message", f"%{p['item_name']}%")
-                    .execute()
-                )
-                
-                if not existing_notif.data:
-                    supabase_admin.table("notifications").insert({
-                        "user_id": user_id,
-                        "message": msg,
-                        "link": url_for("admin_forecast_analytics")
-                    }).execute()
-
-        # 6. Fetch layout data
-        notif_res = supabase_admin.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(5).execute()
-        notifications = notif_res.data or []
-
-        restock_res = supabase_admin.table("material_requests").select("*, profiles(display_name), dental_cases(case_number)").eq("status", "pending").order("created_at", desc=True).execute()
-        restock_requests = restock_res.data or []
-
-        unassigned_res = supabase_admin.table("dental_cases").select("*").eq("status", "submitted").order("created_at", desc=True).execute()
-        unassigned_cases = unassigned_res.data or []
-
+        done, latest, runs = _latest_forecast()
+        inventory = supabase_admin.table("inventory").select("item_name, quantity, unit").execute().data or []
+        plan = stock_plan(done["result"], inventory) if done else []
+        try:
+            real_rows = _real_case_units()
+        except Exception:
+            app.logger.exception("Unable to count real case units")
+            real_rows = []
+        real_weeks = _real_history_weeks(real_rows)
         return render_template(
             "admin_forecast.html",
-            profile=profile,
-            predictions=predictions,
-            active_cases_count=len(active_cases),
-            notifications=notifications,
-            restock_requests=restock_requests,
-            unassigned_cases=unassigned_cases
+            profile=g.profile,
+            migrated=runs is not None,
+            run=done,
+            result=done["result"] if done else None,
+            latest=latest,
+            plan=plan,
+            disc_rows=[r for r in plan if r["kind"] == "disc"],
+            assumptions=done["result"]["assumptions"] if done else profile_summary(),
+            real_units=len(real_rows),
+            real_weeks=real_weeks,
+            min_real_weeks=MIN_REAL_WEEKS,
         )
-    except Exception as e:
-        return f"Forecast Analytics error: {str(e)}", 500
+    except Exception:
+        app.logger.exception("Unable to load forecast analytics")
+        return "Unable to load Forecast Analytics. Check the server logs for details.", 500
 
-import csv
-from flask import make_response
 
-@app.route("/admin/forecast/quick-restock/<string:item_id>", methods=["POST"])
-def admin_quick_restock(item_id):
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-    try:
-        # Fetch current item quantity
-        item_res = supabase_admin.table("inventory").select("*").eq("id", item_id).execute()
-        if not item_res.data:
-            return "Item not found", 404
-        
-        item = item_res.data[0]
-        item_name = item.get("item_name", "Item")
-        current_qty = item.get("quantity", 0)
-        restock_qty = 10.0  # Standard automated restock batch increment
+@app.route("/admin/forecast/run", methods=["POST"])
+@role_required("admin")
+def admin_run_forecast():
+    import threading
+    from ml_models.engine import MIN_REAL_WEEKS
 
-        # Update inventory stock in Supabase
-        new_qty = current_qty + restock_qty
-        supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item_id).execute()
-
-        # Log the restock action matching your audit log schema columns
-        supabase_admin.table("inventory_logs").insert({
-            "inventory_id": item_id,
-            "quantity_changed": restock_qty,
-            "action_type": "Restock",
-            "notes": f"Automated forecast quick-restock of +{rest_qty if 'rest_qty' in locals() else 10}",
-            "user_id": user_id
-        }).execute()
-
+    source = request.form.get("source", "simulated")
+    if source not in FORECAST_SOURCES:
+        source = "simulated"
+    runs = _forecast_runs(limit=1)
+    if runs is None:
+        flash("Run the forecast_runs migration in Supabase first.", "forecast-stale")
         return redirect(url_for("admin_forecast_analytics"))
-    except Exception as e:
-        return f"Quick restock error: {str(e)}", 500
+    if runs and runs[0]["status"] == "running" and not _run_is_stale(runs[0]):
+        flash("A forecast is already running. This page updates by itself when it finishes.", "forecast-stale")
+        return redirect(url_for("admin_forecast_analytics"))
+    if source == "real" and _real_history_weeks(_real_case_units()) < MIN_REAL_WEEKS:
+        flash(f"DentaLink needs at least {MIN_REAL_WEEKS} weeks of real cases before it can forecast from them alone.", "forecast-stale")
+        return redirect(url_for("admin_forecast_analytics"))
+    if runs and _run_is_stale(runs[0]):
+        supabase_admin.table("forecast_runs").update({"status": "failed", "error": "Timed out"}).eq("id", runs[0]["id"]).execute()
+
+    row = supabase_admin.table("forecast_runs").insert({
+        "requested_by": g.profile["id"], "source": source, "status": "running",
+    }).execute().data[0]
+    threading.Thread(target=_forecast_worker, args=(row["id"], source, g.profile["id"]), daemon=True).start()
+    flash("The forecast is running. It takes about a minute, and this page updates by itself when it's done.", "forecast-started")
+    return redirect(url_for("admin_forecast_analytics"))
+
 
 @app.route("/admin/forecast/export-csv")
+@role_required("admin")
 def admin_forecast_export_csv():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-    try:
-        # Re-run forecaster data to generate export payload
-        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
-        inventory_items = inv_res.data or []
-        logs_res = supabase_admin.table("inventory_logs").select("*").execute()
-        historical_logs = logs_res.data or []
+    import csv
+    import io
+    from flask import make_response
+    from ml_models.engine import stock_plan
 
-        from ml_models.forecaster import InventoryForecaster
-        forecaster = InventoryForecaster(inventory_items, historical_logs)
-        predictions = forecaster.predict_stockouts()
+    done, _, _ = _latest_forecast()
+    if not done:
+        return "No forecast has been run yet.", 404
+    result = done["result"]
+    inventory = supabase_admin.table("inventory").select("item_name, quantity").execute().data or []
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["Forecast run", result["generated_at"], "Data", result["source"], "Model", result["best_model"]])
+    writer.writerow([])
+    writer.writerow(["Material", "Week starting", "Forecast units"])
+    for s in result["series"]:
+        for f in s["forecast"]:
+            writer.writerow([s["label"], f["week"], f["units"]])
+    writer.writerow([])
+    writer.writerow(["Material", "Units next 4 weeks", "Cautious units (90%)", "Need (discs/units)", "Reorder point",
+                     "On hand", "Status", "Order quantity", "Order cost (PHP)"])
+    for r in stock_plan(result, inventory):
+        writer.writerow([r["label"], r["units_4w"], r["units_90"], r["need_4w"], r["reorder_point"],
+                         "" if r["on_hand"] is None else r["on_hand"], r["status"], r["order_qty"], r.get("order_cost", "")])
+    response = make_response(out.getvalue())
+    response.headers["Content-Disposition"] = f"attachment; filename=dentalink_forecast_{result['forecast_start']}.csv"
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    return response
 
-        # Build CSV response
-        csv_data = "Item Name,Current Quantity,Daily Burn Rate,Estimated Days Left,Projected Stockout Date,Reorder Status\n"
-        for p in predictions:
-            status = "URGENT REORDER" if p['estimated_days_left'] <= 7 else "Stable"
-            csv_data += f"\"{p['item_name']}\",{p['current_qty']},{p['daily_burn_rate']},{p['estimated_days_left'],},{p['projected_stockout_date']},{status}\n"
 
-        response = make_response(csv_data)
-        response.headers["Content-Disposition"] = "attachment; filename=dentalink_forecast_report.csv"
-        response.headers["Content-Type"] = "text/csv"
-        return response
-    except Exception as e:
-        return f"Export error: {str(e)}", 500
 @app.route("/admin/forecast/report-preview")
+@role_required("admin")
 def admin_forecast_report_preview():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-    try:
-        inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
-        inventory_items = inv_res.data or []
-        logs_res = supabase_admin.table("inventory_logs").select("*").execute()
-        historical_logs = logs_res.data or []
+    from ml_models.engine import stock_plan
 
-        from ml_models.forecaster import InventoryForecaster
-        forecaster = InventoryForecaster(inventory_items, historical_logs)
-        predictions = forecaster.predict_stockouts()
+    done, _, _ = _latest_forecast()
+    if not done:
+        return redirect(url_for("admin_forecast_analytics"))
+    inventory = supabase_admin.table("inventory").select("item_name, quantity").execute().data or []
+    return render_template("admin_forecast_report.html", profile=g.profile, run=done, result=done["result"],
+                           plan=stock_plan(done["result"], inventory))
 
-        # Render a dedicated professional report preview template
-        return render_template("admin_forecast_report.html", predictions=predictions)
-    except Exception as e:
-        return f"Report preview error: {str(e)}", 500
+
 # =========================
 # START FLASK
 # =========================

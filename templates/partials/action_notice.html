@@ -22,6 +22,8 @@
     "rush-on": ("fulfilled", "Marked as rush"),
     "rush-off": ("dismissed", "Rush flag removed"),
     "rush-stale": ("stale", "Rush flag not changed"),
+    "forecast-started": ("fulfilled", "Forecast started"),
+    "forecast-stale": ("stale", "Forecast not started"),
 } %}
 {% with notices = get_flashed_messages(with_categories=true, category_filter=notice_kinds.keys()|list) %}
 {% if notices %}
