@@ -463,7 +463,7 @@
                         {% endif %}
 
                         <div class="k-card-actions">
-                            <span style="font-size: 11px; color: var(--text-muted); padding: 6px 0;">Awaiting technician review</span>
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">View job order</a>
                         </div>
                     </div>
                 {% else %}
@@ -481,7 +481,7 @@
                             <span class="k-due-pill warning">Target: {{ c.due_date or 'TBD' }}</span>
                         </div>
                         <div class="k-card-title">{{ c.patient_name }}</div>
-                        <div class="k-card-subtitle">Tech: <strong style="color: var(--accent-cyan);">{{ c.profiles.display_name if c.profiles else 'Assigned' }}</strong></div>
+                        <div class="k-card-subtitle">Technician: <strong style="color: var(--accent-cyan);">{{ c.technician_name or 'Not yet assigned' }}</strong></div>
 
                         <div class="k-card-teeth" style="justify-content: space-between;">
                             <span>Current Phase:</span>
@@ -489,7 +489,7 @@
                         </div>
 
                         <div class="k-card-actions">
-                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">Review Rx Record</a>
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">View job order</a>
                         </div>
                     </div>
                 {% else %}
@@ -516,7 +516,7 @@
                         {% endif %}
 
                         <div class="k-card-actions">
-                            <span style="font-size: 11px; color: var(--accent-yellow); font-weight: 600;">Undergoing Optical QA</span>
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">View job order</a>
                         </div>
                     </div>
                 {% else %}
@@ -549,9 +549,8 @@
                         <div class="k-card-actions">
                             {% if c.dispatch_token %}
                                 <a href="{{ url_for('scan_dispatch_label', token=c.dispatch_token) }}" class="btn-action-primary">Confirm receipt →</a>
-                            {% else %}
-                                <span style="font-size: 11px; color: var(--text-muted); padding: 6px 0;">Scan the label on the box when it arrives</span>
                             {% endif %}
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">View job order</a>
                         </div>
                     </div>
                 {% else %}
@@ -604,7 +603,7 @@
                         </div>
 
                         <div class="k-card-actions">
-                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-green);">View Final Specs →</a>
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: var(--accent-green);">View job order</a>
                         </div>
                     </div>
                 {% else %}
