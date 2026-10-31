@@ -1,3 +1,11 @@
+{# The one admin sidebar, used by every admin page.
+
+   Set `active_admin_page` before including it to highlight the current page:
+   dashboard, inventory, audit_logs, job_orders, forecast, delivery_issues, backup, login_history.
+   Incoming Cases, Restock Requests and System Settings open their dialog in place when the
+   page has it (dashboard, inventory, audit logs); elsewhere they go to the dashboard and open
+   it there. Counts come from admin_sidebar_counts() and refresh with live updates. #}
+{% set counts = admin_sidebar_counts() %}
 <style>
     .app-sidebar {
         position: fixed;
@@ -5,32 +13,29 @@
         left: 0;
         width: var(--sidebar-width, 260px);
         height: 100vh;
-        padding: 24px 16px;
+        padding: 22px 16px 18px;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        gap: 18px;
+        overflow-y: auto;          /* short screens: scroll, so logout is always reachable */
+        overscroll-behavior: contain;
         background: #FFFFFF;
         border-right: 1px solid var(--border-color, #E2E8F0);
         box-shadow: 4px 0 20px rgba(15, 23, 42, 0.03);
         z-index: 100;
+        scrollbar-width: thin;
     }
-    .sidebar-top { display: flex; flex-direction: column; gap: 24px; }
-    .sidebar-brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid var(--border-color, #E2E8F0);
-    }
-    .logo-box { display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px; }
-    .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
-    .sidebar-titles h1 { margin: 0; color: #0F172A; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-    .version-badge { padding: 2px 5px; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; background: rgba(2, 132, 199, 0.1); color: #0284C7; font-size: 9px; }
-    .sidebar-titles p { margin: 0; color: var(--text-muted, #64748B); font-size: 11px; }
-    .sidebar-nav { display: flex; flex-direction: column; gap: 6px; }
+    .app-sidebar .sidebar-top { display: flex; flex-direction: column; gap: 18px; }
+    .app-sidebar .sidebar-brand { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color, #E2E8F0); }
+    .app-sidebar .logo-box { display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px; }
+    .app-sidebar .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
+    .app-sidebar .sidebar-titles h1 { margin: 0; color: #0F172A; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .app-sidebar .version-badge { padding: 2px 5px; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; background: rgba(2, 132, 199, 0.1); color: #0284C7; font-size: 9px; }
+    .app-sidebar .sidebar-titles p { margin: 0; color: var(--text-muted, #64748B); font-size: 11px; }
+    .app-sidebar .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
     .app-sidebar .nav-pill {
         width: 100%;
-        padding: 10px 14px;
+        padding: 9px 12px;
         display: flex;
         align-items: center;
         gap: 10px;
@@ -43,46 +48,49 @@
         font-weight: 600;
         text-align: left;
         text-decoration: none;
-        transition: all 0.2s;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
     .app-sidebar .nav-pill:hover { border-color: var(--border-color, #E2E8F0); background: #F8FAFC; color: #0F172A; }
     .app-sidebar .nav-pill.active { border-color: rgba(2, 132, 199, 0.25); background: rgba(2, 132, 199, 0.08); color: #0284C7; }
+    .app-sidebar .nav-pill:focus-visible { outline: 2px solid #0284C7; outline-offset: 1px; }
     .app-sidebar .nav-pill svg { flex: 0 0 16px; }
-    .sidebar-footer { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border-color, #E2E8F0); }
-    .status-indicator {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 10px;
-        border: 1px solid rgba(16, 185, 129, 0.25);
-        border-radius: 20px;
-        background: rgba(16, 185, 129, 0.1);
-        color: #10B981;
-        font-size: 11px;
-        font-weight: 600;
-    }
-    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; box-shadow: 0 0 8px #10B981; }
-    .user-profile-box { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border-color, #E2E8F0); border-radius: 8px; background: #F8FAFC; }
-    .user-profile { display: flex; align-items: center; gap: 10px; overflow: hidden; }
-    .avatar { width: 32px; height: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #0284C7; border-radius: 50%; background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(16, 185, 129, 0.15)); color: #0284C7; font-size: 11px; font-weight: 700; }
-    .user-info { overflow: hidden; }
-    .user-info p { overflow: hidden; margin: 0; color: #1E293B; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-    .user-info span { color: #64748B; font-size: 10px; }
-    .sidebar-logout { margin: 0; }
-    .btn-icon { padding: 6px; border: 0; background: transparent; color: #64748B; cursor: pointer; }
-    .btn-icon:hover { color: #EF4444; }
+    .app-sidebar .nav-label { flex: 1; min-width: 0; }
+    .app-sidebar .nav-count { flex: 0 0 auto; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #EF4444; color: #FFFFFF; font-size: 10.5px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+    .app-sidebar .nav-count.amber { background: #D97706; }
+    .app-sidebar .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border-color, #E2E8F0); }
+    .app-sidebar .status-indicator { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 20px; background: rgba(16, 185, 129, 0.1); color: #047857; font-size: 11px; font-weight: 600; }
+    .app-sidebar .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; box-shadow: 0 0 8px #10B981; }
+    .app-sidebar .user-profile-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-color, #E2E8F0); border-radius: 8px; background: #F8FAFC; }
+    .app-sidebar .user-profile { display: flex; align-items: center; gap: 10px; overflow: hidden; min-width: 0; }
+    .app-sidebar .avatar { width: 32px; height: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #0284C7; border-radius: 50%; background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(16, 185, 129, 0.15)); color: #0284C7; font-size: 11px; font-weight: 700; }
+    .app-sidebar .user-info { overflow: hidden; min-width: 0; }
+    .app-sidebar .user-info p { overflow: hidden; margin: 0; color: #1E293B; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .app-sidebar .user-info span { color: #64748B; font-size: 10px; }
+    .app-sidebar .sidebar-logout { margin: 0; flex: 0 0 auto; }
+    .app-sidebar .btn-logout { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #64748B; cursor: pointer; }
+    .app-sidebar .btn-logout:hover { border-color: #FECACA; background: #FEF2F2; color: #DC2626; }
+    .app-sidebar .btn-logout:focus-visible { outline: 2px solid #0284C7; outline-offset: 1px; }
     @media (max-width: 1024px) {
-        .app-sidebar { position: static; width: auto; height: auto; gap: 20px; }
-        .sidebar-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
-        .sidebar-footer { display: grid; grid-template-columns: 1fr 1fr; }
+        .app-sidebar { position: static; width: auto; height: auto; overflow: visible; }
+        .app-sidebar .sidebar-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); }
+        .app-sidebar .sidebar-footer { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
     }
     @media (max-width: 600px) {
-        .sidebar-footer { grid-template-columns: 1fr; }
+        .app-sidebar .sidebar-footer { grid-template-columns: 1fr; }
     }
 </style>
 
-<aside class="app-sidebar">
+{% macro nav_link(page, href, label, icon, count=0, amber=false, modal=none) %}
+    {% set is_active = active_admin_page == page %}
+    <a href="{{ href }}" class="nav-pill{% if is_active %} active{% endif %}"{% if is_active %} aria-current="page"{% endif %}{% if modal %} data-open-modal="{{ modal }}"{% endif %}>
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">{{ icon | safe }}</svg>
+        <span class="nav-label">{{ label }}</span>
+        {% if count %}<span class="nav-count{% if amber %} amber{% endif %}" aria-label="{{ count }} waiting">{{ count }}</span>{% endif %}
+    </a>
+{% endmacro %}
+
+<aside class="app-sidebar" aria-label="Admin navigation">
     <div class="sidebar-top">
         <div class="sidebar-brand">
             <div class="logo-box">
@@ -94,63 +102,68 @@
             </div>
         </div>
         <nav class="sidebar-nav">
-            <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Admin Command
-            </a>
-            <a href="{{ url_for('admin_dashboard', open_modal='incoming') }}" class="nav-pill">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a3 3 0 006 0"></path></svg>
-                Incoming Cases
-            </a>
-            <a href="{{ url_for('admin_dashboard', open_modal='restock') }}" class="nav-pill">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"></path></svg>
-                Restock Requests
-            </a>
-            <a href="{{ url_for('admin_inventory') }}" class="nav-pill">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"></path></svg>
-                Inventory
-            </a>
-            <a href="{{ url_for('admin_inventory_logs') }}" class="nav-pill">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9v10a2 2 0 01-2 2z"></path></svg>
-                Audit Logs
-            </a>
-            <a href="{{ url_for('admin_forecast_analytics') }}" class="nav-pill{% if active_admin_page == 'forecast' %} active{% endif %}"{% if active_admin_page == 'forecast' %} aria-current="page"{% endif %}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-                Forecast Analytics
-            </a>
-            <a href="{{ url_for('admin_delivery_issues') }}" class="nav-pill{% if active_admin_page == 'delivery_issues' %} active{% endif %}"{% if active_admin_page == 'delivery_issues' %} aria-current="page"{% endif %}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
-                Delivery Issues
-            </a>
-            <a href="{{ url_for('admin_backup') }}" class="nav-pill{% if active_admin_page == 'backup' %} active{% endif %}"{% if active_admin_page == 'backup' %} aria-current="page"{% endif %}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v3h14v-3"></path></svg>
-                Backup &amp; Recovery
-            </a>
-            <a href="{{ url_for('admin_login_history') }}" class="nav-pill{% if active_admin_page == 'login_history' %} active{% endif %}"{% if active_admin_page == 'login_history' %} aria-current="page"{% endif %}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Login History
-            </a>
-            <a href="{{ url_for('admin_dashboard', open_modal='settings') }}" class="nav-pill">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.37 2.37 1.724 1.724 0 001.065 2.572 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.066 2.573 1.724 1.724 0 01-2.37 2.37 1.724 1.724 0 00-2.572 1.065 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.37-2.37 1.724 1.724 0 00-1.065-2.572 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.37-2.37 1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                System Settings
-            </a>
+            {{ nav_link('dashboard', url_for('admin_dashboard'), 'Admin Command',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>') }}
+            {{ nav_link('incoming', url_for('admin_dashboard', open_modal='incoming'), 'Incoming Cases',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a3 3 0 006 0"/>',
+                count=counts.incoming, modal='incoming') }}
+            {{ nav_link('restock', url_for('admin_dashboard', open_modal='restock'), 'Restock Requests',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.6m14.8 2A8 8 0 004.6 9m0 0H9m11 11v-5h-.6m0 0a8 8 0 01-14.8-2m14.8 2H15"/>',
+                count=counts.restock, amber=true, modal='restock') }}
+            {{ nav_link('inventory', url_for('admin_inventory'), 'Inventory',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>') }}
+            {{ nav_link('audit_logs', url_for('admin_inventory_logs'), 'Audit Logs',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9v10a2 2 0 01-2 2z"/>') }}
+            {{ nav_link('job_orders', url_for('admin_job_orders'), 'Job Order History',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9v10a2 2 0 01-2 2z"/>') }}
+            {{ nav_link('forecast', url_for('admin_forecast_analytics'), 'Forecast Analytics',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>') }}
+            {{ nav_link('delivery_issues', url_for('admin_delivery_issues'), 'Delivery Issues',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>',
+                count=counts.issues) }}
+            {{ nav_link('backup', url_for('admin_backup'), 'Backup & Recovery',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v3h14v-3"/>') }}
+            {{ nav_link('login_history', url_for('admin_login_history'), 'Login History',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>') }}
+            {{ nav_link('settings', url_for('admin_dashboard', open_modal='settings'), 'System Settings',
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.37 2.37 1.724 1.724 0 001.065 2.572 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.066 2.573 1.724 1.724 0 01-2.37 2.37 1.724 1.724 0 00-2.572 1.065 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.37-2.37 1.724 1.724 0 00-1.065-2.572 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.37-2.37 1.724 1.724 0 002.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>',
+                modal='settings') }}
         </nav>
     </div>
     <div class="sidebar-footer">
         <div class="status-indicator"><span class="status-dot"></span> System Active</div>
         <div class="user-profile-box">
             <div class="user-profile">
-                <div class="avatar">{{ profile.display_name[0] if profile.display_name else 'AD' }}</div>
+                <div class="avatar">{{ (profile.display_name or 'A')[0] | upper }}</div>
                 <div class="user-info">
                     <p>{{ profile.display_name or 'Administrator' }}</p>
                     <span>Administrator</span>
                 </div>
             </div>
             <form method="POST" action="{{ url_for('logout') }}" class="sidebar-logout">
-                <button type="submit" class="btn-icon" title="Logout" aria-label="Logout">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <button type="submit" class="btn-logout" title="Log out" aria-label="Log out">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
             </form>
         </div>
     </div>
 </aside>
+<script>
+    // Incoming Cases, Restock Requests and System Settings: open the dialog right here when this
+    // page has it; otherwise follow the link to the dashboard, which opens it.
+    (function () {
+        if (window.__adminSidebarWired) return;
+        window.__adminSidebarWired = true;
+        const openers = { incoming: 'openIncomingModal', restock: 'openRestockModal', settings: 'openSettingsModal' };
+        document.addEventListener('click', function (e) {
+            const link = e.target.closest('.app-sidebar [data-open-modal]');
+            if (!link) return;
+            const open = window[openers[link.dataset.openModal]];
+            const dialogId = { incoming: 'incomingModal', restock: 'restockModal', settings: 'settingsModal' }[link.dataset.openModal];
+            if (typeof open === 'function' && document.getElementById(dialogId)) {
+                e.preventDefault();
+                open();
+            }
+        });
+    })();
+</script>
