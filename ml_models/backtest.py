@@ -30,7 +30,7 @@ def load_real_cases(path):
     return pd.DataFrame({"date": df["lab_in"], "material": df["material"], "shade": df["shade"], "units": df["units"]})
 
 
-def backtest(weekly, test_weeks=TEST_WEEKS, seed=7):
+def backtest(weekly, test_weeks=TEST_WEEKS, seed=7, n_estimators=200):
     values, weeks = weekly.to_numpy(), weekly.index
     n_weeks, n_series = values.shape
     origins = range(n_weeks - test_weeks - HORIZON, n_weeks - HORIZON)
@@ -40,7 +40,7 @@ def backtest(weekly, test_weeks=TEST_WEEKS, seed=7):
     forest = None
     for k, t in enumerate(origins):
         if k % REFIT_EVERY == 0:
-            forest = RandomForestForecaster(seed=seed).fit(weekly.iloc[: t + 1])
+            forest = RandomForestForecaster(n_estimators=n_estimators, seed=seed).fit(weekly.iloc[: t + 1])
         for s in range(n_series):
             history = values[: t + 1, s]
             actual = values[t + 1: t + 1 + HORIZON, s]

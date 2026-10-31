@@ -28,9 +28,10 @@ def simulate_cases(start="2023-11-01", end="2026-10-31", seed=7):
     avg_weekday_weight = sum(lp.WEEKDAY_WEIGHT.values()) / 7
     per_working_day = lp.ORDERS_PER_MONTH / (30.44 * avg_weekday_weight)
 
-    # Each month runs a little above or below its seasonal norm (about +/-10%), the way a
-    # real lab has good and bad months for reasons no calendar explains.
-    month_noise = {p: rng.gamma(100, 1 / 100) for p in days.to_period("M").unique()}
+    # Each month runs above or below its seasonal norm (MONTH_NOISE, e.g. +/-20%), the way the
+    # lab has slow and busy stretches it can't predict. Gamma keeps the factor positive, mean 1.
+    shape = 1 / lp.MONTH_NOISE ** 2
+    month_noise = {p: rng.gamma(shape, 1 / shape) for p in days.to_period("M").unique()}
 
     rows = []
     for day in days:

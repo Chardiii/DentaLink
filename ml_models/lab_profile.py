@@ -27,7 +27,7 @@ MATERIAL_MIX = {"zirconia": 0.60, "emax": 0.25, "composite": 0.10, "other": 0.05
 ZIRCONIA_SHADE_MIX = {"A2": 0.48, "A3": 0.20, "A1": 0.14, "OM": 0.10, "other": 0.08}
 SHADE_TO_DISC = {
     "A1": "A1", "B1": "A1",
-    "A2": "A2", "B2": "A2",
+    "A2": "A2", "B2": "A2", "C1": "A2",
     "A3": "A3", "A3.5": "A3", "B3": "A3", "C2": "A3", "C3": "A3", "D2": "A3", "D3": "A3", "other": "A3",
     "BL1": "OM", "BL2": "OM", "BL3": "OM", "BL4": "OM", "OM1": "OM", "OM2": "OM", "OM3": "OM", "OM": "OM",
 }
@@ -40,25 +40,24 @@ DISC_YIELD_TYPICAL = (DISC_YIELD_MIN + DISC_YIELD_MAX) / 2
 # Disc prices in PHP (RECEIPT).
 DISC_PRICE = {"A1": 12600, "A2": 12600, "A3": 12600, "OM": 14465}
 
-# Supplier lead time in days (ASSUMED: Y2 Dental Supply, Malabon -> Marikina, next-day delivery).
-LEAD_TIME_DAYS = 2
+# Supplier lead time (LAB): Y2 Dental Supply delivers in about 2-4 working days.
+# Reorder decisions plan for the slow end, so an order placed today still arrives in time.
+LEAD_TIME_WORKING_DAYS_MIN = 2
+LEAD_TIME_WORKING_DAYS_MAX = 4
 
 # Working days (ASSUMED): Monday-Saturday, Saturday about half a day, Sunday closed.
 WEEKDAY_WEIGHT = {0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 0.5, 6: 0.0}
 
-# Seasonality (LAB says demand "depends on the season"; the pattern below is ASSUMED until the
-# lab names its busy and slow months). 1.0 = an average month.
+# Seasonality (LAB): the "ber" months (September-December) are the busiest, with December the
+# peak. The lab can't say when slow months come; they're unpredictable. So January-August share
+# one level, and MONTH_NOISE adds month-to-month swings no calendar explains.
+# 1.0 = an average month; the twelve factors average about 1.0. The exact sizes are ASSUMED.
 MONTH_FACTOR = {
-    1: 0.80,   # after the holidays
-    2: 0.95,
-    3: 1.05,   # summer break / graduation season starts
-    4: 1.10,
-    5: 1.10,
-    6: 0.95,   # school opening, rainy season
-    7: 0.90,
-    8: 0.90,
-    9: 1.00,
-    10: 1.05,
-    11: 1.15,  # pre-holiday rush
-    12: 1.05,  # busy early December, slows near Christmas
+    1: 0.90, 2: 0.90, 3: 0.90, 4: 0.90, 5: 0.90, 6: 0.90, 7: 0.90, 8: 0.90,
+    9: 1.05,
+    10: 1.10,
+    11: 1.20,
+    12: 1.35,  # peak
 }
+# Typical month-to-month swing on top of the season (ASSUMED ~20%, since the lab calls it unpredictable).
+MONTH_NOISE = 0.20
