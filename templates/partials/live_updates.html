@@ -100,6 +100,13 @@
         try {
             const res = await fetch(STATUS_URL, { credentials: 'same-origin', cache: 'no-store' });
             const type = res.headers.get('content-type') || '';
+            if (res.status === 401 && type.includes('application/json')) {
+                // Signed out by the server (e.g. this admin account signed in on another device).
+                const info = await res.json();
+                stopped = true;
+                if (info.redirect) window.location.href = info.redirect;
+                return;
+            }
             if (res.redirected || !type.includes('application/json')) { stopped = true; return; }  // signed out
             if (!res.ok) return;
             const status = await res.json();
