@@ -45,7 +45,7 @@
         const openOverlay = Array.from(document.querySelectorAll('.modal-overlay')).some((el) => getComputedStyle(el).display !== 'none');
         const confirmOpen = document.querySelector('#confirmDialog.open');
         const noticeOpen = document.getElementById('actionNotice');
-        const dropdownOpen = document.querySelector('.notif-dropdown.show');
+        const dropdownOpen = document.querySelector('.notif-dropdown.show, .dl-notif-panel.open');
         const el = document.activeElement;
         const typingInRegion = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)
             && regions().some((sel) => Array.from(document.querySelectorAll(sel)).some((r) => r.contains(el)));

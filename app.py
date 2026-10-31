@@ -544,7 +544,7 @@ def admin_sidebar_counts():
 
 @app.context_processor
 def inject_admin_sidebar_counts():
-    return {"admin_sidebar_counts": admin_sidebar_counts}
+    return {"admin_sidebar_counts": admin_sidebar_counts, "notification_feed": notification_feed}
 
 
 @app.context_processor
@@ -1128,7 +1128,7 @@ def update_case_status(case_id):
         create_notification(
             user_id=dentist_id,
             message=f"Case Status Update: Case {case_number} is now {readable_status} (Tech: {tech_name}).",
-            link="/dentist"
+            link=f"/dentist/cases/{case_id}"
         )
 
         # 2. Notify all Approved Admins
@@ -1911,6 +1911,10 @@ def register():
                 "role": role,
                 "status": "pending"
             }).execute()
+            _notify_admins(
+                f"New account waiting for approval: {display_name} ({role}{', ' + clinic_name if clinic_name else ''}).",
+                link="/admin",
+            )
 
             # =========================
             # SHOW EMAIL VERIFICATION
@@ -2452,12 +2456,14 @@ def log_case_status_change(case_id, status, user_id, notes=None):
 # TECHNICIAN DASHBOARD
 # =========================
 @app.route("/technician/cases/<case_id>/request-material", methods=["POST"])
+@role_required("technician")
 def request_material(case_id):
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect(url_for("login"))
-    
-    item_name = request.form.get("item_name", "").strip()
+    user_id = g.profile["id"]
+    cases = (supabase_admin.table("dental_cases").select("case_number")
+             .eq("id", case_id).eq("technician_id", user_id).execute().data or [])
+    if not cases:
+        return "This job order isn't assigned to you.", 404
+    item_name = request.form.get("item_name", "").strip()[:120]
     if item_name:
         supabase_admin.table("material_requests").insert({
             "case_id": case_id,
@@ -2465,16 +2471,10 @@ def request_material(case_id):
             "item_name": item_name,
             "status": "pending"
         }).execute()
-
-        # Alert all admins
-        admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
-        for admin in (admins_res.data or []):
-            create_notification(
-                user_id=admin["id"],
-                message=f"📦 Restock Request: Technician requested '{item_name}' for Case #{case_id[:8]}",
-                link="/admin/inventory"
-            )
-            
+        _notify_admins(
+            f"Restock request: {_display_name(g.profile, 'A technician')} needs '{item_name}' for Case {cases[0]['case_number']}.",
+            link=url_for("admin_dashboard", open_modal="restock"),
+        )
     return redirect(f"/technician/cases/{case_id}")
 
 
@@ -3580,14 +3580,70 @@ def live_status():
 # NOTIFICATION HELPER
 # =========================
 def create_notification(user_id, message, link="#"):
+    if not user_id:
+        return
     try:
         supabase_admin.table("notifications").insert({
             "user_id": user_id,
             "message": message,
-            "link": link
+            "link": link,
+            "is_read": False,
         }).execute()
-    except Exception as e:
-        print(f"Failed to create notification: {str(e)}")
+    except Exception:
+        app.logger.exception("Failed to create notification")
+
+
+NOTIFICATION_FEED_SIZE = 10
+
+
+def notification_feed():
+    """The signed-in user's bell: unread count and the newest notifications (for partials/notifications_bell.html)."""
+    user_id = session.get("user_id")
+    feed = {"unread": 0, "items": []}
+    if not user_id:
+        return feed
+    try:
+        feed["unread"] = (supabase_admin.table("notifications").select("id", count="exact")
+                          .eq("user_id", user_id).eq("is_read", False).limit(1).execute().count or 0)
+        feed["items"] = (supabase_admin.table("notifications").select("id, message, link, is_read, created_at")
+                         .eq("user_id", user_id).order("created_at", desc=True)
+                         .limit(NOTIFICATION_FEED_SIZE).execute().data or [])
+    except Exception:
+        app.logger.exception("Unable to load notifications")
+    return feed
+
+
+def _unread_count(user_id):
+    return (supabase_admin.table("notifications").select("id", count="exact")
+            .eq("user_id", user_id).eq("is_read", False).limit(1).execute().count or 0)
+
+
+@app.route("/notifications/<notification_id>/read", methods=["POST"])
+@role_required("admin", "technician", "dentist")
+def mark_notification_read(notification_id):
+    user_id = g.profile["id"]
+    supabase_admin.table("notifications").update({"is_read": True}).eq("id", notification_id).eq("user_id", user_id).execute()
+    return {"ok": True, "unread": _unread_count(user_id)}
+
+
+@app.route("/notifications/read-all", methods=["POST"])
+@role_required("admin", "technician", "dentist")
+def mark_all_notifications_read():
+    user_id = g.profile["id"]
+    supabase_admin.table("notifications").update({"is_read": True}).eq("user_id", user_id).eq("is_read", False).execute()
+    return {"ok": True, "unread": 0}
+
+
+@app.route("/notifications/<notification_id>/open")
+@role_required("admin", "technician", "dentist")
+def open_notification(notification_id):
+    """Mark a notification read and go where it points (only to pages inside DentaLink)."""
+    rows = (supabase_admin.table("notifications").update({"is_read": True})
+            .eq("id", notification_id).eq("user_id", g.profile["id"]).execute().data or [])
+    link = rows[0].get("link") if rows else None
+    if link and link != "#" and _safe_next_path(link):
+        return redirect(link)
+    return redirect(url_for({"admin": "admin_dashboard", "technician": "technician_dashboard"}.get(g.profile["role"], "dentist_dashboard")))
 
 # =========================
 # TECHNICIAN: RETURN CASE
@@ -3829,6 +3885,12 @@ def admin_approve_qc(case_id):
                 user_id=case["technician_id"],
                 message=f"QC passed: Case {case['case_number']} is ready for dispatch. Print the label and pack the case.",
                 link=url_for("dispatch_slip", case_id=case_id),
+            )
+        if case.get("dentist_id"):
+            create_notification(
+                user_id=case["dentist_id"],
+                message=f"Passed the lab's quality check: Case {case['case_number']} is being packed for dispatch.",
+                link=f"/dentist/cases/{case_id}",
             )
         return redirect(url_for("dispatch_slip", case_id=case_id))
     except Exception:
@@ -4129,12 +4191,18 @@ def admin_assign_case(case_id):
             return "This case was assigned by someone else meanwhile.", 409
         log_case_status_change(case_id, "Assigned", admin_id, None)
 
-        # NOTIFY ONLY THE SPECIFIC ASSIGNED TECHNICIAN
         create_notification(
             user_id=technician_id,
             message=f"New Case Assigned: You have been assigned Case {case_number}.",
             link=f"/technician/cases/{case_id}"
         )
+        # The dentist learns the lab has started on it.
+        if updated[0].get("dentist_id"):
+            create_notification(
+                user_id=updated[0]["dentist_id"],
+                message=f"In the lab: Case {case_number} was assigned to a technician.",
+                link=f"/dentist/cases/{case_id}",
+            )
 
         return redirect(url_for("admin_dashboard"))
 

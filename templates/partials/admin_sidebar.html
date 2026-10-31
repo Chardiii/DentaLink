@@ -32,6 +32,8 @@
     .app-sidebar .sidebar-titles h1 { margin: 0; color: #0F172A; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
     .app-sidebar .version-badge { padding: 2px 5px; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; background: rgba(2, 132, 199, 0.1); color: #0284C7; font-size: 9px; }
     .app-sidebar .sidebar-titles p { margin: 0; color: var(--text-muted, #64748B); font-size: 11px; }
+    .app-sidebar .sidebar-titles { min-width: 0; }
+    .app-sidebar .sidebar-bell { margin-left: auto; }
     .app-sidebar .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
     .app-sidebar .nav-pill {
         width: 100%;
@@ -99,6 +101,10 @@
             <div class="sidebar-titles">
                 <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
                 <p>Mrkzter Dental Lab</p>
+            </div>
+            <div class="sidebar-bell">
+                {% set notif_placement = 'side' %}
+                {% include 'partials/notifications_bell.html' %}
             </div>
         </div>
         <nav class="sidebar-nav">
