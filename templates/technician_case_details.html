@@ -3,481 +3,666 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Case #{{ case.case_number }} - DentaLink LIS</title>
+    <title>Job order #{{ case.case_number }} - DentaLink LIS</title>
     <style>
         :root {
             --bg-main: #F0F5FA;
             --bg-card: #FFFFFF;
-            --bg-card-hover: #F8FAFC;
-            --bg-input: #F8FAFC;
+            --bg-soft: #F8FAFC;
             --border-color: #E2E8F0;
-            --border-focus: #0284C7;
             --text-main: #1E293B;
+            --text-strong: #0F172A;
             --text-muted: #64748B;
             --accent-cyan: #0284C7;
             --accent-cyan-hover: #0369A1;
-            --accent-green: #10B981;
-            --accent-yellow: #D97706;
-            --accent-red: #EF4444;
-            --panel-header: #F0F9FF;
+            --ok: #047857; --ok-bg: #ECFDF5; --ok-line: #A7F3D0;
+            --warn: #B45309; --warn-bg: #FFFBEB; --warn-line: #FDE68A;
+            --crit: #B91C1C; --crit-bg: #FEF2F2; --crit-line: #FECACA;
         }
-
         * { box-sizing: border-box; }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            margin: 0;
-            padding: 0;
-            line-height: 1.5;
-            color-scheme: light;
-            background-image: 
-                radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%),
-                radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            margin: 0; min-height: 100vh; background-color: var(--bg-main); color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5;
+            background-image: radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%), radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
             background-attachment: fixed;
-            min-height: 100vh;
         }
 
-        /* Top Header */
-        .app-header {
-            background-color: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 12px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-left { display: flex; align-items: center; gap: 14px; }
-        .logo-box { border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
-        .header-titles h1 { margin: 0; font-size: 17px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 8px; }
-        .version-badge { background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(2, 132, 199, 0.25); }
+        .app-header { position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 32px; background: rgba(255, 255, 255, .92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color); }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; display: block; }
+        .header-titles h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-strong); }
         .header-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
 
-        /* Container & Layout */
-        .container { max-width: 1440px; margin: 0 auto; padding: 28px 32px; }
-        
-        .main-layout {
-            display: grid;
-            grid-template-columns: 8fr 4fr;
-            gap: 24px;
-            align-items: start;
-        }
+        .container { max-width: 1240px; margin: 0 auto; padding: 26px 32px 48px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 14px; border-radius: 9px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
+        .btn-primary { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-primary:hover { background: var(--accent-cyan-hover); }
+        .btn-ghost { background: #FFFFFF; border-color: var(--border-color); color: var(--text-main); }
+        .btn-ghost:hover { border-color: #94A3B8; }
+        .btn-warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+        .btn-warn:hover { background: #FEF3C7; }
+        .btn-danger { background: #DC2626; color: #FFFFFF; width: 100%; }
+        .btn-danger:hover { background: #B91C1C; }
+        .btn-sm { padding: 6px 11px; font-size: 12px; }
+        .btn:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
 
-        /* Clinical Banner */
-        .order-hero-card {
-            background: linear-gradient(145deg, #FFFFFF 0%, rgba(2, 132, 199, 0.03) 100%);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-        }
+        /* Summary card */
+        .summary { background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 16px; padding: 22px 24px; box-shadow: 0 4px 12px rgba(15, 23, 42, .04); margin-bottom: 20px; }
+        .summary-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: flex-start; }
+        .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-cyan); }
+        .summary h2 { margin: 4px 0 6px; font-size: 26px; color: var(--text-strong); letter-spacing: -.02em; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .chip.type { color: var(--accent-cyan); background: #F0F9FF; border-color: #BAE6FD; }
+        .chip.rush { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
+        .chip.remake { color: #92400E; background: #FEF3C7; border-color: #FDE68A; }
+        .chip.due-overdue { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
+        .chip.due-today, .chip.due-soon { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+        .chip.due-later, .chip.due-none { color: #475569; background: #F1F5F9; border-color: #E2E8F0; }
+        .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .facts dt { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+        .facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 700; color: var(--text-strong); }
+        .facts dd span { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
 
-        .hero-left h2 { margin: 0 0 6px 0; font-size: 26px; font-weight: 800; color: #0F172A; display: flex; align-items: center; gap: 12px; }
-        .hero-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
-        .hero-meta strong { color: #0F172A; }
-        
-        .hero-badges { display: flex; align-items: center; gap: 10px; }
-        .pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .pill-cyan { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); border: 1px solid rgba(2, 132, 199, 0.25); }
-        .pill-yellow { background: rgba(217, 119, 6, 0.1); color: var(--accent-yellow); border: 1px solid rgba(217, 119, 6, 0.25); }
-        .pill-green { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.25); }
+        /* Stage tracker */
+        .stages { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; margin-top: 18px; list-style: none; padding: 0; }
+        .stages li { position: relative; padding-top: 14px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-align: center; }
+        .stages li::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; border-radius: 3px; background: #E2E8F0; }
+        .stages li.done::before { background: #7DD3FC; }
+        .stages li.current::before { background: var(--accent-cyan); }
+        .stages li.current { color: var(--text-strong); font-weight: 800; }
+        .banner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid; border-radius: 11px; font-size: 13.5px; margin-top: 16px; }
+        .banner.warn { color: #92400E; background: var(--warn-bg); border-color: var(--warn-line); }
 
-        /* Panels */
-        .panel {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 22px;
-            margin-bottom: 24px;
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-        }
+        /* Layout */
+        .layout { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+        .stack { display: grid; gap: 20px; }
+        .panel { background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 16px; padding: 20px 22px; box-shadow: 0 4px 12px rgba(15, 23, 42, .04); }
+        .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .panel h3 { margin: 0; font-size: 15px; color: var(--text-strong); display: flex; align-items: center; gap: 9px; }
+        .panel h3 svg { color: var(--accent-cyan); flex: 0 0 auto; }
+        .hint { margin: 0 0 12px; font-size: 12.5px; color: var(--text-muted); }
 
-        .panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 18px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid var(--border-color);
-        }
+        .instructions { padding: 14px 16px; border-left: 3px solid var(--accent-cyan); background: #F0F9FF; border-radius: 0 10px 10px 0; font-size: 14px; white-space: pre-wrap; color: #1E293B; }
+        .instructions.empty { color: var(--text-muted); font-style: italic; border-left-color: #CBD5E1; background: var(--bg-soft); }
+        .mix { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+        .mix span { padding: 6px 12px; border-radius: 10px; background: var(--bg-soft); border: 1px solid var(--border-color); font-size: 13px; }
+        .mix strong { color: var(--text-strong); }
 
-        .panel-title {
-            margin: 0;
-            font-size: 15px;
-            color: #0F172A;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+        th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+        td { padding: 11px 12px; border-bottom: 1px solid #EEF2F6; }
+        tr:last-child td { border-bottom: 0; }
+        .tooth { font-weight: 800; color: var(--accent-cyan); }
+        .shade { display: inline-block; min-width: 34px; padding: 2px 8px; border-radius: 6px; background: #F0F9FF; border: 1px solid #BAE6FD; color: var(--accent-cyan); font-size: 12px; font-weight: 800; text-align: center; }
 
-        /* Clinic Instructions Callout */
-        .instructions-box {
-            background: #F0F9FF;
-            border-left: 3px solid var(--accent-cyan);
-            border-top: 1px solid var(--border-color);
-            border-right: 1px solid var(--border-color);
-            border-bottom: 1px solid var(--border-color);
-            padding: 16px 20px;
-            border-radius: 8px;
-            font-size: 13px;
-            line-height: 1.6;
-            color: #334155;
-        }
+        /* Files */
+        .files { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .file { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
+        .file-thumb { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #E0F2FE; color: var(--accent-cyan); overflow: hidden; border: 1px solid #BAE6FD; }
+        .file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .file-name { font-weight: 700; color: var(--text-strong); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-meta { font-size: 12px; color: var(--text-muted); }
+        .file-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+        .file-actions .btn { flex: 1; }
 
-        /* Tables */
-        .dark-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
+        /* Side column */
+        .timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; max-height: 360px; overflow-y: auto; }
+        .timeline.expanded { max-height: none; }
+        .timeline::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; background: var(--border-color); }
+        .timeline li { position: relative; padding-bottom: 14px; }
+        .timeline li::before { content: ''; position: absolute; left: -18px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-cyan); border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px #BAE6FD; }
+        .timeline li:last-child::before { background: var(--ok); box-shadow: 0 0 0 1px var(--ok-line); }
+        .tl-status { display: block; font-size: 13px; font-weight: 700; color: var(--text-strong); }
+        .tl-meta { font-size: 12px; color: var(--text-muted); }
+        .tl-note { margin-top: 3px; font-size: 12px; color: #475569; background: var(--bg-soft); border-radius: 6px; padding: 4px 8px; }
+        .input, textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-soft); font: inherit; font-size: 13px; color: var(--text-main); }
+        .input:focus, textarea:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .12); background: #FFFFFF; }
+        textarea { resize: vertical; min-height: 84px; margin-bottom: 10px; }
+        .inline-form { display: flex; gap: 8px; }
+        .note-box { padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: 9px; font-size: 12.5px; color: var(--text-muted); }
+        .panel.danger { border-left: 3px solid #EF4444; }
+        .panel.danger h3, .panel.danger h3 svg { color: #B91C1C; }
 
-        .dark-table th {
-            text-align: left;
-            padding: 12px 14px;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid var(--border-color);
-            background-color: var(--panel-header);
-        }
+        /* Tooth chart */
+        .chart-wrap { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 14px; }
+        .tooth-chart { width: 100%; height: auto; display: block; }
+        .tooth-chart circle { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1.2; }
+        .tooth-chart text { font-size: 9.5px; font-weight: 700; fill: #94A3B8; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
+        .tooth-chart g.marked circle { fill: var(--accent-cyan); stroke: #0369A1; }
+        .tooth-chart g.marked text { fill: #FFFFFF; }
+        .tooth-chart .arch-label { font-size: 10px; font-weight: 800; fill: #94A3B8; letter-spacing: .08em; }
+        .chart-key { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+        .chart-key span { display: inline-flex; align-items: center; gap: 8px; }
+        .chart-key i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1.2px solid #CBD5E1; background: #F8FAFC; }
+        .chart-key i.on { background: var(--accent-cyan); border-color: #0369A1; }
 
-        .dark-table td {
-            padding: 14px;
-            border-bottom: 1px solid var(--border-color);
-            vertical-align: middle;
-            color: #334155;
-        }
-        .dark-table tr:hover td { background-color: var(--bg-card-hover); }
-        .dark-table tr:last-child td { border-bottom: none; }
+        /* Move + material log */
+        .field-label { display: block; font-size: 12px; font-weight: 700; color: var(--text-strong); margin-bottom: 5px; }
+        select.input { appearance: auto; }
+        .mat-log { margin: 12px 0; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-soft); }
+        .mat-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 32px; gap: 6px; align-items: end; margin-bottom: 8px; }
+        .mat-row small { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 3px; }
+        .mat-row .input { padding: 7px 9px; font-size: 12.5px; background: #FFFFFF; }
+        .row-remove { width: 32px; height: 34px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; }
+        .row-remove:hover { color: #B91C1C; border-color: var(--crit-line); }
+        .used-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .used-list li { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-soft); font-size: 13px; }
+        .used-list strong { color: var(--text-strong); }
+        .used-list span { display: block; font-size: 12px; color: var(--text-muted); }
 
-        /* File List Items */
-        .file-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
-        .file-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-input);
-            padding: 12px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            transition: border-color 0.2s;
-        }
-        .file-item:hover { border-color: rgba(2, 132, 199, 0.4); }
-        .file-info { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+        /* Viewer dialog */
+        .viewer { position: fixed; inset: 0; z-index: 300; display: none; background: rgba(8, 13, 24, .94); padding: 20px; }
+        .viewer.open { display: flex; flex-direction: column; }
+        .viewer-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #FFFFFF; padding: 0 4px 12px; }
+        .viewer-title { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .viewer-hint { font-size: 12px; color: #CBD5E1; }
+        .viewer-body { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; overflow: hidden; background: #0B1220; }
+        .viewer-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .viewer-body canvas { width: 100% !important; height: 100% !important; display: block; }
+        .viewer-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #CBD5E1; font-size: 14px; text-align: center; padding: 20px; }
+        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #FFFFFF; cursor: pointer; }
+        .icon-btn:hover { background: rgba(255, 255, 255, .18); }
 
-        /* Timeline */
-        .timeline-container {
-            max-height: 380px;
-            overflow-y: auto;
-            padding-right: 8px;
-        }
-        .timeline-container.expanded { max-height: none; }
-        .timeline-container::-webkit-scrollbar { width: 4px; }
-        .timeline-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
-
-        .timeline { position: relative; padding-left: 20px; margin: 0; list-style: none; }
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 4px;
-            top: 6px;
-            bottom: 6px;
-            width: 2px;
-            background-color: var(--border-color);
-        }
-
-        .timeline-item { position: relative; margin-bottom: 20px; }
-        .timeline-item:last-child { margin-bottom: 0; }
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: -20px;
-            top: 5px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: var(--accent-cyan);
-            border: 2px solid var(--bg-card);
-        }
-
-        .timeline-status { font-weight: 700; font-size: 13px; color: #0F172A; display: block; margin-bottom: 2px; }
-        .timeline-date { font-size: 11px; color: var(--text-muted); }
-        .timeline-author { font-size: 11px; color: var(--accent-green); background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; font-weight: 600; }
-
-        /* Form Inputs & Buttons */
-        .input-dark, .textarea-dark {
-            width: 100%;
-            padding: 10px 14px;
-            background-color: var(--bg-input);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            border-radius: 8px;
-            font-size: 13px;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            font-family: inherit;
-        }
-        .input-dark:focus, .textarea-dark:focus { border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12); background-color: #FFFFFF; }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            border: none;
-            transition: 0.2s;
-            text-decoration: none;
-        }
-
-        .btn-cyan { background-color: var(--accent-cyan); color: #FFFFFF; }
-        .btn-cyan:hover { background-color: var(--accent-cyan-hover); }
-        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
-        .btn-outline:hover { border-color: var(--text-muted); background: rgba(0, 0, 0, 0.02); }
-        .btn-warning { background-color: rgba(217, 119, 6, 0.1); color: var(--accent-yellow); border: 1px solid rgba(217, 119, 6, 0.3); }
-        .btn-warning:hover { background-color: rgba(217, 119, 6, 0.2); }
-        .btn-danger { background-color: var(--accent-red); color: white; }
-        .btn-danger:hover { background-color: #dc2626; }
-
-        @media (max-width: 1024px) {
-            .main-layout { grid-template-columns: 1fr; }
+        @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 700px) {
+            .app-header { padding: 10px 16px; }
+            .header-titles p { display: none; }
+            .container { padding: 18px 16px 40px; }
+            .stages { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 10px; }
         }
     </style>
 </head>
 <body>
+    {% set status_labels = {
+        'assigned': 'Assigned', 'pending': 'Assigned', 'new': 'Assigned',
+        'in_progress': 'In progress', 'cad_designing': 'CAD designing', 'wax_up_or_try_in': 'Wax-up / setup',
+        'milling_or_printing': 'Milling / printing', 'packing_and_curing': 'Packing & curing',
+        'finishing_and_quality_check': 'Finishing & QC', 'pending_admin_review': 'Awaiting admin QC',
+        'ready_for_dispatch': 'Ready for pickup', 'in_transit': 'In transit', 'delivered': 'Delivered',
+        'completed': 'Completed', 'needs_revision': 'Returned to the clinic',
+    } %}
+    {% set stage_of = {
+        'assigned': 0, 'pending': 0, 'new': 0, 'in_progress': 1, 'cad_designing': 1, 'wax_up_or_try_in': 1,
+        'milling_or_printing': 2, 'packing_and_curing': 3, 'finishing_and_quality_check': 4,
+        'pending_admin_review': 5, 'ready_for_dispatch': 6, 'in_transit': 6, 'delivered': 7, 'completed': 7,
+    } %}
+    {% set stages = ['Assigned', 'Setup & CAD', 'Milling', 'Packing', 'Finishing', 'Admin QC', 'Dispatch', 'Delivered'] %}
+    {% set current = stage_of.get(case.status, -1) %}
+    {% set units = teeth | length %}
 
-    <!-- Header -->
     <header class="app-header">
         <div class="header-left">
-            <div class="logo-box">
-                <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="DentaLink Logo">
-            </div>
+            <div class="logo-box"><img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="DentaLink logo"></div>
             <div class="header-titles">
-                <h1>DentaLink <span class="version-badge">LIS v2.0</span></h1>
-                <p>Technician Bench Oversight</p>
+                <h1>DentaLink</h1>
+                <p>Technician bench · {{ profile.display_name }}</p>
             </div>
         </div>
-
-        <a href="{{ url_for('technician_dashboard') }}" class="btn btn-outline">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-            Back to Bench Pipeline
+        <a href="{{ url_for('technician_dashboard') }}" class="btn btn-ghost">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Back to pipeline
         </a>
     </header>
 
     <main class="container">
-        
-        <!-- Clinical Order Hero Card -->
-        <div class="order-hero-card">
-            <div class="hero-left">
-                <h2>
-                    Order #{{ case.case_number }}
-                    <span class="pill pill-cyan">{{ case.case_type | replace('_', ' ') | title }}</span>
-                </h2>
-                <div class="hero-meta">
-                    <span>Patient: <strong>{{ case.patient_name }}</strong></span>
-                    <span>Ref: <strong>{{ case.patient_reference or 'N/A' }}</strong></span>
-                    <span>Target Due: <strong style="color: var(--accent-yellow);">{{ case.due_date or 'Not Specified' }}</strong></span>
+        <section class="summary" aria-labelledby="caseTitle">
+            <div class="summary-top">
+                <div>
+                    <span class="eyebrow">Job order</span>
+                    <h2 id="caseTitle">#{{ case.case_number }}</h2>
+                    <div class="chips">
+                        <span class="chip type">{{ (case.case_type or 'Case') | replace('_', ' ') | title }}</span>
+                        {% if case.status not in ['delivered', 'completed', 'in_transit', 'ready_for_dispatch'] %}<span class="chip due-{{ case.due_state }}">{{ case.due_label }}</span>{% endif %}
+                        {% if case.is_rush %}<span class="chip rush">Rush</span>{% endif %}
+                        {% if case.remake_of %}<span class="chip remake">Remake</span>{% endif %}
+                    </div>
+                </div>
+                <div class="chips" style="align-items: center;">
+                    <span class="chip type" style="font-size: 13px; padding: 5px 12px;">{{ status_labels.get(case.status, case.status | replace('_', ' ') | title) }}</span>
                 </div>
             </div>
 
-            <div class="hero-badges">
-                <span class="pill pill-yellow">Phase: {{ case.status | replace('_', ' ') | title }}</span>
-            </div>
-        </div>
+            <dl class="facts">
+                <div><dt>Patient</dt><dd>{{ case.patient_name or '—' }}<span>Ref {{ case.patient_reference or 'not given' }}</span></dd></div>
+                <div><dt>Dentist</dt><dd>{{ dentist.display_name or 'Unknown' }}<span>{{ dentist.clinic_name or 'Independent practice' }}{% if dentist.phone %} · {{ dentist.phone }}{% endif %}</span></dd></div>
+                <div><dt>Due</dt><dd>{% if case.due_date %}<time data-date datetime="{{ case.due_date }}">{{ case.due_date }}</time>{% else %}Not set{% endif %}{% if case.due_state in ['overdue', 'today', 'soon'] %}<span>{{ case.due_label }}</span>{% endif %}</dd></div>
+                <div><dt>Units</dt><dd>{{ units }} unit{{ 's' if units != 1 }}<span>Received <time data-date datetime="{{ (case.created_at or '')[:10] }}">{{ (case.created_at or '')[:10] }}</time></span></dd></div>
+            </dl>
 
-        <!-- 2-Column Asymmetric Layout -->
-        <div class="main-layout">
-            
-            <!-- Left Primary Column: Specifications, Files, Directives -->
-            <div class="layout-left">
-                
-                <!-- Clinic Directives & Notes -->
-                <section class="panel">
-                    <div class="panel-header">
-                        <h3 class="panel-title">
-                            <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            Doctor's Prescription & Clinical Directives
-                        </h3>
+            {% if case.status == 'needs_revision' %}
+                <div class="banner warn" role="status"><strong>Returned to the clinic.</strong> {{ case.revision_notes or 'Waiting for the dentist to resubmit.' }}</div>
+            {% else %}
+                <ol class="stages" aria-label="Production stage">
+                    {% for name in stages %}
+                        <li class="{{ 'current' if loop.index0 == current else ('done' if loop.index0 < current else '') }}"{% if loop.index0 == current %} aria-current="step"{% endif %}>{{ name }}</li>
+                    {% endfor %}
+                </ol>
+            {% endif %}
+        </section>
+
+        <div class="layout">
+            <div class="stack">
+                <section class="panel" aria-labelledby="rxTitle">
+                    <div class="panel-head">
+                        <h3 id="rxTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Dentist's instructions</h3>
                     </div>
-                    <div class="instructions-box">
-                        {{ case.instructions or 'No custom margin or characterization instructions attached to this order.' }}
-                    </div>
+                    <div class="instructions {{ 'empty' if not case.instructions }}">{{ case.instructions or 'No special instructions. Fabricate to standard.' }}</div>
+                    {% if material_summary %}
+                        <div class="mix" aria-label="Materials needed">
+                            {% for m in material_summary %}<span><strong>{{ m.units }} × {{ m.material }}</strong>{% if m.shade %} · shade {{ m.shade }}{% endif %}</span>{% endfor %}
+                        </div>
+                    {% endif %}
                 </section>
 
-                <!-- Tooth & Materials Specifications Table -->
-                <section class="panel">
-                    <div class="panel-header">
-                        <h3 class="panel-title">
-                            <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                            Odontogram Teeth Specifications
-                        </h3>
+                <section class="panel" aria-labelledby="teethTitle">
+                    <div class="panel-head">
+                        <h3 id="teethTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>Teeth</h3>
+                        <span class="hint" style="margin: 0;">FDI numbering</span>
                     </div>
-                    <div style="overflow-x: auto;">
-                        <table class="dark-table">
-                            <thead>
-                                <tr>
-                                    <th>Tooth #</th>
-                                    <th>Prescribed Material</th>
-                                    <th>VITA Shade</th>
-                                    <th>Specific Instructions</th>
-                                </tr>
-                            </thead>
+                    <div class="chart-wrap">
+                        <svg class="tooth-chart" viewBox="0 0 360 300" role="img" aria-label="Tooth chart: {{ teeth | map(attribute='tooth_number') | join(', ') or 'no teeth marked' }}">
+                            <text class="arch-label" x="180" y="122">UPPER</text>
+                            <text class="arch-label" x="180" y="178">LOWER</text>
+                            <text class="arch-label" x="14" y="150" style="text-anchor: start;">R</text>
+                            <text class="arch-label" x="346" y="150" style="text-anchor: end;">L</text>
+                            {% for t in tooth_chart %}
+                                <g class="{{ 'marked' if t.marked }}"><title>#{{ t.num }}{% if t.marked %}: {{ t.label }}{% endif %}</title>
+                                    <circle cx="{{ t.x }}" cy="{{ t.y }}" r="12.5"></circle>
+                                    <text x="{{ t.x }}" y="{{ t.y }}">{{ t.num }}</text>
+                                </g>
+                            {% endfor %}
+                        </svg>
+                        <div class="chart-key">
+                            <span><i class="on"></i>In this job order</span>
+                            <span><i></i>Not included</span>
+                            <span>Seen from the front: the patient's right is on your left.</span>
+                            {% if teeth_off_chart %}<span>Also: #{{ teeth_off_chart | join(', #') }} (not on the adult chart)</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Tooth</th><th>Restoration</th><th>Material</th><th>Shade</th><th>Notes</th></tr></thead>
                             <tbody>
                                 {% for tooth in teeth %}
                                     <tr>
-                                        <td><strong style="color: var(--accent-cyan); font-size: 14px;">#{{ tooth.tooth_number }}</strong></td>
-                                        <td><strong>{{ tooth.material | replace('_', ' ') | title if tooth.material else 'Standard' }}</strong></td>
-                                        <td><span class="pill pill-cyan">{{ tooth.shade or 'N/A' }}</span></td>
-                                        <td><span style="color: var(--text-muted);">{{ tooth.notes or 'Standard fabrication' }}</span></td>
+                                        <td><span class="tooth">#{{ tooth.tooth_number }}</span></td>
+                                        <td>{{ (tooth.restoration_type or case.case_type or '—') | replace('_', ' ') | title }}</td>
+                                        <td><strong>{{ tooth.material | replace('_', ' ') | title if tooth.material else 'Not specified' }}</strong></td>
+                                        <td>{% if tooth.shade %}<span class="shade">{{ tooth.shade }}</span>{% else %}—{% endif %}</td>
+                                        <td style="color: var(--text-muted);">{{ tooth.notes or '—' }}</td>
                                     </tr>
                                 {% else %}
-                                    <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No individual units assigned.</td></tr>
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 26px;">No teeth recorded on this job order.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </section>
 
-                <!-- Attached CAD/STL & Reference Media -->
-                <section class="panel">
-                    <div class="panel-header">
-                        <h3 class="panel-title">
-                            <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                            Attached Impression & Media Files
-                        </h3>
+                <section class="panel" aria-labelledby="filesTitle">
+                    <div class="panel-head">
+                        <h3 id="filesTitle"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>Scans &amp; photos</h3>
+                        <span class="hint" style="margin: 0;">{{ files | length }} file{{ 's' if files | length != 1 }}</span>
                     </div>
-                    <ul class="file-list">
-                        {% for file in files %}
-                            <li class="file-item">
-                                <div class="file-info">
-                                    <svg width="18" height="18" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                                    <div>
-                                        <strong style="color: #0F172A; display: block;">{{ file.file_name }}</strong>
-                                        <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">{{ file.file_type }} File</span>
+                    {% if files %}
+                        <div class="files">
+                            {% for f in files %}
+                                <div class="file">
+                                    <div class="file-thumb" aria-hidden="true">
+                                        {% if f.kind == 'image' and f.view_url %}<img src="{{ f.view_url }}" alt="" loading="lazy">
+                                        {% elif f.kind == 'stl' %}<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                        {% else %}<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>{% endif %}
+                                    </div>
+                                    <div style="min-width: 0;">
+                                        <div class="file-name" title="{{ f.file_name }}">{{ f.file_name }}</div>
+                                        <div class="file-meta">{{ {'stl': '3D scan (STL)', 'image': 'Photo', 'pdf': 'PDF'}.get(f.kind, 'File') }}{% if f.size_label %} · {{ f.size_label }}{% endif %}</div>
+                                    </div>
+                                    <div class="file-actions">
+                                        {% if not f.view_url %}
+                                            <span class="file-meta">This file couldn't be loaded. Try again later.</span>
+                                        {% else %}
+                                            {% if f.kind in ['image', 'stl'] %}
+                                                <button type="button" class="btn btn-primary btn-sm" data-view-kind="{{ f.kind }}" data-view-url="{{ f.view_url }}" data-view-name="{{ f.file_name }}">
+                                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                    {{ 'View 3D' if f.kind == 'stl' else 'View' }}
+                                                </button>
+                                            {% elif f.kind == 'pdf' %}
+                                                <a class="btn btn-primary btn-sm" href="{{ f.view_url }}" target="_blank" rel="noopener">View</a>
+                                            {% endif %}
+                                            <a class="btn btn-ghost btn-sm" href="{{ f.download_url }}">
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                Download
+                                            </a>
+                                        {% endif %}
                                     </div>
                                 </div>
-                                <a href="{{ file.download_url }}" target="_blank" download class="btn btn-outline" style="font-size: 11px; padding: 6px 12px;">
-                                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                    Download
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="file-item" style="justify-content: center; color: var(--text-muted); padding: 24px;">
-                                No intraoral digital scans or photos attached.
-                            </li>
-                        {% endfor %}
-                    </ul>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="note-box">The dentist attached no scans or photos to this job order.</div>
+                    {% endif %}
                 </section>
             </div>
 
-            <!-- Right Secondary Column: Bench Controls, Stock Requests, Timeline -->
-            <div class="layout-right">
-                
-                <!-- Quick Restock Request Box -->
-                <section class="panel" style="border-left: 3px solid var(--accent-yellow);">
-                    <div class="panel-header" style="margin-bottom: 12px; padding-bottom: 10px;">
-                        <h3 class="panel-title" style="color: var(--accent-yellow); font-size: 14px;">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                            Flag Low Bench Material
-                        </h3>
+            <aside class="stack">
+                <section class="panel" aria-labelledby="moveTitle">
+                    <div class="panel-head">
+                        <h3 id="moveTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>Move this job order</h3>
                     </div>
-                    <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 12px 0;">Alert administration of a supply shortage encountered during this case.</p>
-                    <form method="POST" action="/technician/cases/{{ case.id }}/request-material" style="display: flex; gap: 8px;">
-                        <input type="text" name="item_name" class="input-dark" placeholder="Item name (e.g. A2 Zirconia)" required style="flex: 1; font-size: 12px;">
-                        <button type="submit" class="btn btn-warning" style="white-space: nowrap;">Request</button>
-                    </form>
-                </section>
-
-                <!-- Fabrication Timeline History -->
-                <section class="panel">
-                    <div class="panel-header">
-                        <h3 class="panel-title">
-                            <svg width="16" height="16" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            Audit Trail
-                        </h3>
-                        <button type="button" class="btn btn-outline" id="timelineToggleBtn" onclick="toggleTimeline()" style="font-size: 10px; padding: 3px 8px;">Expand</button>
-                    </div>
-                    <div class="timeline-container" id="timelineContainer">
-                        <ul class="timeline">
-                            {% for h in case_history %}
-                                <li class="timeline-item">
-                                    <span class="timeline-status">{{ h.status | replace('_', ' ') | title }}</span>
-                                    <span class="timeline-date">{{ h.created_at[:19].replace('T', ' ') }}</span>
-                                    {% if h.profiles and h.profiles.display_name %}
-                                        <br><span class="timeline-author">{{ h.profiles.display_name }}</span>
-                                    {% endif %}
-                                </li>
-                            {% else %}
-                                <li class="timeline-item">
-                                    <span class="timeline-status" style="color: var(--text-muted);">No recorded transitions.</span>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </section>
-
-                <!-- Revision / Return Section -->
-                <section class="panel" style="border-left: 3px solid var(--accent-red); background: rgba(239, 68, 68, 0.02);">
-                    <div class="panel-header" style="margin-bottom: 10px; padding-bottom: 8px;">
-                        <h3 class="panel-title" style="color: var(--accent-red); font-size: 14px;">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                            Require Clinical Revision
-                        </h3>
-                    </div>
-                    <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 12px 0;">Return case to the submitting dentist if scan data, margins, or bite registration are insufficient.</p>
-                    
-                    {% if case.status in ['assigned', 'in_progress', 'cad_designing', 'wax_up_or_try_in', 'milling_or_printing', 'packing_and_curing', 'finishing_and_quality_check'] and case.technician_id == session.get('user_id') %}
-                    <form method="POST" action="/technician/cases/{{ case.id }}/return">
-                        <textarea name="revision_notes" class="textarea-dark" rows="3" required placeholder="Specify revision reason (e.g. margin distorted around #16)..." style="font-size: 12px; margin-bottom: 10px;"></textarea>
-                        <button type="submit" class="btn btn-danger" style="width: 100%;">
-                            Return Case to Clinic
-                        </button>
-                    </form>
+                    {% if case.status == 'finishing_and_quality_check' %}
+                        <p class="hint">Finished? Send it to the admin for the final quality check before dispatch.</p>
+                        <form method="POST" action="{{ url_for('submit_for_admin_review', case_id=case.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">Submit for QC review</button>
+                        </form>
+                    {% elif next_stages %}
+                        <form method="POST" action="/technician/cases/{{ case.id }}/update-status" id="moveForm" data-materials="{{ case.material_mix }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <label class="field-label" for="moveStage">Move to</label>
+                            <select class="input" id="moveStage" name="status">
+                                {% for value, label in next_stages %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                            </select>
+                            <div class="mat-log" id="matLog" hidden>
+                                <span class="field-label">Material used <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></span>
+                                <p class="hint" id="matHint" style="margin-bottom: 8px;">Portion = how much of one disc, block or bottle this job order used.</p>
+                                <div id="matRows"></div>
+                                <button type="button" class="btn btn-ghost btn-sm" id="addMatRow">+ Add material</button>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Move job order</button>
+                        </form>
+                        <template id="matRowTpl">
+                            <div class="mat-row">
+                                <label><small class="mat-label">Material</small>
+                                    <select class="input" name="logged_materials">
+                                        {% if inventory_items %}
+                                            <option value="">Choose from Inventory…</option>
+                                            {% for category, items in inventory_items | groupby('category') %}
+                                                <optgroup label="{{ category }}">
+                                                    {% for item in items %}<option value="{{ item.id }}" data-name="{{ item.item_name | lower }}">{{ item.item_name }} ({{ '%g' | format((item.quantity or 0) | float) }} {{ item.unit or '' }} left)</option>{% endfor %}
+                                                </optgroup>
+                                            {% endfor %}
+                                        {% else %}
+                                            <option value="">No materials in Inventory yet</option>
+                                        {% endif %}
+                                    </select>
+                                </label>
+                                <label><small>Portion %</small><input class="input" type="number" name="logged_percentages" min="1" max="100" step="1" placeholder="5"></label>
+                                <button type="button" class="row-remove" aria-label="Remove this material">×</button>
+                            </div>
+                        </template>
                     {% else %}
-                    <p style="font-size: 12px; color: var(--text-muted); margin: 0; padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: 8px;">
-                        {% if case.technician_id != session.get('user_id') %}Only the technician assigned to this case can return it.{% else %}This case has left the bench ({{ case.status|replace('_', ' ') }}), so it can no longer be returned to the clinic.{% endif %}
-                    </p>
+                        <div class="note-box">{% if case.status == 'needs_revision' %}Waiting for the dentist to resubmit.{% else %}This job order has left the bench, so there's nothing to move here.{% endif %}</div>
                     {% endif %}
                 </section>
 
-            </div>
+                <section class="panel" aria-labelledby="usedTitle">
+                    <div class="panel-head">
+                        <h3 id="usedTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Materials used</h3>
+                    </div>
+                    {% if materials_used %}
+                        <ul class="used-list">
+                            {% for u in materials_used %}
+                                <li><strong>{{ u.portion }}</strong> · {{ u.item_name }}
+                                    <span>{% if u.stage %}{{ u.stage }} · {% endif %}<time datetime="{{ u.created_at }}">{{ (u.created_at or '')[:16] | replace('T', ' ') }}</time></span></li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="note-box">No material use logged yet. It's recorded when the job order moves to Milling, Packing or Finishing.</div>
+                    {% endif %}
+                </section>
 
+                <section class="panel" aria-labelledby="historyTitle">
+                    <div class="panel-head">
+                        <h3 id="historyTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>History</h3>
+                        {% if case_history | length > 5 %}<button type="button" class="btn btn-ghost btn-sm" id="historyToggle" aria-expanded="false">Show all</button>{% endif %}
+                    </div>
+                    {% if case_history %}
+                        <ol class="timeline" id="historyList">
+                            {% for h in case_history %}
+                                <li>
+                                    {% set label = (h.status or '') | replace('_', ' ') %}
+                                    {% set label = label[3:] if label.startswith('in ') else label %}
+                                    <span class="tl-status">{{ label[:1] | upper }}{{ label[1:] }}</span>
+                                    <span class="tl-meta"><time datetime="{{ h.created_at }}">{{ h.created_at[:16] | replace('T', ' ') }}</time>{% if h.profiles and h.profiles.display_name %} · {{ h.profiles.display_name }}{% endif %}</span>
+                                    {% if h.notes and not h.notes.startswith('Updated by technician') %}<div class="tl-note">{{ h.notes }}</div>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <div class="note-box">No stage changes recorded yet.</div>
+                    {% endif %}
+                </section>
+
+                <section class="panel" aria-labelledby="shortTitle">
+                    <div class="panel-head">
+                        <h3 id="shortTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Running low on a material?</h3>
+                    </div>
+                    <p class="hint">Tell the admin what's short for this job order. They'll see it under Restock Requests.</p>
+                    <form method="POST" action="/technician/cases/{{ case.id }}/request-material" class="inline-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label for="itemName" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Material that's running low</label>
+                        <input type="text" id="itemName" name="item_name" class="input" placeholder="e.g. Zirconia disc A2" required maxlength="120">
+                        <button type="submit" class="btn btn-warn">Request</button>
+                    </form>
+                </section>
+
+                <section class="panel danger" aria-labelledby="returnTitle">
+                    <div class="panel-head">
+                        <h3 id="returnTitle"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>Return to the dentist</h3>
+                    </div>
+                    {% if case.status in bench_statuses %}
+                        <p class="hint">Use this when the scan, margins or bite registration aren't good enough to fabricate. The dentist is notified and the case leaves your pipeline until they resubmit.</p>
+                        <form method="POST" action="/technician/cases/{{ case.id }}/return">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <label for="revisionNotes" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">What the dentist needs to fix</label>
+                            <textarea id="revisionNotes" name="revision_notes" rows="3" required maxlength="1000" placeholder="What needs fixing, e.g. margin distorted around #16"></textarea>
+                            <button type="submit" class="btn btn-danger">Return job order to dentist</button>
+                        </form>
+                    {% else %}
+                        <div class="note-box">This job order has left the bench ({{ status_labels.get(case.status, case.status | replace('_', ' ')) | lower }}), so it can't be returned from here.</div>
+                    {% endif %}
+                </section>
+            </aside>
         </div>
-
     </main>
 
+    <!-- File viewer: photos inline, STL scans in an interactive 3D view -->
+    <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+        <div class="viewer-bar">
+            <div style="min-width: 0;">
+                <div class="viewer-title" id="viewerTitle"></div>
+                <div class="viewer-hint" id="viewerHint"></div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <a class="btn btn-ghost btn-sm" id="viewerDownload" href="#">Download</a>
+                <button type="button" class="icon-btn" id="viewerClose" aria-label="Close viewer">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="viewer-body" id="viewerBody"></div>
+    </div>
+
+    <script type="importmap">
+        { "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        } }
+    </script>
+    {% include 'partials/material_pick.html' %}
     <script>
-        function toggleTimeline() {
-            const container = document.getElementById('timelineContainer');
-            const btn = document.getElementById('timelineToggleBtn');
-            container.classList.toggle('expanded');
-            if (container.classList.contains('expanded')) {
-                btn.innerText = "Collapse";
-            } else {
-                btn.innerText = "Expand";
+        document.querySelectorAll('time[datetime]').forEach((el) => {
+            const raw = el.getAttribute('datetime');
+            if (!raw) return;
+            const d = new Date(el.hasAttribute('data-date') ? raw + 'T00:00:00' : raw);
+            if (isNaN(d)) return;
+            el.textContent = el.hasAttribute('data-date')
+                ? d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+                : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        });
+
+        // Move this job order: at Milling, Packing and Finishing, offer material rows. At Milling,
+        // each prescribed material and shade gets a row with its stock pre-picked and ~5% of a
+        // disc per unit filled in. Empty rows are dropped before sending.
+        const moveForm = document.getElementById('moveForm');
+        if (moveForm) {
+            const LOG_STAGES = {{ material_log_stages | list | tojson }};
+            const stage = document.getElementById('moveStage');
+            const matLog = document.getElementById('matLog');
+            const rows = document.getElementById('matRows');
+            const tpl = document.getElementById('matRowTpl');
+            const addRow = (label) => {
+                rows.append(tpl.content.cloneNode(true));
+                const row = rows.lastElementChild;
+                if (label) row.querySelector('.mat-label').textContent = label;
+                return row;
+            };
+            const refresh = () => {
+                rows.replaceChildren();
+                matLog.hidden = !LOG_STAGES.includes(stage.value);
+                if (matLog.hidden) return;
+                const prescribed = stage.value === 'milling_or_printing'
+                    ? (moveForm.dataset.materials || '').split(',').filter(Boolean) : [];
+                prescribed.forEach((part) => {
+                    const [material, shade, units] = part.split(':');
+                    const n = parseInt(units, 10) || 1;
+                    const pretty = material.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+                    const row = addRow(`${pretty}${shade ? ' · ' + shade : ''} · ${n} unit${n === 1 ? '' : 's'}`);
+                    const picked = pickStockFor(row.querySelector('select'), material, shade);
+                    if (picked && /zircon|sagemax/.test(picked)) {
+                        row.querySelector('input').value = Math.min(100, Math.max(1, Math.round(n / 21.5 * 100)));
+                    }
+                });
+                if (!prescribed.length) addRow();
+            };
+            stage.addEventListener('change', refresh);
+            document.getElementById('addMatRow').addEventListener('click', () => addRow());
+            rows.addEventListener('click', (e) => { if (e.target.closest('.row-remove')) e.target.closest('.mat-row').remove(); });
+            moveForm.addEventListener('submit', () => {
+                rows.querySelectorAll('.mat-row').forEach((row) => {
+                    if (!row.querySelector('select').value || !row.querySelector('input').value) row.remove();
+                });
+            });
+            refresh();
+        }
+
+        const historyToggle = document.getElementById('historyToggle');
+        if (historyToggle) historyToggle.addEventListener('click', () => {
+            const expanded = document.getElementById('historyList').classList.toggle('expanded');
+            historyToggle.textContent = expanded ? 'Show less' : 'Show all';
+            historyToggle.setAttribute('aria-expanded', String(expanded));
+        });
+    </script>
+    <script type="module">
+        const viewer = document.getElementById('viewer');
+        const body = document.getElementById('viewerBody');
+        let cleanup = null;
+        let opener = null;
+
+        function message(text) {
+            const m = document.createElement('div');
+            m.className = 'viewer-msg';
+            m.textContent = text;
+            body.append(m);
+            return m;
+        }
+
+        function close() {
+            if (cleanup) { cleanup(); cleanup = null; }
+            body.replaceChildren();
+            viewer.classList.remove('open');
+            if (opener) opener.focus();
+        }
+
+        async function showStl(url) {
+            const loading = message('Loading 3D scan…');
+            let THREE, STLLoader, OrbitControls;
+            try {
+                THREE = await import('three');
+                ({ STLLoader } = await import('three/addons/loaders/STLLoader.js'));
+                ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+            } catch (e) {
+                loading.textContent = "The 3D viewer couldn't load (it needs an internet connection). Use Download instead.";
+                return;
+            }
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(0x0b1220);
+            body.append(renderer.domElement);
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
+            scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.1));
+            const key = new THREE.DirectionalLight(0xffffff, 1.4);
+            key.position.set(1, 1.5, 2);
+            camera.add(key);
+            scene.add(camera);
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            let frame = 0;
+            const resize = () => {
+                const w = body.clientWidth, h = body.clientHeight;
+                renderer.setSize(w, h, false);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+            };
+            const loop = () => { frame = requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); };
+            resize();
+            window.addEventListener('resize', resize);
+            cleanup = () => { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); controls.dispose(); renderer.dispose(); };
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(response.status);
+                const geometry = new STLLoader().parse(await response.arrayBuffer());
+                geometry.computeVertexNormals();
+                geometry.center();
+                geometry.computeBoundingSphere();
+                const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.55, metalness: 0.05 }));
+                scene.add(mesh);
+                const r = geometry.boundingSphere.radius || 10;
+                camera.position.set(0, -r * 0.6, r * 2.6);
+                camera.near = r / 100; camera.far = r * 20; camera.updateProjectionMatrix();
+                controls.target.set(0, 0, 0);
+                loading.remove();
+                loop();
+            } catch (e) {
+                loading.textContent = "This scan couldn't be opened. Download it and open it in exocad or another STL viewer.";
             }
         }
+
+        function open(button) {
+            opener = button;
+            const { viewKind, viewUrl, viewName } = button.dataset;
+            document.getElementById('viewerTitle').textContent = viewName;
+            document.getElementById('viewerHint').textContent = viewKind === 'stl'
+                ? 'Drag to rotate · scroll or pinch to zoom · right-drag to move'
+                : '';
+            const download = button.parentElement.querySelector('a.btn-ghost');
+            document.getElementById('viewerDownload').href = download ? download.href : viewUrl;
+            body.replaceChildren();
+            viewer.classList.add('open');
+            document.getElementById('viewerClose').focus();
+            if (viewKind === 'image') {
+                const img = document.createElement('img');
+                img.src = viewUrl;
+                img.alt = viewName;
+                img.onerror = () => { img.remove(); message("This photo couldn't be loaded. Try Download."); };
+                body.append(img);
+            } else {
+                showStl(viewUrl);
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const button = e.target.closest('[data-view-kind]');
+            if (button) open(button);
+        });
+        document.getElementById('viewerClose').addEventListener('click', close);
+        viewer.addEventListener('click', (e) => { if (e.target === viewer) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && viewer.classList.contains('open')) close(); });
     </script>
 </body>
 </html>
