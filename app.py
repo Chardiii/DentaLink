@@ -1131,16 +1131,8 @@ def update_case_status(case_id):
             link=f"/dentist/cases/{case_id}"
         )
 
-        # 2. Notify all Approved Admins
-        admins_res = supabase_admin.table("profiles").select("id").eq("role", "admin").eq("status", "approved").execute()
-        admins = admins_res.data or []
-
-        for admin in admins:
-            create_notification(
-                user_id=admin["id"],
-                message=f"Lab Progress: Case {case_number} updated to {readable_status} by {tech_name}.",
-                link="/admin"
-            )
+        # Admins aren't notified of routine stage moves: they follow the pipeline live on the
+        # dashboard, and their bell is kept for things that need action (QC review, issues...).
 
         # Redirect back depending on where they triggered it from
         referer = request.referrer
