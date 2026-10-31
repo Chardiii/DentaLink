@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Order History - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-strong: #0F172A;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --ok: #047857; --ok-bg: #ECFDF5; --ok-line: #A7F3D0;
+            --warn: #B45309; --warn-bg: #FFFBEB; --warn-line: #FDE68A;
+            --sidebar-width: 260px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; background-color: var(--bg-main);
+            background-image: radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%), radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            background-attachment: fixed; color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5;
+        }
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 38px 42px 48px; max-width: 1320px; }
+        .page-heading { margin-bottom: 22px; }
+        .eyebrow { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; color: var(--accent-cyan); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+        .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: #0EA5E9; }
+        h1 { margin: 0; color: var(--text-strong); font-size: clamp(27px, 3vw, 34px); letter-spacing: -.04em; }
+        .lead { max-width: 720px; margin: 9px 0 0; color: var(--text-muted); font-size: 14px; }
+
+        .card { background: rgba(255, 255, 255, .97); border: 1px solid rgba(203, 213, 225, .9); border-radius: 14px; box-shadow: 0 6px 20px rgba(15, 23, 42, .04); padding: 20px 22px; margin-bottom: 18px; }
+        .card h2 { margin: 0 0 4px; font-size: 16px; color: var(--text-strong); }
+        .hint { color: var(--text-muted); font-size: 12.5px; margin: 0; }
+
+        .import { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+        .import form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .file { font: inherit; font-size: 13px; max-width: 280px; }
+        .file::file-selector-button { margin-right: 10px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: #FFFFFF; color: var(--text-main); font: inherit; font-weight: 700; cursor: pointer; }
+        .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 10px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; }
+        .btn-primary { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-primary:hover { background: var(--accent-cyan-hover); }
+        .btn:focus-visible, .icon-btn:focus-visible, .file:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        code { font-size: 12px; background: #F1F5F9; padding: 1px 5px; border-radius: 5px; }
+
+        .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .figure { background: #FFFFFF; border: 1px solid rgba(203, 213, 225, .9); border-radius: 14px; padding: 15px 18px; }
+        .figure .label { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+        .figure .value { margin-top: 4px; font-size: 26px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+        .figure .note { font-size: 12px; color: var(--text-muted); }
+
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+        th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        td { padding: 12px; border-bottom: 1px solid #EEF2F6; vertical-align: top; }
+        tr:last-child td { border-bottom: 0; }
+        .ref { font-weight: 800; color: var(--accent-cyan); white-space: nowrap; }
+        .strong { font-weight: 700; color: var(--text-strong); }
+        .sub { display: block; font-size: 12px; color: var(--text-muted); }
+        .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .pill.done { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+        .pill.remake { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+        td.work { min-width: 280px; }
+        td.team { min-width: 130px; }
+        .notes { margin-top: 4px; font-size: 12.5px; color: #475569; }
+        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border-color); border-radius: 8px; background: #FFFFFF; color: var(--text-muted); cursor: pointer; }
+        .icon-btn:hover { color: #B91C1C; border-color: #FECACA; background: #FEF2F2; }
+
+        .empty { padding: 48px 20px; text-align: center; border: 1px dashed var(--border-color); border-radius: 14px; background: rgba(255, 255, 255, .96); }
+        .empty h3 { margin: 0 0 6px; color: var(--text-strong); }
+        .empty p { margin: 0 auto; max-width: 520px; color: var(--text-muted); font-size: 13.5px; }
+        .warning { padding: 13px 15px; border: 1px solid var(--warn-line); border-radius: 11px; background: var(--warn-bg); color: #92400E; font-size: 13px; margin-bottom: 16px; }
+
+        @media (max-width: 1100px) { .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 1024px) { .dashboard-container { margin-left: 0; padding: 24px; } }
+        @media (max-width: 760px) { .dashboard-container { padding: 20px 16px; } .import { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    {% set active_admin_page = 'job_orders' %}
+    {% include "partials/admin_sidebar.html" %}
+
+    <main class="dashboard-container">
+        <header class="page-heading">
+            <span class="eyebrow"><span class="eyebrow-dot"></span>Records</span>
+            <h1>Job Order History</h1>
+            <p class="lead">The lab's paper job orders from before DentaLink, transcribed and imported. All are completed work. They also count as real demand in Forecast Analytics. Patient names are not stored.</p>
+        </header>
+
+        {% if not migrated %}
+            <div class="warning"><strong>Setup needed:</strong> run the migration <code>20261101030000_create_job_order_history.sql</code> in the Supabase SQL editor, then import your file.</div>
+        {% endif %}
+
+        <section class="card import" aria-labelledby="importTitle">
+            <div>
+                <h2 id="importTitle">Import job orders</h2>
+                <p class="hint">Upload a CSV with at least <code>jo_id</code>, <code>material</code> and <code>units</code> columns, like <code>job_orders.csv</code> in your DentaLink_data folder. Dates use 2026-10-29. Importing a job order again with the same <code>jo_id</code> updates it instead of adding a copy.</p>
+            </div>
+            <form method="POST" action="{{ url_for('admin_import_job_orders') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input class="file" type="file" id="csvFile" name="csv_file" accept=".csv,text/csv" required aria-label="CSV file of job orders">
+                <button type="submit" class="btn btn-primary" {{ 'disabled' if not migrated }}>
+                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    Import CSV
+                </button>
+            </form>
+        </section>
+
+        {% if orders %}
+            <section class="figures" aria-label="Summary">
+                <div class="figure"><div class="label">Job orders</div><div class="value">{{ orders | length }}</div><div class="note">from {{ clinics }} clinic{{ 's' if clinics != 1 }}</div></div>
+                <div class="figure"><div class="label">Units</div><div class="value">{{ total_units }}</div><div class="note">{{ by_material | map('join', ' ') | join(' · ') }}</div></div>
+                <div class="figure"><div class="label">Average turnaround</div><div class="value">{% if avg_turnaround is not none %}{{ avg_turnaround }} <span style="font-size: 14px; color: var(--text-muted);">days</span>{% else %}—{% endif %}</div><div class="note">from received to sent out</div></div>
+                <div class="figure"><div class="label">Remakes / warranty</div><div class="value">{{ orders | selectattr('is_remake', 'in', ['yes', 'Yes', 'YES']) | list | length }}</div><div class="note">of {{ orders | length }} job orders</div></div>
+            </section>
+
+            <section class="card" aria-labelledby="listTitle">
+                <h2 id="listTitle" style="margin-bottom: 10px;">Completed job orders</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Job order</th>
+                                <th>Clinic</th>
+                                <th>Work</th>
+                                <th>Material · shade</th>
+                                <th>Received → out</th>
+                                <th>Due</th>
+                                <th>Lab team</th>
+                                <th>Status</th>
+                                <th><span class="sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in orders %}
+                                <tr>
+                                    <td><span class="ref">{{ o.jo_ref }}</span>{% if o.clinic_ref %}<span class="sub">Clinic ref {{ o.clinic_ref }}</span>{% endif %}</td>
+                                    <td><span class="strong">{{ o.clinic or '—' }}</span>{% if o.dentist_name %}<span class="sub">{{ o.dentist_name }}</span>{% endif %}</td>
+                                    <td class="work"><span class="strong">{{ o.units }} unit{{ 's' if o.units != 1 }}</span> {{ (o.case_type or '') }}
+                                        {% if o.teeth %}<span class="sub">Teeth: {{ o.teeth }}</span>{% endif %}
+                                        {% if o.notes %}<span class="sub notes">Note: {{ o.notes }}</span>{% endif %}</td>
+                                    <td>{{ o.material }}{% if o.shade %}<span class="sub">Shade {{ o.shade }}</span>{% endif %}</td>
+                                    <td class="num">{% if o.lab_in %}<time data-date datetime="{{ o.lab_in }}">{{ o.lab_in }}</time>{% else %}—{% endif %} → {% if o.lab_out %}<time data-date datetime="{{ o.lab_out }}">{{ o.lab_out }}</time>{% else %}<span class="sub" style="display: inline;">not recorded</span>{% endif %}
+                                        {% if o.turnaround is not none %}<span class="sub">{{ o.turnaround }} day{{ 's' if o.turnaround != 1 }}</span>{% endif %}</td>
+                                    <td class="num">{% if o.due_date %}<time data-date datetime="{{ o.due_date }}">{{ o.due_date }}</time>{% else %}—{% endif %}</td>
+                                    <td class="team">{% if o.cad_designer %}<span>CAD: {{ o.cad_designer }}</span>{% endif %}{% if o.porcelain_technician %}<span class="sub">Porcelain: {{ o.porcelain_technician }}</span>{% endif %}{% if not o.cad_designer and not o.porcelain_technician %}<span class="sub">—</span>{% endif %}</td>
+                                    <td>
+                                        <span class="pill done"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M5 13l4 4L19 7"/></svg>Completed</span>
+                                        {% if (o.is_remake or '') | lower == 'yes' %}<span class="pill remake" style="margin-top: 4px;">Remake / warranty</span>{% elif (o.is_remake or '') | lower == 'maybe' %}<span class="sub">Possibly an adjustment</span>{% endif %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="icon-btn" aria-label="Remove {{ o.jo_ref }}" title="Remove from history"
+                                                data-confirm-action="{{ url_for('admin_delete_job_order', order_id=o.id) }}"
+                                                data-confirm-title="Remove {{ o.jo_ref }}?"
+                                                data-confirm-message="This removes the job order from Job Order History and from the forecast's real data. Your CSV file and photos are not affected, so you can import it again."
+                                                data-confirm-label="Remove">
+                                            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        {% elif migrated %}
+            <div class="empty">
+                <h3>No job orders imported yet</h3>
+                <p>Import <code>job_orders.csv</code> from your DentaLink_data\extracted folder to add the 9 job orders you photographed.</p>
+            </div>
+        {% endif %}
+    </main>
+
+    {% include 'partials/confirm_dialog.html' %}
+    {% include 'partials/action_notice.html' %}
+    <script>
+        document.querySelectorAll('time[data-date]').forEach((el) => {
+            const d = new Date(el.getAttribute('datetime') + 'T00:00:00');
+            if (!isNaN(d)) el.textContent = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        });
+    </script>
+    <script>
+        window.LIVE_REGIONS = ['.sidebar-nav'];
+        window.liveHooks = {};
+    </script>
+    {% include 'partials/live_updates.html' %}
+</body>
+</html>

@@ -72,7 +72,11 @@ LOGIN_REASON_TEXT = {
     "account_rejected": "Account application rejected",
     "account_not_approved": "Account not approved",
     "invalid_account_role": "Account has an invalid role",
+    "signed_in_elsewhere": "Signed out: the account signed in on another device",
 }
+
+# Roles limited to one signed-in device at a time; a new sign-in signs the other device out.
+SINGLE_SESSION_ROLES = ("admin",)
 
 # Case lifecycle after the bench stages:
 # finishing_and_quality_check -> pending_admin_review -> ready_for_dispatch -> in_transit -> delivered
@@ -489,6 +493,57 @@ def _valid_csrf_token():
     token = session.get("csrf_token")
     submitted = request.form.get("csrf_token", "")
     return bool(token and submitted and secrets.compare_digest(token, submitted))
+
+
+@app.before_request
+def enforce_single_device_sessions():
+    """Sign out an admin browser whose sign-in was replaced by a newer one on another device."""
+    user_id = session.get("user_id")
+    if not user_id or request.endpoint in (None, "static", "login", "logout"):
+        return None
+    role = session.get("role")
+    if role and role not in SINGLE_SESSION_ROLES:
+        return None  # dentists and technicians may use several devices
+    try:
+        rows = (supabase_admin.table("profiles").select("role, active_session_id")
+                .eq("id", user_id).execute().data or [])
+    except Exception:
+        return None  # e.g. before migration 20261101020000: never lock anyone out over this
+    if not rows:
+        return None
+    profile = rows[0]
+    session["role"] = profile.get("role")
+    active = profile.get("active_session_id")
+    if profile.get("role") not in SINGLE_SESSION_ROLES or not active or active == session.get("login_session_id"):
+        return None
+
+    _record_login_event("logout", session.get("login_email"), user_id, "signed_in_elsewhere")
+    session.clear()
+    flash("You were signed out because your admin account signed in on another device. "
+          "If that wasn't you, sign in again and change your password.", "session")
+    if request.path.startswith("/api/"):
+        # Background checks (live updates) get JSON, so the page can send the user to sign in
+        # without the fetch using up the message above.
+        return app.response_class(json.dumps({"signed_out": True, "redirect": url_for("login")}),
+                                  status=401, mimetype="application/json")
+    return redirect(url_for("login"))
+
+
+def admin_sidebar_counts():
+    """Badge counts for the admin sidebar; called only by pages that render it."""
+    counts = {"incoming": 0, "restock": 0, "issues": 0}
+    try:
+        counts["incoming"] = _count("dental_cases", status="submitted")
+        counts["restock"] = _count("material_requests", status="pending")
+        counts["issues"] = _open_issue_count()
+    except Exception:
+        app.logger.exception("Unable to load sidebar counts")
+    return counts
+
+
+@app.context_processor
+def inject_admin_sidebar_counts():
+    return {"admin_sidebar_counts": admin_sidebar_counts}
 
 
 @app.context_processor
@@ -1966,7 +2021,18 @@ def login():
             session["user_id"] = user_id
             session["login_session_id"] = str(uuid.uuid4())
             session["login_email"] = email
+            session["role"] = profile["role"]
             _record_login_event("success", email, user_id)
+
+            # One device per admin: this sign-in becomes the account's only valid session,
+            # so any other browser signed in as this admin is signed out on its next request.
+            if profile["role"] in SINGLE_SESSION_ROLES:
+                try:
+                    supabase_admin.table("profiles").update(
+                        {"active_session_id": session["login_session_id"]}
+                    ).eq("id", user_id).execute()
+                except Exception:
+                    app.logger.exception("Unable to record the active admin session (run migration 20261101020000)")
 
             # =========================
             # UPDATE LAST SEEN TIMESTAMP
@@ -2234,6 +2300,14 @@ def logout():
     user_id = session.get("user_id")
     if user_id:
         _record_login_event("logout", session.get("login_email"), user_id)
+        # Free the admin's one-device slot, unless a newer sign-in already holds it.
+        if session.get("role") in SINGLE_SESSION_ROLES and session.get("login_session_id"):
+            try:
+                supabase_admin.table("profiles").update({"active_session_id": None}).eq("id", user_id).eq(
+                    "active_session_id", session["login_session_id"]
+                ).execute()
+            except Exception:
+                app.logger.exception("Unable to clear the active admin session")
 
     try:
 
@@ -4385,6 +4459,167 @@ def update_inventory_stock(item_id):
 
 
 # =========================
+# JOB ORDER HISTORY (the lab's paper job orders, imported from CSV)
+# =========================
+# Completed work from before DentaLink. The clinics have no DentaLink accounts, so these are
+# kept apart from dental_cases; the forecast counts them as real demand. No patient names.
+JOB_ORDER_TEXT_FIELDS = {
+    "clinic": 160, "dentist": 120, "clinic_ref": 80, "cad_designer": 80, "porcelain_technician": 80,
+    "case_type": 80, "material": 80, "teeth": 200, "shade": 30, "is_remake": 20, "notes": 500,
+}
+JOB_ORDER_DATE_FIELDS = ("date_sent", "lab_in", "lab_out", "due_date")
+JOB_ORDER_MAX_ROWS = 2000
+
+
+def _job_orders():
+    """All imported job orders, newest received first; [] before the migration has run."""
+    try:
+        rows = _fetch_all(lambda: supabase_admin.table("job_order_history").select("*").order("jo_ref"))
+    except Exception:
+        return []
+    return sorted(rows, key=lambda r: (r.get("lab_in") or r.get("date_sent") or "", r["jo_ref"]), reverse=True)
+
+
+def _job_orders_from_csv(upload):
+    """Validated rows from a job-order CSV (the format of DentaLink_data/extracted/job_orders.csv).
+
+    Needs jo_id, material and units columns; the rest are optional. Raises ValueError with a
+    message naming the line to fix.
+    """
+    import csv
+    import io
+
+    raw = upload.read(1_000_001)
+    if len(raw) > 1_000_000:
+        raise ValueError("That file is larger than 1 MB. Split it into smaller files.")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ValueError("Save the file as CSV UTF-8 and try again.")
+    reader = csv.DictReader(io.StringIO(text))
+    columns = {(c or "").strip() for c in (reader.fieldnames or [])}
+    missing = {"jo_id", "material", "units"} - columns
+    if missing:
+        raise ValueError(f"The file needs these columns: {', '.join(sorted(missing))}.")
+
+    rows, seen = [], set()
+    for line, record in enumerate(reader, start=2):
+        r = {(k or "").strip(): (v or "").strip() for k, v in record.items() if k}
+        if not any(r.values()):
+            continue
+        ref = r.get("jo_id", "")[:40]
+        if not ref:
+            raise ValueError(f"Line {line}: jo_id is empty.")
+        if ref in seen:
+            raise ValueError(f"Line {line}: {ref} appears twice in the file.")
+        seen.add(ref)
+        try:
+            units = int(float(r.get("units") or ""))
+        except ValueError:
+            raise ValueError(f"Line {line} ({ref}): units must be a number.")
+        if units < 1:
+            raise ValueError(f"Line {line} ({ref}): units must be at least 1.")
+        if not r.get("material"):
+            raise ValueError(f"Line {line} ({ref}): material is empty.")
+        row = {"jo_ref": ref, "units": units}
+        for field, limit in JOB_ORDER_TEXT_FIELDS.items():
+            value = r.get(field, "")[:limit] or None
+            row["dentist_name" if field == "dentist" else field] = value
+        for field in JOB_ORDER_DATE_FIELDS:
+            value = r.get(field, "")
+            if value:
+                try:
+                    value = datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+                except ValueError:
+                    raise ValueError(f"Line {line} ({ref}): {field} must be a date like 2026-10-29.")
+            row[field] = value or None
+        rows.append(row)
+        if len(rows) > JOB_ORDER_MAX_ROWS:
+            raise ValueError(f"Import at most {JOB_ORDER_MAX_ROWS} job orders at a time.")
+    if not rows:
+        raise ValueError("The file has no job orders.")
+    return rows
+
+
+@app.route("/admin/job-orders")
+@role_required("admin")
+def admin_job_orders():
+    try:
+        supabase_admin.table("job_order_history").select("id").limit(1).execute()
+        migrated = True
+    except Exception:
+        migrated = False
+    orders = _job_orders() if migrated else []
+    for o in orders:
+        start, end = _parse_timestamp(o.get("lab_in")), _parse_timestamp(o.get("lab_out"))
+        o["turnaround"] = (end - start).days if start and end else None
+    turnarounds = [o["turnaround"] for o in orders if o["turnaround"] is not None]
+    by_material = {}
+    for o in orders:
+        family = (o.get("material") or "Other").split(" (")[0].strip().capitalize()
+        by_material[family] = by_material.get(family, 0) + int(o.get("units") or 0)
+    return render_template(
+        "admin_job_orders.html",
+        profile=g.profile,
+        migrated=migrated,
+        orders=orders,
+        total_units=sum(int(o.get("units") or 0) for o in orders),
+        clinics=len({o.get("clinic") for o in orders if o.get("clinic")}),
+        avg_turnaround=round(sum(turnarounds) / len(turnarounds), 1) if turnarounds else None,
+        by_material=sorted(by_material.items(), key=lambda kv: -kv[1]),
+    )
+
+
+@app.route("/admin/job-orders/import", methods=["POST"])
+@role_required("admin")
+def admin_import_job_orders():
+    upload = request.files.get("csv_file")
+    if not upload or not upload.filename:
+        flash("Choose a CSV file to import.", "joborders-input")
+        return redirect(url_for("admin_job_orders"))
+    try:
+        rows = _job_orders_from_csv(upload)
+    except ValueError as error:
+        flash(str(error), "joborders-input")
+        return redirect(url_for("admin_job_orders"))
+    try:
+        refs = [r["jo_ref"] for r in rows]
+        existing = {
+            r["jo_ref"]: r["id"]
+            for r in supabase_admin.table("job_order_history").select("id, jo_ref").in_("jo_ref", refs).execute().data or []
+        }
+        new_rows = [dict(r, imported_by=g.profile["id"]) for r in rows if r["jo_ref"] not in existing]
+        if new_rows:
+            supabase_admin.table("job_order_history").insert(new_rows).execute()
+        for r in rows:
+            if r["jo_ref"] in existing:
+                supabase_admin.table("job_order_history").update(r).eq("id", existing[r["jo_ref"]]).execute()
+    except Exception:
+        app.logger.exception("Unable to import job orders")
+        flash("Couldn't save the job orders. Run migration 20261101030000 in Supabase, then try again.", "joborders-input")
+        return redirect(url_for("admin_job_orders"))
+    added, updated = len(new_rows), len(rows) - len(new_rows)
+    parts = [f"{added} job order{'s' if added != 1 else ''} added"] + ([f"{updated} updated"] if updated else [])
+    flash(f"{' and '.join(parts)}. They now count as real demand in Forecast Analytics.", "joborders-imported")
+    return redirect(url_for("admin_job_orders"))
+
+
+@app.route("/admin/job-orders/<order_id>/delete", methods=["POST"])
+@role_required("admin")
+def admin_delete_job_order(order_id):
+    try:
+        deleted = supabase_admin.table("job_order_history").delete().eq("id", order_id).execute().data or []
+    except Exception:
+        app.logger.exception("Unable to delete job order")
+        return "Unable to delete this job order. Check the server logs for details.", 500
+    if deleted:
+        flash(f"{deleted[0]['jo_ref']} was removed from Job Order History.", "joborder-deleted")
+    else:
+        flash("That job order was already removed.", "joborders-input")
+    return redirect(url_for("admin_job_orders"))
+
+
+# =========================
 # MACHINE LEARNING: MATERIAL DEMAND FORECAST
 # =========================
 # The engine (ml_models/engine.py) rebuilds material demand from job orders, backtests six
@@ -4407,15 +4642,22 @@ def _fetch_all(query_fn, page_size=1000):
 
 
 def _real_case_units():
-    """One row per tooth of every real (non-draft) DentaLink case: date, material, shade, units=1."""
+    """Real demand rows (date, material, shade, units): one per tooth of every non-draft
+    DentaLink case, plus each imported paper job order (Job Order History)."""
+    rows = []
     cases = _fetch_all(lambda: supabase_admin.table("dental_cases").select("id, created_at, status")
                        .not_.in_("status", ["draft", "cancelled"]).order("created_at"))
     dates = {c["id"]: str(c["created_at"])[:10] for c in cases if c.get("created_at")}
-    if not dates:
-        return []
-    teeth = _fetch_all(lambda: supabase_admin.table("case_teeth").select("case_id, material, shade").order("case_id"))
-    return [{"date": dates[t["case_id"]], "material": t.get("material"), "shade": t.get("shade"), "units": 1}
-            for t in teeth if t.get("case_id") in dates]
+    if dates:
+        teeth = _fetch_all(lambda: supabase_admin.table("case_teeth").select("case_id, material, shade").order("case_id"))
+        rows += [{"date": dates[t["case_id"]], "material": t.get("material"), "shade": t.get("shade"), "units": 1}
+                 for t in teeth if t.get("case_id") in dates]
+    for jo in _job_orders():
+        day = jo.get("lab_in") or jo.get("date_sent")
+        if day:
+            rows.append({"date": str(day)[:10], "material": jo.get("material"), "shade": jo.get("shade"),
+                         "units": int(jo.get("units") or 0)})
+    return rows
 
 
 def _real_history_weeks(rows):
@@ -4508,7 +4750,7 @@ def admin_forecast_analytics():
             plan=plan,
             disc_rows=[r for r in plan if r["kind"] == "disc"],
             assumptions=done["result"]["assumptions"] if done else profile_summary(),
-            real_units=len(real_rows),
+            real_units=sum(int(r["units"] or 0) for r in real_rows),
             real_weeks=real_weeks,
             min_real_weeks=MIN_REAL_WEEKS,
         )

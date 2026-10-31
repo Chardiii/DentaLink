@@ -484,7 +484,7 @@
                         <p class="error-modal-message">{{ message }}</p>
                     {% endfor %}
                     
-                    <button type="button" class="error-modal-btn" onclick="closeErrorModal()">Try Again</button>
+                    <button type="button" class="error-modal-btn" onclick="closeErrorModal()">{{ 'OK' if messages | selectattr(0, 'equalto', 'session') | list else 'Try Again' }}</button>
                 </div>
             </div>
         {% endif %}
