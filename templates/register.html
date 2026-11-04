@@ -289,6 +289,132 @@
             display: block;
         }
 
+        /* Terms and Conditions agreement */
+        .terms-agree {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 25px;
+            padding: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-main);
+        }
+
+        .terms-agree input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 1px 0 0 0;
+            flex-shrink: 0;
+            accent-color: var(--accent-cyan);
+            cursor: pointer;
+        }
+
+        .terms-agree label { cursor: pointer; }
+
+        .terms-link {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            color: var(--accent-cyan);
+            font-weight: 600;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .terms-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            display: block;
+        }
+
+        .terms-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+
+        .terms-modal-overlay[hidden] { display: none; }
+
+        .terms-modal {
+            background: var(--bg-card);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 640px;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            animation: slideUp 0.3s ease-out forwards;
+            overflow: hidden;
+        }
+
+        .terms-modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terms-modal-header h3 {
+            margin: 0;
+            font-size: 17px;
+            color: #0F172A;
+        }
+
+        .terms-body {
+            padding: 4px 24px 20px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.65;
+            color: #334155;
+        }
+
+        .terms-body h4 {
+            font-size: 13px;
+            color: #0F172A;
+            margin: 20px 0 6px;
+        }
+
+        .terms-body ul { padding-left: 20px; margin: 6px 0; }
+        .terms-body li { margin-bottom: 4px; }
+        .terms-body .terms-meta { color: var(--text-muted); font-size: 12px; }
+        .terms-body .terms-end { font-weight: 600; color: #0F172A; }
+
+        .terms-modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .terms-scroll-note {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .terms-modal-actions { display: flex; gap: 8px; margin-left: auto; }
+
+        .terms-modal-actions .error-modal-btn:disabled {
+            background-color: #E2E8F0;
+            color: #94A3B8;
+            cursor: not-allowed;
+        }
+
         .submit-btn {
             width: 100%;
             background-color: var(--accent-cyan);
@@ -571,6 +697,15 @@
                     </div>
                 </div>
 
+                <div class="terms-agree">
+                    <input type="checkbox" id="accept_terms" name="accept_terms" value="yes" required>
+                    <div>
+                        <label for="accept_terms">I have read and agree to the</label>
+                        <button type="button" class="terms-link" id="openTerms">Terms and Conditions and Data Privacy Notice</button>.
+                        <span class="terms-hint" id="termsHint">Open and read the terms to continue.</span>
+                    </div>
+                </div>
+
                 <button type="submit" class="submit-btn" id="submitBtn">
                     Submit Registration
                     <svg style="width: 16px; height: 16px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -608,6 +743,24 @@
             </div>
         {% endif %}
     {% endwith %}
+
+    <div class="terms-modal-overlay" id="termsModal" hidden>
+        <div class="terms-modal" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+            <div class="terms-modal-header">
+                <h3 id="termsTitle">Terms and Conditions and Data Privacy Notice</h3>
+            </div>
+            <div class="terms-body" id="termsBody">
+                {% include "_terms_content.html" %}
+            </div>
+            <div class="terms-modal-footer">
+                <span class="terms-scroll-note" id="termsScrollNote">Scroll to the end to accept.</span>
+                <div class="terms-modal-actions">
+                    <button type="button" class="error-modal-btn-secondary" id="declineTerms">Decline</button>
+                    <button type="button" class="error-modal-btn" id="acceptTerms" disabled>I Agree</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="page-footer">
         © 2026 Mrkzter Dental Laboratory • All Rights Reserved
@@ -801,8 +954,70 @@
             const isMatch = passwordInput.value === confirmPasswordInput.value;
             const isPhoneValid = phoneInput.value.length === 11 && phoneInput.value.startsWith('09');
 
-            submitBtn.disabled = !(isFirstNameValid && isLastNameValid && isRoleSelected && isClinicValid && isPasswordValid && isMatch && isPhoneValid);
+            submitBtn.disabled = !(isFirstNameValid && isLastNameValid && isRoleSelected && isClinicValid && isPasswordValid && isMatch && isPhoneValid && acceptTermsBox.checked);
         }
+
+        // Terms and Conditions: the box can be checked only after the terms were read to the end.
+        const acceptTermsBox = document.getElementById('accept_terms');
+        const termsHint = document.getElementById('termsHint');
+        const termsModal = document.getElementById('termsModal');
+        const termsBody = document.getElementById('termsBody');
+        const termsScrollNote = document.getElementById('termsScrollNote');
+        const acceptTermsBtn = document.getElementById('acceptTerms');
+        let termsRead = false;
+
+        function checkTermsScrolled() {
+            if (termsBody.scrollTop + termsBody.clientHeight >= termsBody.scrollHeight - 8) {
+                acceptTermsBtn.disabled = false;
+                termsScrollNote.textContent = 'You have reached the end of the terms.';
+            }
+        }
+
+        function openTermsModal() {
+            termsModal.hidden = false;
+            termsBody.scrollTop = 0;
+            document.body.style.overflow = 'hidden';
+            checkTermsScrolled();
+            termsBody.focus();
+        }
+
+        function closeTermsModal() {
+            termsModal.hidden = true;
+            document.body.style.overflow = '';
+        }
+
+        termsBody.tabIndex = 0;
+        termsBody.addEventListener('scroll', checkTermsScrolled);
+        document.getElementById('openTerms').addEventListener('click', openTermsModal);
+
+        acceptTermsBox.addEventListener('click', function(e) {
+            if (!termsRead) {
+                e.preventDefault();
+                openTermsModal();
+            }
+        });
+        acceptTermsBox.addEventListener('change', validateForm);
+
+        acceptTermsBtn.addEventListener('click', function() {
+            termsRead = true;
+            acceptTermsBox.checked = true;
+            termsHint.textContent = '✓ Terms accepted';
+            termsHint.style.color = 'var(--accent-green)';
+            closeTermsModal();
+            validateForm();
+        });
+
+        document.getElementById('declineTerms').addEventListener('click', function() {
+            acceptTermsBox.checked = false;
+            termsHint.textContent = 'You must accept the terms to create an account.';
+            termsHint.style.color = 'var(--accent-red)';
+            closeTermsModal();
+            validateForm();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !termsModal.hidden) closeTermsModal();
+        });
 
         function closeErrorModal() {
             const modal = document.getElementById('errorModal');
@@ -838,6 +1053,11 @@
             if (passwordInput.value !== confirmPasswordInput.value) {
                 e.preventDefault();
                 alert("Passwords do not match.");
+                return;
+            }
+            if (!acceptTermsBox.checked) {
+                e.preventDefault();
+                openTermsModal();
                 return;
             }
         });
