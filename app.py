@@ -60,6 +60,11 @@ def _is_local_url(url):
 
 
 APP_URL = _normalize_app_url(os.getenv("APP_URL"))
+
+# Version of templates/_terms_content.html. Change it whenever the terms' wording changes, so each
+# profile records which version the user accepted (profiles.terms_version).
+TERMS_VERSION = "2026-11-04"
+app.jinja_env.globals["terms_version"] = TERMS_VERSION
 supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
@@ -1894,6 +1899,13 @@ def register():
             flash("Invalid role selected.", "error")
             return render_template("register.html")
 
+        # =========================
+        # REQUIRE TERMS ACCEPTANCE
+        # =========================
+        if request.form.get("accept_terms") != "yes":
+            flash("You must read and accept the Terms and Conditions and Data Privacy Notice to create an account.", "error")
+            return render_template("register.html")
+
         try:
             # =========================
             # CREATE SUPABASE AUTH USER
@@ -1924,7 +1936,9 @@ def register():
                 "professional_id": professional_id,
                 "clinic_name": clinic_name,  # <--- SAVED TO DATABASE HERE
                 "role": role,
-                "status": "pending"
+                "status": "pending",
+                "terms_version": TERMS_VERSION,
+                "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
             }).execute()
             _notify_admins(
                 f"New account waiting for approval: {display_name} ({role}{', ' + clinic_name if clinic_name else ''}).",
