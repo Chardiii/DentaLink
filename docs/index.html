@@ -116,7 +116,8 @@
   .shot {
     border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff;
   }
-  .shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: #e9eef8; }
+  .shot img { display: block; width: 100%; height: auto; background: #e9eef8; }
+  .shot a { display: block; }
   .shot.diagram img { aspect-ratio: auto; object-fit: contain; max-height: 520px; background: #fff; padding: 8px; }
   .shot.missing img { display: none; }
   .shot.missing::before { content: "Screenshot coming soon"; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; background: #e9eef8; color: var(--muted); font-weight: 600; }
@@ -309,14 +310,14 @@
 <section id="screenshots">
   <div class="wrap">
     <h2>Screenshots</h2>
-    <p class="lead">Key modules of DentaLink.</p>
+    <p class="lead">Key modules of DentaLink. Click a screenshot to view it full size.</p>
     <div class="grid g2">
-      <figure class="shot"><img src="assets/screenshots/admin-dashboard.png" alt="Administrator dashboard" loading="lazy"><figcaption>Administrator Dashboard</figcaption></figure>
-      <figure class="shot"><img src="assets/screenshots/case-order.png" alt="Case and client order submission" loading="lazy"><figcaption>Case and Client Order Submission</figcaption></figure>
-      <figure class="shot"><img src="assets/screenshots/workflow-tracking.png" alt="Departmental workflow tracking" loading="lazy"><figcaption>Departmental Workflow Tracking</figcaption></figure>
-      <figure class="shot"><img src="assets/screenshots/qr-dispatch.png" alt="QR-enabled dispatch" loading="lazy"><figcaption>QR-Enabled Dispatch</figcaption></figure>
-      <figure class="shot"><img src="assets/screenshots/inventory.png" alt="Inventory management" loading="lazy"><figcaption>Inventory Management</figcaption></figure>
-      <figure class="shot"><img src="assets/screenshots/forecasting.png" alt="Inventory forecasting" loading="lazy"><figcaption>Inventory Forecasting</figcaption></figure>
+      <figure class="shot"><a href="assets/screenshots/admin-dashboard.png" target="_blank"><img src="assets/screenshots/admin-dashboard.png" alt="Administrator dashboard" loading="lazy"></a><figcaption>Administrator Dashboard</figcaption></figure>
+      <figure class="shot"><a href="assets/screenshots/case-order.png" target="_blank"><img src="assets/screenshots/case-order.png" alt="Case and client order submission" loading="lazy"></a><figcaption>New Case Prescription and Odontogram (Dentist)</figcaption></figure>
+      <figure class="shot"><a href="assets/screenshots/workflow-tracking.png" target="_blank"><img src="assets/screenshots/workflow-tracking.png" alt="Departmental workflow tracking" loading="lazy"></a><figcaption>Technician Workflow Pipeline</figcaption></figure>
+      <figure class="shot"><a href="assets/screenshots/qr-dispatch.png" target="_blank"><img src="assets/screenshots/qr-dispatch.png" alt="QR-enabled dispatch" loading="lazy"></a><figcaption>QR Dispatch Label</figcaption></figure>
+      <figure class="shot"><a href="assets/screenshots/inventory.png" target="_blank"><img src="assets/screenshots/inventory.png" alt="Inventory management" loading="lazy"></a><figcaption>Inventory Management</figcaption></figure>
+      <figure class="shot"><a href="assets/screenshots/forecasting.png" target="_blank"><img src="assets/screenshots/forecasting.png" alt="Inventory forecasting" loading="lazy"></a><figcaption>Forecast Analytics</figcaption></figure>
     </div>
   </div>
 </section>
