@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DentaLink | Web-Based Laboratory Information System with ML-Based Inventory Forecasting</title>
+<meta name="description" content="DentaLink: A Web-Based Laboratory Information System with Machine Learning-Based Inventory Forecasting for Mrkzter Dental Laboratory. Capstone project, College of Computer Studies, Laguna State Polytechnic University.">
+<style>
+  :root {
+    --navy: #14284b;
+    --navy-2: #1f3a68;
+    --maroon: #8b1e2d;
+    --gold: #e8a33d;
+    --ink: #1d2433;
+    --muted: #5b6577;
+    --line: #e3e7ee;
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.6;
+  }
+  a { color: var(--navy-2); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  /* Nav */
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(20, 40, 75, 0.97);
+    border-bottom: 3px solid var(--gold);
+  }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 58px; flex-wrap: wrap; }
+  nav .brand { color: #fff; font-weight: 700; text-decoration: none; letter-spacing: .3px; }
+  nav .brand span { color: var(--gold); }
+  nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; }
+  nav ul a { color: #dfe6f3; text-decoration: none; font-size: 14px; padding: 6px 10px; border-radius: 6px; }
+  nav ul a:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+  /* Hero */
+  header.hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 60%, #2c4f8a 100%);
+    color: #fff; padding: 64px 0 56px;
+  }
+  .hero .school { text-transform: uppercase; letter-spacing: 1.5px; font-size: 13px; color: #c9d4ea; margin: 0 0 14px; }
+  .hero h1 { font-size: clamp(28px, 4.4vw, 44px); line-height: 1.15; margin: 0 0 14px; }
+  .hero h1 span { color: var(--gold); }
+  .hero .subtitle { font-size: clamp(16px, 2vw, 19px); color: #e4eaf6; max-width: 820px; margin: 0 0 26px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn {
+    display: inline-block; padding: 10px 18px; border-radius: 8px; font-weight: 600;
+    text-decoration: none; font-size: 15px; border: 2px solid transparent;
+  }
+  .btn.primary { background: var(--gold); color: var(--navy); }
+  .btn.ghost { border-color: rgba(255,255,255,.55); color: #fff; }
+  .btn:hover { filter: brightness(1.06); }
+
+  /* Sections */
+  section { padding: 56px 0; }
+  section:nth-of-type(even) { background: #fff; }
+  h2 {
+    font-size: 28px; margin: 0 0 8px; color: var(--navy);
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2::before { content: ""; width: 6px; height: 28px; background: var(--maroon); border-radius: 3px; }
+  .lead { color: var(--muted); margin: 0 0 28px; max-width: 780px; }
+  h3 { color: var(--navy-2); margin: 0 0 8px; font-size: 18px; }
+
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .g4 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  section, header.hero { scroll-margin-top: 64px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px; box-shadow: 0 1px 2px rgba(20,40,75,.04);
+  }
+  section:nth-of-type(even) .card { background: var(--bg); }
+
+  /* Team */
+  .person { text-align: center; }
+  .avatar {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 12px;
+    background: var(--navy); color: var(--gold); font-weight: 700; font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .person .name { font-weight: 700; margin: 0; }
+  .person .role { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
+
+  ol.objectives, ul.clean { margin: 0; padding-left: 20px; }
+  ol.objectives > li { margin-bottom: 12px; }
+  ol.objectives ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+
+  /* Phases */
+  .phase { position: relative; padding-top: 30px; }
+  .phase .num {
+    position: absolute; top: -14px; left: 22px; width: 36px; height: 36px; border-radius: 50%;
+    background: var(--maroon); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip { background: #e9eef8; color: var(--navy); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; }
+
+  /* Features */
+  .feature h3 { display: flex; align-items: center; gap: 8px; }
+  .feature .icon { font-size: 20px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  /* Screenshots */
+  figure { margin: 0; }
+  .shot {
+    border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff;
+  }
+  .shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: #e9eef8; }
+  .shot.diagram img { aspect-ratio: auto; object-fit: contain; max-height: 520px; background: #fff; padding: 8px; }
+  .shot.missing img { display: none; }
+  .shot.missing::before { content: "Screenshot coming soon"; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; background: #e9eef8; color: var(--muted); font-weight: 600; }
+  .shot figcaption { padding: 10px 14px; font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); }
+
+  /* Links */
+  .links a.card { text-decoration: none; color: inherit; display: block; transition: transform .15s ease, box-shadow .15s ease; }
+  .links a.card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(20,40,75,.10); }
+  .links .label { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--maroon); font-weight: 700; }
+  .links .url { color: var(--navy-2); word-break: break-all; font-size: 14px; }
+
+  footer { background: var(--navy); color: #c9d4ea; padding: 28px 0; font-size: 14px; }
+  footer strong { color: #fff; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">Denta<span>Link</span></a>
+    <ul>
+      <li><a href="#team">Team</a></li>
+      <li><a href="#problem">Problem &amp; Objectives</a></li>
+      <li><a href="#methodology">Methodology</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#diagrams">Diagrams</a></li>
+      <li><a href="#screenshots">Screenshots</a></li>
+      <li><a href="#links">Links</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <p class="school">Laguna State Polytechnic University &middot; College of Computer Studies &middot; Capstone Project</p>
+    <h1>Denta<span>Link</span>: A Web-Based Laboratory Information System with Machine Learning-Based Inventory Forecasting for Mrkzter Dental Laboratory</h1>
+    <p class="subtitle">One web-based platform for dental case and client order management, digital case files, real-time departmental workflow tracking with QR-enabled dispatch, and inventory management with machine learning-based demand forecasting.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://dentalink-production-1de3.up.railway.app/login" target="_blank" rel="noopener">Open the System</a>
+      <a class="btn ghost" href="https://github.com/Chardiii/DentaLink" target="_blank" rel="noopener">View Repository</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section id="team">
+  <div class="wrap">
+    <h2>Team Members &amp; Adviser</h2>
+    <p class="lead">Bachelor of Science in Information Technology, major in Web and Mobile Application Development.</p>
+    <div class="grid g4">
+      <div class="card person">
+        <div class="avatar">JL</div>
+        <p class="name">Jamelle Ivan C. Lao</p>
+        <p class="role">Researcher / Developer</p>
+      </div>
+      <div class="card person">
+        <div class="avatar">SR</div>
+        <p class="name">Shiella Mae B. Rico</p>
+        <p class="role">Researcher / Developer</p>
+      </div>
+      <div class="card person">
+        <div class="avatar">CV</div>
+        <p class="name">Cliff Richard R. Veluz</p>
+        <p class="role">Researcher / Developer</p>
+      </div>
+      <div class="card person">
+        <div class="avatar">GM</div>
+        <p class="name">Gener F. Mosico, MSIT</p>
+        <p class="role">Thesis Adviser</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="problem">
+  <div class="wrap">
+    <h2>Problem Statement</h2>
+    <p class="lead">Mrkzter Dental Laboratory in Marikina City handles many of its activities through separate messaging apps and manual records.</p>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Current situation</h3>
+        <ul class="clean">
+          <li>Case communication and files are scattered across Messenger and Viber, making them hard to find as conversations grow.</li>
+          <li>Partner clinics send handwritten job orders that staff must read and re-encode, which can lead to errors.</li>
+          <li>Case progress through CAD design and porcelain work has no centralized, real-time visibility.</li>
+          <li>Finished restorations leave the laboratory with no record of when each case was dispatched or who received it.</li>
+          <li>The laboratory keeps no inventory records, so there is no consumption history for estimating future material needs.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Why it matters</h3>
+        <p>The main milling material, Sagemax zirconia discs, is bought by shade from a supplier that delivers in about two to four working days. Running out of a single shade can delay cases until the next delivery. Without workflow, dispatch, and inventory records, the laboratory cannot easily monitor cases, confirm deliveries, or anticipate stock shortages.</p>
+        <p>DentaLink addresses this by bringing case handling, digital files, workflow tracking, dispatch, and inventory together in one web-based system.</p>
+      </div>
+    </div>
+
+    <h2 style="margin-top:48px">Objectives</h2>
+    <p class="lead"><strong>General objective:</strong> to develop a web-based laboratory information system that improves the management of dental cases, laboratory workflow, client orders, digital case files, and inventory at Mrkzter Dental Laboratory.</p>
+    <div class="card">
+      <h3>Specific objectives</h3>
+      <ol class="objectives">
+        <li>To design and develop a web-based laboratory information system with the following key features:
+          <ul>
+            <li>Dental Case and Client Order Management</li>
+            <li>Digital Case-File Management</li>
+            <li>Real-Time Departmental Workflow Tracking with QR-Enabled Dispatch</li>
+            <li>Laboratory Inventory Management</li>
+          </ul>
+        </li>
+        <li>To develop a machine learning-based inventory forecasting module in terms of:
+          <ul>
+            <li>Future Material Demand Forecasting</li>
+            <li>Future Inventory-Level Forecasting</li>
+            <li>Stockout-Risk Prediction</li>
+            <li>Replenishment Recommendations</li>
+          </ul>
+        </li>
+        <li>To assess the functionality of the developed system based on its key features.</li>
+        <li>To evaluate the developed system in terms of functionality, usability, and acceptability among its intended users.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="methodology">
+  <div class="wrap">
+    <h2>Methodology</h2>
+    <p class="lead">The study used a descriptive-developmental research design. DentaLink was built using the Agile model, organized into short sprints over six weeks, with each sprint producing a working and testable increment.</p>
+    <div class="grid g3">
+      <div class="card phase"><div class="num">1</div><h3>Requirements</h3><p>Interviews with the laboratory owner and staff and observation of the current process, mapping the case workflow from job order to delivery.</p></div>
+      <div class="card phase"><div class="num">2</div><h3>Design</h3><p>System architecture, relational database schema, case statuses, and separate screens for administrators, technicians, and dentists.</p></div>
+      <div class="card phase"><div class="num">3</div><h3>Development</h3><p>Core modules built sprint by sprint in Python Flask, with database changes recorded as migration files.</p></div>
+      <div class="card phase"><div class="num">4</div><h3>Testing</h3><p>Each increment tested by the developers, followed by black-box testing by IT experts for functional completeness.</p></div>
+      <div class="card phase"><div class="num">5</div><h3>Deployment</h3><p>Launched on Railway, with the database, authentication, and file storage on Supabase.</p></div>
+      <div class="card phase"><div class="num">6</div><h3>Review</h3><p>Feedback from the laboratory after each increment used to refine the system.</p></div>
+    </div>
+
+    <div class="grid g2" style="margin-top:22px">
+      <div class="card">
+        <h3>Evaluation</h3>
+        <p>The system is evaluated for functionality, usability, and acceptability by its intended users: laboratory administrators and technicians (total population sampling) and dentists and staff of partner clinics (convenience sampling, with the number of respondents set using Slovin's formula). Acceptance is measured using the Technology Acceptance Model.</p>
+      </div>
+      <div class="card">
+        <h3>Forecasting approach</h3>
+        <p>Simple benchmarks, Croston's method for intermittent demand, and a Random Forest model are compared through rolling-origin backtesting, and the most accurate method is used to forecast weekly demand for zirconia discs and e.max.</p>
+        <div class="stack">
+          <span class="chip">Python 3</span>
+          <span class="chip">Flask</span>
+          <span class="chip">Supabase</span>
+          <span class="chip">scikit-learn</span>
+          <span class="chip">Railway</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>System Features</h2>
+    <p class="lead">Separate interfaces for laboratory administrators, technicians, and partner clinic dentists.</p>
+    <div class="grid g3">
+      <div class="card feature"><h3><span class="icon">&#128203;</span>Case &amp; Client Order Management</h3><p>Partner clinics submit job orders online, replacing handwritten forms and manual re-encoding.</p></div>
+      <div class="card feature"><h3><span class="icon">&#128193;</span>Digital Case-File Management</h3><p>Scans, photos, and design files are stored with each case instead of scattered across chat apps.</p></div>
+      <div class="card feature"><h3><span class="icon">&#128260;</span>Departmental Workflow Tracking</h3><p>Real-time status of each case as it moves through CAD design, porcelain work, and quality control.</p></div>
+      <div class="card feature"><h3><span class="icon">&#128230;</span>QR-Enabled Dispatch</h3><p>Each delivery box gets a QR label linked to its case record, logging when it left the laboratory and who received it.</p></div>
+      <div class="card feature"><h3><span class="icon">&#128202;</span>Inventory Management</h3><p>Records of materials, stock levels, and supplier deliveries for zirconia discs and other laboratory materials.</p></div>
+      <div class="card feature"><h3><span class="icon">&#129302;</span>ML-Based Inventory Forecasting</h3><p>Forecasts weekly material demand, inventory levels, and stockout risk, and recommends order quantities and reorder points.</p></div>
+      <div class="card feature"><h3><span class="icon">&#9888;&#65039;</span>Delivery Issues &amp; Remakes</h3><p>Clinics can report problems with delivered cases, and remakes are tracked back to the original case.</p></div>
+      <div class="card feature"><h3><span class="icon">&#128221;</span>Job Order History</h3><p>Records the laboratory's paper job orders so past work becomes searchable and usable for forecasting.</p></div>
+      <div class="card feature"><h3><span class="icon">&#128276;</span>Dashboards &amp; Notifications</h3><p>Role-based dashboards and alerts for case updates, dispatch, and low stock.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="diagrams">
+  <div class="wrap">
+    <h2>System Diagrams</h2>
+    <p class="lead">Design documentation from the manuscript. Full descriptions are in the <a href="https://github.com/Chardiii/DentaLink/blob/main/docs/SYSTEM_DOCUMENTATION.md" target="_blank" rel="noopener">system documentation</a>.</p>
+    <div class="grid g2">
+      <figure class="shot diagram"><a href="diagrams/conceptual-framework.jpg" target="_blank"><img src="diagrams/conceptual-framework.jpg" alt="Conceptual framework" loading="lazy"></a><figcaption>Figure 1. Conceptual Framework</figcaption></figure>
+      <figure class="shot diagram"><a href="diagrams/system-architecture.jpg" target="_blank"><img src="diagrams/system-architecture.jpg" alt="System architecture" loading="lazy"></a><figcaption>Figure 4. System Communication and Interaction</figcaption></figure>
+      <figure class="shot diagram"><a href="diagrams/erd.jpg" target="_blank"><img src="diagrams/erd.jpg" alt="Entity-relationship diagram" loading="lazy"></a><figcaption>Figure 3. Entity-Relationship Diagram (ERD)</figcaption></figure>
+      <figure class="shot diagram"><a href="diagrams/forecasting-process.png" target="_blank"><img src="diagrams/forecasting-process.png" alt="Forecasting process" loading="lazy"></a><figcaption>Figure 5. Forecasting Process</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="lead">Key modules of DentaLink.</p>
+    <div class="grid g2">
+      <figure class="shot"><img src="assets/screenshots/admin-dashboard.png" alt="Administrator dashboard" loading="lazy"><figcaption>Administrator Dashboard</figcaption></figure>
+      <figure class="shot"><img src="assets/screenshots/case-order.png" alt="Case and client order submission" loading="lazy"><figcaption>Case and Client Order Submission</figcaption></figure>
+      <figure class="shot"><img src="assets/screenshots/workflow-tracking.png" alt="Departmental workflow tracking" loading="lazy"><figcaption>Departmental Workflow Tracking</figcaption></figure>
+      <figure class="shot"><img src="assets/screenshots/qr-dispatch.png" alt="QR-enabled dispatch" loading="lazy"><figcaption>QR-Enabled Dispatch</figcaption></figure>
+      <figure class="shot"><img src="assets/screenshots/inventory.png" alt="Inventory management" loading="lazy"><figcaption>Inventory Management</figcaption></figure>
+      <figure class="shot"><img src="assets/screenshots/forecasting.png" alt="Inventory forecasting" loading="lazy"><figcaption>Inventory Forecasting</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="links">
+  <div class="wrap">
+    <h2>Links</h2>
+    <p class="lead">Source code, live system, and documentation.</p>
+    <div class="grid g2 links">
+      <a class="card" href="https://github.com/Chardiii/DentaLink" target="_blank" rel="noopener"><div class="label">Repository</div><h3>Source Code on GitHub</h3><div class="url">https://github.com/Chardiii/DentaLink</div></a>
+      <a class="card" href="https://dentalink-production-1de3.up.railway.app/login" target="_blank" rel="noopener"><div class="label">Live System</div><h3>DentaLink</h3><div class="url">https://dentalink-production-1de3.up.railway.app/login</div></a>
+      <a class="card" href="https://github.com/Chardiii/DentaLink/blob/main/docs/USER_MANUAL.md" target="_blank" rel="noopener"><div class="label">Documentation</div><h3>User Manual &amp; Setup Guide</h3><div class="url">Installation, deployment, and usage guide</div></a>
+      <a class="card" href="https://github.com/Chardiii/DentaLink/blob/main/docs/SYSTEM_DOCUMENTATION.md" target="_blank" rel="noopener"><div class="label">Documentation</div><h3>System Documentation</h3><div class="url">Diagrams, case lifecycle, and database tables</div></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <strong>DentaLink</strong> &middot; Capstone Project &middot; College of Computer Studies, Laguna State Polytechnic University, Sta. Cruz, Laguna &middot; 2026
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll(".shot img").forEach(function (img) {
+    function miss() { img.closest(".shot").classList.add("missing"); }
+    if (img.complete && img.naturalWidth === 0) miss(); else img.addEventListener("error", miss);
+  });
+</script>
+</body>
+</html>
