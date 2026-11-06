@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 930" width="1320" height="930" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+<title>DentaLink Use Case Diagram</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="ah-rev" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#333"/></marker></defs>
+<rect width="1320" height="930" fill="#fff"/>
+<text x="660.0" y="22.0" font-size="18" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Use Case Diagram</text>
+<rect x="220" y="62" width="850" height="830" rx="10" fill="#f6f8fb" stroke="#14284b" stroke-width="2"/>
+<text x="645.0" y="82.0" font-size="15" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">DentaLink System</text>
+<circle cx="95" cy="116" r="11" fill="#fff" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="127.0" x2="95.0" y2="158.0" stroke="#14284b" stroke-width="2"/>
+<line x1="78.0" y1="140.0" x2="112.0" y2="140.0" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="158.0" x2="82.0" y2="180.0" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="158.0" x2="108.0" y2="180.0" stroke="#14284b" stroke-width="2"/>
+<text x="95.0" y="198.0" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">DentaLink User</text>
+<circle cx="95" cy="336" r="11" fill="#fff" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="347.0" x2="95.0" y2="378.0" stroke="#14284b" stroke-width="2"/>
+<line x1="78.0" y1="360.0" x2="112.0" y2="360.0" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="378.0" x2="82.0" y2="400.0" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="378.0" x2="108.0" y2="400.0" stroke="#14284b" stroke-width="2"/>
+<text x="95.0" y="410.2" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Dentist /</text>
+<text x="95.0" y="425.8" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Partner Clinic</text>
+<circle cx="95" cy="616" r="11" fill="#fff" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="627.0" x2="95.0" y2="658.0" stroke="#14284b" stroke-width="2"/>
+<line x1="78.0" y1="640.0" x2="112.0" y2="640.0" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="658.0" x2="82.0" y2="680.0" stroke="#14284b" stroke-width="2"/>
+<line x1="95.0" y1="658.0" x2="108.0" y2="680.0" stroke="#14284b" stroke-width="2"/>
+<text x="95.0" y="690.2" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Laboratory</text>
+<text x="95.0" y="705.8" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Technician</text>
+<circle cx="1230" cy="616" r="11" fill="#fff" stroke="#14284b" stroke-width="2"/>
+<line x1="1230.0" y1="627.0" x2="1230.0" y2="658.0" stroke="#14284b" stroke-width="2"/>
+<line x1="1213.0" y1="640.0" x2="1247.0" y2="640.0" stroke="#14284b" stroke-width="2"/>
+<line x1="1230.0" y1="658.0" x2="1217.0" y2="680.0" stroke="#14284b" stroke-width="2"/>
+<line x1="1230.0" y1="658.0" x2="1243.0" y2="680.0" stroke="#14284b" stroke-width="2"/>
+<text x="1230.0" y="690.2" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Laboratory</text>
+<text x="1230.0" y="705.8" font-size="12.5" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Administrator</text>
+<ellipse cx="385" cy="120" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="120.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Register and sign in</text>
+<line x1="115.0" y1="140.0" x2="253.0" y2="120.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="178" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="178.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">View notifications</text>
+<line x1="115.0" y1="140.0" x2="253.0" y2="178.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="240" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="232.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Submit job order with</text>
+<text x="385.0" y="247.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">odontogram and files</text>
+<line x1="115.0" y1="360.0" x2="253.0" y2="240.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="300" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="300.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Edit or delete draft case</text>
+<line x1="115.0" y1="360.0" x2="253.0" y2="300.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="360" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="360.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Track case status</text>
+<line x1="115.0" y1="360.0" x2="253.0" y2="360.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="420" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="412.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Confirm receipt by</text>
+<text x="385.0" y="427.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">scanning QR label</text>
+<line x1="115.0" y1="360.0" x2="253.0" y2="420.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="480" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="480.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Report delivery issue</text>
+<line x1="115.0" y1="360.0" x2="253.0" y2="480.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="580" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="572.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Update case stage and</text>
+<text x="385.0" y="587.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">log materials used</text>
+<line x1="115.0" y1="640.0" x2="253.0" y2="580.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="700" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="700.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Submit case for QC review</text>
+<line x1="115.0" y1="640.0" x2="253.0" y2="700.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="760" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="760.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Return case to dentist</text>
+<line x1="115.0" y1="640.0" x2="253.0" y2="760.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="385" cy="820" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="385.0" y="820.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Request material</text>
+<line x1="115.0" y1="640.0" x2="253.0" y2="820.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="645" cy="640" rx="118" ry="27" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="645.0" y="632.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Record courier handover</text>
+<text x="645.0" y="647.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">by scanning QR label</text>
+<line x1="115.0" y1="640.0" x2="527.0" y2="640.0" stroke="#555" stroke-width="1.3"/>
+<line x1="1210.0" y1="640.0" x2="763.0" y2="640.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="110" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="110.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Approve or reject accounts</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="110.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="170" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="170.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Assign or reassign technician</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="170.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="230" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="230.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Mark case as rush</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="230.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="290" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="290.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Approve or reject QC</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="290.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="350" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="350.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Print or reissue dispatch label</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="350.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="410" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="410.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Review delivery issues</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="410.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="470" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="462.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Manage inventory and</text>
+<text x="925.0" y="477.5" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">resolve restock requests</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="470.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="530" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="530.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Import job order history</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="530.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="590" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="590.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Run forecast and export report</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="590.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="700" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="700.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">View login history</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="700.0" stroke="#555" stroke-width="1.3"/>
+<ellipse cx="925" cy="760" rx="132" ry="23" fill="#fff" stroke="#8b1e2d" stroke-width="1.8"/>
+<text x="925.0" y="760.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#1d2433">Back up and restore data</text>
+<line x1="1210.0" y1="640.0" x2="1057.0" y2="760.0" stroke="#555" stroke-width="1.3"/>
+<polyline points="95,322 95,212" fill="none" stroke="#555" stroke-width="1.4"/>
+<polygon points="95,212 103.0,225.0 87.0,225.0" fill="#fff" stroke="#555" stroke-width="1.4"/>
+<polyline points="66,640 40,640 40,150 77,150" fill="none" stroke="#555" stroke-width="1.4"/>
+<polygon points="77,150 64.0,158.0 64.0,142.0" fill="#fff" stroke="#555" stroke-width="1.4"/>
+<polyline points="1230,604 1230,44 60,44 60,120 80,128" fill="none" stroke="#555" stroke-width="1.4"/>
+<polygon points="80,128 65.0,130.6 70.9,115.7" fill="#fff" stroke="#555" stroke-width="1.4"/>
+<text x="220.0" y="918.0" font-size="12" text-anchor="start" dominant-baseline="middle" font-weight="normal" fill="#666">Dentist, technician, and administrator are kinds of DentaLink user and inherit its use cases.</text>
+</svg>
