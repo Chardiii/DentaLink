@@ -119,6 +119,8 @@
   .shot img { display: block; width: 100%; height: auto; background: #e9eef8; }
   .shot a { display: block; }
   .shot.diagram img { aspect-ratio: auto; object-fit: contain; max-height: 520px; background: #fff; padding: 8px; }
+  .shot.diagram.wide { grid-column: 1 / -1; }
+  .shot.diagram.wide img { max-height: none; }
   .shot.missing img { display: none; }
   .shot.missing::before { content: "Screenshot coming soon"; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; background: #e9eef8; color: var(--muted); font-weight: 600; }
   .shot figcaption { padding: 10px 14px; font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); }
@@ -297,8 +299,11 @@
 <section id="diagrams">
   <div class="wrap">
     <h2>System Diagrams</h2>
-    <p class="lead">Design documentation from the manuscript. Full descriptions are in the <a href="https://github.com/Chardiii/DentaLink/blob/main/docs/SYSTEM_DOCUMENTATION.md" target="_blank" rel="noopener">system documentation</a>.</p>
+    <p class="lead">Data flow, use case, and design diagrams of DentaLink. Click a diagram to view it full size. Full descriptions are in the <a href="https://github.com/Chardiii/DentaLink/blob/main/docs/SYSTEM_DOCUMENTATION.md" target="_blank" rel="noopener">system documentation</a>.</p>
     <div class="grid g2">
+      <figure class="shot diagram"><a href="diagrams/dfd-context.svg" target="_blank"><img src="diagrams/dfd-context.svg" alt="Context diagram, DFD level 0" loading="lazy"></a><figcaption>Context Diagram (DFD Level 0)</figcaption></figure>
+      <figure class="shot diagram"><a href="diagrams/use-case.svg" target="_blank"><img src="diagrams/use-case.svg" alt="Use case diagram" loading="lazy"></a><figcaption>Use Case Diagram (UML)</figcaption></figure>
+      <figure class="shot diagram wide"><a href="diagrams/dfd-level1.svg" target="_blank"><img src="diagrams/dfd-level1.svg" alt="Data flow diagram level 1" loading="lazy"></a><figcaption>Data Flow Diagram (Level 1)</figcaption></figure>
       <figure class="shot diagram"><a href="diagrams/conceptual-framework.jpg" target="_blank"><img src="diagrams/conceptual-framework.jpg" alt="Conceptual framework" loading="lazy"></a><figcaption>Figure 1. Conceptual Framework</figcaption></figure>
       <figure class="shot diagram"><a href="diagrams/system-architecture.jpg" target="_blank"><img src="diagrams/system-architecture.jpg" alt="System architecture" loading="lazy"></a><figcaption>Figure 4. System Communication and Interaction</figcaption></figure>
       <figure class="shot diagram"><a href="diagrams/erd.jpg" target="_blank"><img src="diagrams/erd.jpg" alt="Entity-relationship diagram" loading="lazy"></a><figcaption>Figure 3. Entity-Relationship Diagram (ERD)</figcaption></figure>

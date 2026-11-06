@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 640" width="1180" height="640" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+<title>DentaLink Context Diagram (DFD Level 0)</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="ah-rev" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#333"/></marker></defs>
+<rect width="1180" height="640" fill="#fff"/>
+<text x="590.0" y="28.0" font-size="18" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">Context Diagram (DFD Level 0)</text>
+<circle cx="590" cy="330" r="88" fill="#fff" stroke="#8b1e2d" stroke-width="3"/>
+<text x="590.0" y="310.0" font-size="15" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">0</text>
+<text x="590.0" y="330.0" font-size="15" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">DentaLink</text>
+<text x="590.0" y="350.0" font-size="15" text-anchor="middle" dominant-baseline="middle" font-weight="700" fill="#14284b">System</text>
+<rect x="30" y="285" width="190" height="90" fill="#e9eef8" stroke="#14284b" stroke-width="2"/>
+<text x="125.0" y="322.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Dentist /</text>
+<text x="125.0" y="338.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Partner Clinic</text>
+<line x1="220.0" y1="305.0" x2="505.6" y2="305.0" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="240.1" y="237.5" width="229.8" height="49.0" fill="#fff" opacity="0.92"/>
+<text x="355.0" y="247.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">registration details, job orders,</text>
+<text x="355.0" y="262.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">case files, receipt confirmation,</text>
+<text x="355.0" y="277.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">delivery issue reports</text>
+<line x1="505.6" y1="355.0" x2="220.0" y2="355.0" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="263.6" y="367.5" width="182.7" height="19.0" fill="#fff" opacity="0.92"/>
+<text x="355.0" y="377.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">case status, notifications</text>
+<rect x="960" y="285" width="190" height="90" fill="#e9eef8" stroke="#14284b" stroke-width="2"/>
+<text x="1055.0" y="322.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Laboratory</text>
+<text x="1055.0" y="338.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Technician</text>
+<line x1="960.0" y1="305.0" x2="674.4" y2="305.0" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="706.8" y="237.5" width="236.5" height="49.0" fill="#fff" opacity="0.92"/>
+<text x="825.0" y="247.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">stage updates, materials used,</text>
+<text x="825.0" y="262.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">QC submissions, material requests,</text>
+<text x="825.0" y="277.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">courier handover scans</text>
+<line x1="674.4" y1="355.0" x2="960.0" y2="355.0" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="723.6" y="367.5" width="202.9" height="19.0" fill="#fff" opacity="0.92"/>
+<text x="825.0" y="377.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#333">assigned cases, notifications</text>
+<rect x="495" y="60" width="190" height="80" fill="#e9eef8" stroke="#14284b" stroke-width="2"/>
+<text x="590.0" y="92.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Laboratory</text>
+<text x="590.0" y="108.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Administrator</text>
+<line x1="560.0" y1="140.0" x2="560.0" y2="247.3" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="306.1" y="165.5" width="249.9" height="49.0" fill="#fff" opacity="0.92"/>
+<text x="552.0" y="175.0" font-size="12" text-anchor="end" dominant-baseline="middle" font-weight="normal" fill="#333">account decisions, case assignments,</text>
+<text x="552.0" y="190.0" font-size="12" text-anchor="end" dominant-baseline="middle" font-weight="normal" fill="#333">QC decisions, stock updates,</text>
+<text x="552.0" y="205.0" font-size="12" text-anchor="end" dominant-baseline="middle" font-weight="normal" fill="#333">job order imports, forecast requests</text>
+<line x1="620.0" y1="247.3" x2="620.0" y2="140.0" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="624.0" y="165.5" width="229.8" height="49.0" fill="#fff" opacity="0.92"/>
+<text x="628.0" y="175.0" font-size="12" text-anchor="start" dominant-baseline="middle" font-weight="normal" fill="#333">dashboards, dispatch labels,</text>
+<text x="628.0" y="190.0" font-size="12" text-anchor="start" dominant-baseline="middle" font-weight="normal" fill="#333">forecasts, order recommendations,</text>
+<text x="628.0" y="205.0" font-size="12" text-anchor="start" dominant-baseline="middle" font-weight="normal" fill="#333">reports, backups</text>
+<rect x="495" y="520" width="190" height="70" fill="#e9eef8" stroke="#14284b" stroke-width="2"/>
+<text x="590.0" y="547.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">Email Service</text>
+<text x="590.0" y="563.0" font-size="13" text-anchor="middle" dominant-baseline="middle" font-weight="600" fill="#14284b">(Brevo)</text>
+<line x1="590.0" y1="418.0" x2="590.0" y2="520.0" stroke="#333" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="594.0" y="453.0" width="142.4" height="34.0" fill="#fff" opacity="0.92"/>
+<text x="598.0" y="462.5" font-size="12" text-anchor="start" dominant-baseline="middle" font-weight="normal" fill="#333">account approval and</text>
+<text x="598.0" y="477.5" font-size="12" text-anchor="start" dominant-baseline="middle" font-weight="normal" fill="#333">rejection emails</text>
+<text x="590.0" y="620.0" font-size="12" text-anchor="middle" dominant-baseline="middle" font-weight="normal" fill="#666">External entities exchange data with DentaLink as a single process (0).</text>
+</svg>
