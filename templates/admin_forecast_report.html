@@ -39,7 +39,7 @@
     {% set status_text = {'order_now': 'Order now', 'order_soon': 'Order this month', 'enough': 'Enough stock', 'untracked': 'Not in Inventory'} %}
     <div class="toolbar">
         <a class="btn" href="{{ url_for('admin_forecast_analytics') }}">← Back to Forecast Analytics</a>
-        <a class="btn" href="{{ url_for('admin_forecast_export_csv') }}">Download CSV</a>
+        <a class="btn" href="{{ url_for('admin_forecast_export_excel') }}">Download Excel</a>
         <button class="btn primary" type="button" onclick="window.print()">Print or save as PDF</button>
     </div>
 
@@ -51,7 +51,8 @@
             </div>
             <div class="meta">
                 Forecast for the 4 weeks from <strong><time data-date datetime="{{ result.forecast_start }}">{{ result.forecast_start }}</time></strong><br>
-                Generated <time datetime="{{ result.generated_at }}">{{ result.generated_at[:10] }}</time><br>
+                Generated <strong>{{ generated_local.strftime('%b %d, %Y %I:%M %p') if generated_local else 'not recorded' }}</strong><br>
+                Printed {{ printed_at.strftime('%b %d, %Y %I:%M %p') }}<br>
                 Method: <strong>{{ result.best_model }}</strong> (±{{ (result.scores[result.best_model].wape_4_weeks * 100) | round | int }}% typical 4-week miss)
             </div>
         </header>

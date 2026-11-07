@@ -56,6 +56,8 @@
         .chip.type { color: var(--accent-cyan); background: #F0F9FF; border-color: #BAE6FD; }
         .chip.rush { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
         .chip.remake { color: #92400E; background: #FEF3C7; border-color: #FDE68A; }
+        .remake-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+        .remake-reason { padding: 5px 11px; border-radius: 9px; background: #FEF3C7; color: #92400E; font-size: 12.5px; font-weight: 600; }
         .chip.due-overdue { color: var(--crit); background: var(--crit-bg); border-color: var(--crit-line); }
         .chip.due-today, .chip.due-soon { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
         .chip.due-later, .chip.due-none { color: #475569; background: #F1F5F9; border-color: #E2E8F0; }
@@ -141,6 +143,7 @@
 <body>
     {% from 'partials/case_files.html' import file_grid, file_viewer %}
     {% from 'partials/tooth_chart.html' import tooth_chart as draw_tooth_chart %}
+    {% from 'partials/previous_job_order.html' import prev_jo_button, prev_jo_dialog %}
     {% set status_labels = {
         'assigned': 'Assigned', 'pending': 'Assigned', 'new': 'Assigned',
         'in_progress': 'In progress', 'cad_designing': 'CAD designing', 'wax_up_or_try_in': 'Wax-up / setup',
@@ -166,10 +169,16 @@
                 <p>Technician bench · {{ profile.display_name }}</p>
             </div>
         </div>
-        <a href="{{ url_for('technician_dashboard') }}" class="btn btn-ghost">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-            Back to pipeline
-        </a>
+        <div style="display: flex; gap: 8px;">
+            <a href="{{ url_for('print_job_order', case_id=case.id) }}" class="btn btn-ghost" target="_blank" rel="noopener">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print job order
+            </a>
+            <a href="{{ url_for('technician_dashboard') }}" class="btn btn-ghost">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to pipeline
+            </a>
+        </div>
     </header>
 
     <main class="container">
@@ -196,6 +205,13 @@
                 <div><dt>Due</dt><dd>{% if case.due_date %}<time data-date datetime="{{ case.due_date }}">{{ case.due_date }}</time>{% else %}Not set{% endif %}{% if case.due_state in ['overdue', 'today', 'soon'] %}<span>{{ case.due_label }}</span>{% endif %}</dd></div>
                 <div><dt>Units</dt><dd>{{ units }} unit{{ 's' if units != 1 }}<span>Received <time data-date datetime="{{ (case.created_at or '')[:10] }}">{{ (case.created_at or '')[:10] }}</time></span></dd></div>
             </dl>
+
+            {% if case.remake_of %}
+                <div class="remake-links">
+                    <span class="remake-reason">Remake of <strong>#{{ parent.case_number if parent else 'an earlier job order' }}</strong>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>
+                    {{ prev_jo_button(case.remake_of, 'View original job order' ~ (' #' ~ parent.case_number if parent else '')) }}
+                </div>
+            {% endif %}
 
             {% if case.status == 'needs_revision' %}
                 <div class="banner warn" role="status"><strong>Returned to the clinic.</strong> {{ case.revision_notes or 'Waiting for the dentist to resubmit.' }}</div>
@@ -269,40 +285,20 @@
                             <button type="submit" class="btn btn-primary" style="width: 100%;">Submit for QC review</button>
                         </form>
                     {% elif next_stages %}
-                        <form method="POST" action="/technician/cases/{{ case.id }}/update-status" id="moveForm" data-materials="{{ case.material_mix }}">
+                        <form method="POST" action="/technician/cases/{{ case.id }}/update-status" id="moveForm" data-case-id="{{ case.id }}" data-case-number="{{ case.case_number }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <label class="field-label" for="moveStage">Move to</label>
                             <select class="input" id="moveStage" name="status">
                                 {% for value, label in next_stages %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
                             </select>
                             <div class="mat-log" id="matLog" hidden>
-                                <span class="field-label">Material used <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></span>
-                                <p class="hint" id="matHint" style="margin-bottom: 8px;">Portion = how much of one disc, block or bottle this job order used.</p>
+                                <span class="field-label">Material used <span style="font-weight: 400; color: var(--text-muted);">(required)</span></span>
+                                <p class="hint" id="matHint" style="margin-bottom: 8px;"></p>
                                 <div id="matRows"></div>
                                 <button type="button" class="btn btn-ghost btn-sm" id="addMatRow">+ Add material</button>
                             </div>
                             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Move job order</button>
                         </form>
-                        <template id="matRowTpl">
-                            <div class="mat-row">
-                                <label><small class="mat-label">Material</small>
-                                    <select class="input" name="logged_materials">
-                                        {% if inventory_items %}
-                                            <option value="">Choose from Inventory…</option>
-                                            {% for category, items in inventory_items | groupby('category') %}
-                                                <optgroup label="{{ category }}">
-                                                    {% for item in items %}<option value="{{ item.id }}" data-name="{{ item.item_name | lower }}">{{ item.item_name }} ({{ '%g' | format((item.quantity or 0) | float) }} {{ item.unit or '' }} left)</option>{% endfor %}
-                                                </optgroup>
-                                            {% endfor %}
-                                        {% else %}
-                                            <option value="">No materials in Inventory yet</option>
-                                        {% endif %}
-                                    </select>
-                                </label>
-                                <label><small>Portion %</small><input class="input" type="number" name="logged_percentages" min="1" max="100" step="1" placeholder="5"></label>
-                                <button type="button" class="row-remove" aria-label="Remove this material">×</button>
-                            </div>
-                        </template>
                     {% else %}
                         <div class="note-box">{% if case.status == 'needs_revision' %}Waiting for the dentist to resubmit.{% else %}This job order has left the bench, so there's nothing to move here.{% endif %}</div>
                     {% endif %}
@@ -379,6 +375,7 @@
         </div>
     </main>
 
+    {% include 'partials/material_log.html' %}
     <script>
         document.querySelectorAll('time[datetime]').forEach((el) => {
             const raw = el.getAttribute('datetime');
@@ -390,47 +387,32 @@
                 : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
         });
 
-        // Move this job order: at Milling, Packing and Finishing, offer material rows. At Milling,
-        // each prescribed material and shade gets a row with its stock pre-picked and ~5% of a
-        // disc per unit filled in. Empty rows are dropped before sending.
+        // Move this job order: at Milling, Packing and Finishing at least one material must be
+        // logged. Rows are pre-filled from the usage rules (partials/material_log.html).
         const moveForm = document.getElementById('moveForm');
         if (moveForm) {
             const LOG_STAGES = {{ material_log_stages | list | tojson }};
             const stage = document.getElementById('moveStage');
             const matLog = document.getElementById('matLog');
             const rows = document.getElementById('matRows');
-            const tpl = document.getElementById('matRowTpl');
-            const addRow = (label) => {
-                rows.append(tpl.content.cloneNode(true));
-                const row = rows.lastElementChild;
-                if (label) row.querySelector('.mat-label').textContent = label;
-                return row;
-            };
             const refresh = () => {
                 rows.replaceChildren();
                 matLog.hidden = !LOG_STAGES.includes(stage.value);
-                if (matLog.hidden) return;
-                const prescribed = stage.value === 'milling_or_printing'
-                    ? (moveForm.dataset.materials || '').split(',').filter(Boolean) : [];
-                prescribed.forEach((part) => {
-                    const [material, shade, units] = part.split(':');
-                    const n = parseInt(units, 10) || 1;
-                    const pretty = material.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-                    const row = addRow(`${pretty}${shade ? ' · ' + shade : ''} · ${n} unit${n === 1 ? '' : 's'}`);
-                    const picked = pickStockFor(row.querySelector('select'), material, shade);
-                    if (picked && /zircon|sagemax/.test(picked)) {
-                        row.querySelector('input').value = Math.min(100, Math.max(1, Math.round(n / 21.5 * 100)));
-                    }
-                });
-                if (!prescribed.length) addRow();
+                if (!matLog.hidden) MaterialLog.load(rows, moveForm.dataset.caseId, stage.value, document.getElementById('matHint'));
             };
             stage.addEventListener('change', refresh);
-            document.getElementById('addMatRow').addEventListener('click', () => addRow());
-            rows.addEventListener('click', (e) => { if (e.target.closest('.row-remove')) e.target.closest('.mat-row').remove(); });
-            moveForm.addEventListener('submit', () => {
-                rows.querySelectorAll('.mat-row').forEach((row) => {
-                    if (!row.querySelector('select').value || !row.querySelector('input').value) row.remove();
-                });
+            document.getElementById('addMatRow').addEventListener('click', () => MaterialLog.addRow(rows));
+            let confirmed = false;
+            moveForm.addEventListener('submit', async (e) => {
+                if (matLog.hidden || confirmed) return;
+                e.preventDefault();
+                const result = MaterialLog.collect(rows);
+                if (result.error) { MaterialLog.explain(result, moveForm.dataset.caseId); return; }
+                const stageName = stage.selectedOptions[0] ? stage.selectedOptions[0].textContent.trim() : stage.value;
+                if (!(await MaterialLog.confirm(result.rows, moveForm.dataset.caseNumber, stageName))) return;
+                MaterialLog.attach(moveForm, result.rows);
+                confirmed = true;
+                moveForm.submit();
             });
             refresh();
         }
@@ -443,5 +425,7 @@
         });
     </script>
     {{ file_viewer() }}
+    {{ prev_jo_dialog() }}
+    {% include 'partials/action_notice.html' %}
 </body>
 </html>

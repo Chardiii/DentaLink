@@ -1,0 +1,110 @@
+{# Body of the "original job order" pop-up, rendered by app.previous_job_order() and
+   inserted into the dialog from partials/previous_job_order.html. Read-only. #}
+{% from 'partials/case_files.html' import file_grid %}
+{% set status_labels = {
+    "draft": "Draft", "submitted": "Waiting for the lab", "assigned": "Assigned", "in_progress": "In production",
+    "cad_designing": "CAD design", "wax_up_or_try_in": "Wax-up / setup", "milling_or_printing": "Milling / printing",
+    "packing_and_curing": "Packing & curing", "finishing_and_quality_check": "Finishing", "pending_admin_review": "Lab QC",
+    "ready_for_dispatch": "Packed for dispatch", "in_transit": "In transit", "delivered": "Delivered",
+    "completed": "Completed", "cancelled": "Cancelled", "needs_revision": "Returned to dentist"} %}
+<div class="pjo-head">
+    <div>
+        <span class="pjo-eyebrow">Original job order</span>
+        <h2 class="pjo-title" id="pjoTitle">#{{ case.case_number }}</h2>
+        <div class="pjo-chips">
+            <span class="pjo-chip">{{ (case.case_type or 'Restoration') | replace('_', ' ') | title }}</span>
+            <span class="pjo-chip {{ 'ok' if case.status in ['delivered', 'completed'] }}">{{ status_labels.get(case.status, case.status | replace('_', ' ') | capitalize) }}</span>
+            {% if case.remake_of %}<span class="pjo-chip remake">Also a remake</span>{% endif %}
+        </div>
+    </div>
+    {% if remakes %}
+        <div class="pjo-remade">
+            {% for rm in remakes %}<span>Remade as <strong>#{{ rm.case_number }}</strong></span>{% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+{% set remake_reports = reports | selectattr('status', 'equalto', 'remake_accepted') | list %}
+<section class="pjo-why" aria-labelledby="pjoWhy">
+    <h3 id="pjoWhy">Why it was remade</h3>
+    {% for r in (remake_reports or reports) %}
+        <div class="pjo-report">
+            <div class="pjo-report-head">
+                <strong>{{ issue_types.get(r.issue_type, r.issue_type | replace('_', ' ') | capitalize) }}</strong>
+                <span class="pjo-muted">Reported by the clinic <time datetime="{{ r.created_at }}">{{ (r.created_at or '')[:10] }}</time></span>
+            </div>
+            {% if r.details %}<p class="pjo-quote">“{{ r.details }}”</p>{% endif %}
+            <div class="pjo-decision">
+                {% if r.status == 'remake_accepted' %}Lab accepted a remake{% if r.remake_number %} (#{{ r.remake_number }}){% endif %}.
+                {% elif r.status == 'open' %}Still under review by the lab.
+                {% else %}Lab decided no remake was needed.{% endif %}
+                {% if r.admin_note %}<br><strong>Lab note:</strong> {{ r.admin_note }}{% endif %}
+                {% if r.return_requested %}<br>The clinic was asked to send the original restoration back.{% endif %}
+            </div>
+        </div>
+    {% else %}
+        <p class="pjo-muted">No issue report was recorded for this job order. The remake may have been arranged directly with the lab.</p>
+    {% endfor %}
+</section>
+
+<dl class="pjo-facts">
+    <div><dt>Patient</dt><dd>{{ case.patient_name or '—' }}</dd></div>
+    <div><dt>Technician</dt><dd>{{ technician_name or 'Not assigned' }}</dd></div>
+    <div><dt>Sent</dt><dd><time data-date datetime="{{ (case.created_at or '')[:10] }}">{{ (case.created_at or '')[:10] or '—' }}</time></dd></div>
+    <div><dt>Due</dt><dd>{% if case.due_date %}<time data-date datetime="{{ case.due_date }}">{{ case.due_date }}</time>{% else %}Not set{% endif %}</dd></div>
+    <div><dt>Delivered</dt><dd>{% if case.delivered_at %}<time datetime="{{ case.delivered_at }}">{{ case.delivered_at[:10] }}</time>{% if receipt.late_days %} <span class="pjo-late">{{ receipt.late_days }} day{{ 's' if receipt.late_days != 1 }} late</span>{% endif %}{% else %}—{% endif %}</dd></div>
+</dl>
+
+<section class="pjo-section" aria-labelledby="pjoRx">
+    <h3 id="pjoRx">Prescription</h3>
+    <div class="pjo-instructions {{ 'empty' if not case.instructions }}">{{ case.instructions or 'No special instructions.' }}</div>
+    {% if material_summary %}
+        <div class="pjo-mix">{% for m in material_summary %}<span><strong>{{ m.units }} × {{ m.material }}</strong>{% if m.shade %} · shade {{ m.shade }}{% endif %}</span>{% endfor %}</div>
+    {% endif %}
+    <div class="pjo-table-wrap">
+        <table class="pjo-table">
+            <thead><tr><th scope="col">Tooth</th><th scope="col">Restoration</th><th scope="col">Material</th><th scope="col">Shade</th><th scope="col">Notes</th></tr></thead>
+            <tbody>
+                {% for t in case.teeth %}
+                    <tr>
+                        <td><strong class="pjo-tooth">#{{ t.tooth_number }}</strong></td>
+                        <td>{{ (t.restoration_type or case.case_type or '—') | replace('_', ' ') | title }}</td>
+                        <td>{{ (t.material or 'Not specified') | replace('_', ' ') | title }}</td>
+                        <td>{{ t.shade or '—' }}</td>
+                        <td class="pjo-muted">{{ t.notes or '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="pjo-muted" style="text-align: center;">No teeth recorded.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="pjo-section" aria-labelledby="pjoFiles">
+    <h3 id="pjoFiles">Scans &amp; photos <span class="pjo-muted">({{ files | length }})</span></h3>
+    {{ file_grid(files, "No scans or photos were attached to this job order.") }}
+</section>
+
+{% if history %}
+<section class="pjo-section" aria-labelledby="pjoHistory">
+    <h3 id="pjoHistory">Progress history</h3>
+    <ol class="pjo-timeline">
+        {% for h in history %}
+            {% set label = (h.status or '') | replace('_', ' ') %}
+            <li>
+                <strong>{{ label[:1] | upper }}{{ label[1:] }}</strong>
+                <span class="pjo-muted"><time datetime="{{ h.created_at }}">{{ (h.created_at or '')[:16] | replace('T', ' ') }}</time> · {{ h.actor_name }}</span>
+                {% if h.notes and 'by ' not in h.notes[:30] %}<div class="pjo-note">{{ h.notes }}</div>{% endif %}
+            </li>
+        {% endfor %}
+    </ol>
+</section>
+{% endif %}
+
+{% if parent %}
+    <div class="pjo-chain">
+        <span>This job order was itself a remake of <strong>#{{ parent.case_number }}</strong>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>
+        <button type="button" class="pjo-btn" data-prev-jo="{{ url_for('previous_job_order', case_id=parent.id) }}">View #{{ parent.case_number }}</button>
+    </div>
+{% endif %}

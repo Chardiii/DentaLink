@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, g
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, g, make_response, jsonify
 from markupsafe import Markup
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -65,6 +65,26 @@ APP_URL = _normalize_app_url(os.getenv("APP_URL"))
 # profile records which version the user accepted (profiles.terms_version).
 TERMS_VERSION = "2026-11-04"
 app.jinja_env.globals["terms_version"] = TERMS_VERSION
+def _use_http1_for_database():
+    """Make Supabase's database client (postgrest) use HTTP/1.1 instead of HTTP/2.
+
+    postgrest shares one HTTP/2 connection between all request threads. On Windows, overlapping
+    requests on it (e.g. a page load and a live-update poll) intermittently fail with
+    "[WinError 10035] A non-blocking socket operation could not be completed immediately".
+    With HTTP/1.1 each request takes its own connection from a pool, which avoids that.
+    """
+    from postgrest import SyncPostgrestClient
+    from postgrest.utils import SyncClient
+
+    def create_session(self, base_url, headers, timeout, verify=True, proxy=None):
+        return SyncClient(base_url=base_url, headers=headers, timeout=timeout, verify=verify,
+                          proxy=proxy, follow_redirects=True, http2=False)
+
+    SyncPostgrestClient.create_session = create_session
+
+
+_use_http1_for_database()  # must run before the clients below are created
+
 supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
@@ -1071,6 +1091,18 @@ def update_case_status(case_id):
         if new_status not in allowed_statuses:
             return "Invalid status selection.", 400
 
+        # Milling, packing and finishing must log the material used (there is no "skip").
+        # Rows are checked before anything changes, so a bad row never half-applies.
+        material_entries = []
+        if new_status in MATERIAL_LOG_STAGES:
+            material_entries, material_error = _parse_material_log(request.form)
+            if material_error:
+                # Back to the page the technician came from, with the reason in a pop-up.
+                from urllib.parse import urlparse
+                back = urlparse(request.referrer or "").path
+                flash(material_error, "material-blocked")
+                return redirect(back if back.startswith("/technician") else url_for("technician_dashboard"))
+
         # Fetch Case info; only cases still on the bench can change stage (an old browser tab
         # must not pull a delivered or in-transit case back into production).
         case_res = supabase_admin.table("dental_cases").select("dentist_id, case_number, status").eq("id", case_id).eq("technician_id", user_id).execute()
@@ -1115,42 +1147,11 @@ def update_case_status(case_id):
             print(f"History log error: {str(hist_err)}")
 
         # ==========================================
-        # MATERIAL USE: deduct the logged portion from the chosen Inventory items
+        # MATERIAL USE: amounts from the usage rules (confirmed by the technician) and discs
         # ==========================================
-        # The form sends Inventory item ids (from the technician's material picker) and the
-        # portion of one unit used, e.g. 5 = 5% of a zirconia disc. Unknown items are skipped,
-        # never created, and stock never goes below zero.
-        logged_materials = request.form.getlist("logged_materials")
-        logged_percentages = request.form.getlist("logged_percentages")
-        for item_ref, percent_str in zip(logged_materials, logged_percentages):
-            try:
-                percent = float(percent_str)
-            except (TypeError, ValueError):
-                continue
-            if not 0 < percent <= 100:
-                continue
-            try:
-                rows = supabase_admin.table("inventory").select("*").eq("id", item_ref).execute().data or []
-                if not rows:
-                    app.logger.warning("Material log for case %s skipped: no inventory item %r", case_number, item_ref)
-                    continue
-                item = rows[0]
-                current_qty = float(item.get("quantity") or 0)
-                new_qty = round(max(current_qty - percent / 100.0, 0.0), 2)
-                supabase_admin.table("inventory").update({"quantity": new_qty}).eq("id", item["id"]).execute()
-                supabase_admin.table("inventory_logs").insert({
-                    "inventory_id": item["id"],
-                    "user_id": user_id,
-                    "action_type": "case_deduction",
-                    "quantity_changed": round(new_qty - current_qty, 2),
-                    "previous_quantity": current_qty,
-                    "new_quantity": new_qty,
-                    "notes": f"Used {percent:g}% of a {item.get('unit') or 'unit'} at "
-                             f"{status_labels.get(new_status, new_status).replace('in ', '', 1)} for Case {case_number}"
-                             + (" (stock was already 0; count it in Inventory)" if current_qty <= 0 else ""),
-                }).execute()
-            except Exception:
-                app.logger.exception("Material deduction error for %r", item_ref)
+        if material_entries:
+            _apply_material_log(material_entries, case_id, case_number,
+                                status_labels.get(new_status, new_status).replace("in ", "", 1), user_id)
 
         # 1. Notify the Dentist
         create_notification(
@@ -1634,6 +1635,26 @@ def dentist_dashboard():
                 c["month_key"] = received.astimezone(LAB_TZ).strftime("%Y-%m") if received else ""
             completed_cases.sort(key=lambda c: c.get("delivered_at") or "", reverse=True)
 
+        # Previous patients for the intake form's name autocomplete:
+        # one entry per name (case and spacing ignored), most recent first.
+        patient_history = {}
+        for c in dental_cases:  # already newest first
+            name = " ".join((c.get("patient_name") or "").split())
+            if not name:
+                continue
+            key = name.casefold()
+            entry = patient_history.get(key)
+            if entry:
+                entry["count"] += 1
+            else:
+                patient_history[key] = {
+                    "name": name,
+                    "count": 1,
+                    "last_date": (c.get("created_at") or "")[:10],
+                    "last_type": (c.get("case_type") or "").replace("_", " "),
+                }
+        patient_suggestions = list(patient_history.values())
+
         # =========================
         # 7. GET RECENT NOTIFICATIONS
         # =========================
@@ -1665,6 +1686,7 @@ def dentist_dashboard():
             ready_cases=ready_cases,
             completed_cases=completed_cases,
             draft_cases=draft_cases,
+            patient_suggestions=patient_suggestions,
             notifications=notifications
         )
 
@@ -2660,8 +2682,6 @@ def technician_dashboard():
                 case["teeth"] = []
                 case["case_teeth"] = []
 
-        for case in assigned_cases:
-            case["material_mix"] = _material_mix(case.get("case_teeth"))
         inventory_items = _picker_inventory()
 
         # Due-date urgency for the pipeline cards (lab time). Within a stage, rush cases come
@@ -2751,21 +2771,236 @@ BENCH_FLOW = (
 MATERIAL_LOG_STAGES = ("milling_or_printing", "packing_and_curing", "finishing_and_quality_check")
 
 
-def _material_mix(teeth):
-    """What a case is made from, for the material log: "material:shade:units" per distinct
-    material and shade, e.g. "zirconia:A2:3,emax:A1:1"."""
-    mix = {}
-    for tooth in teeth or []:
-        key = ((tooth.get("material") or "").strip(), (tooth.get("shade") or "").strip())
-        if key[0]:
-            mix[key] = mix.get(key, 0) + 1
-    return ",".join(f"{m}:{s}:{n}" for (m, s), n in mix.items())
+
+
+USAGE_BASIS_LABELS = {"unit": "per unit", "arch": "per arch", "case": "per case"}
+
+
+def _disc_token(shade):
+    """Which zirconia disc a shade is milled from (mirrors ml_models/lab_profile.py): A1/B1 from
+    A1, A2/B2/C1 from A2, bleach and OM shades from OM, darker shades from A3."""
+    s = (shade or "").upper().replace(" ", "")
+    if s in ("A1", "B1"):
+        return "a1"
+    if s in ("A2", "B2", "C1"):
+        return "a2"
+    if s.startswith(("BL", "OM")):
+        return "om"
+    return "a3"
+
+
+def _rule_tokens(text):
+    return [t.strip().lower() for t in (text or "").split(",") if t.strip()]
+
+
+def _usage_plan(case, teeth, stage, items):
+    """Suggested material rows for a case moving to `stage`, from each Inventory item's rule.
+
+    A rule applies to a tooth when one of its words is the tooth's prescribed material
+    (zirconia, emax...) or appears in the case type (e.g. "denture"); a rule with no words
+    applies to every case. Disc items (tracks_discs) are split by shade, so each zirconia
+    tooth is counted against the disc it is milled from. Amounts are in the item's own unit.
+    """
+    import re
+    case_type = (case.get("case_type") or "").lower()
+
+    def applies(tokens, tooth):
+        material = (tooth.get("material") or "").lower()
+        return not tokens or any(t == material or t in case_type for t in tokens)
+
+    rules = [i for i in items if i.get("usage_stage") == stage and float(i.get("usage_amount") or 0) > 0]
+    disc_items = [i for i in rules if i.get("tracks_discs")]
+    disc_of_tooth = {}
+    for idx, tooth in enumerate(teeth):
+        candidates = [i for i in disc_items if applies(_rule_tokens(i.get("usage_applies_to")), tooth)]
+        if candidates:
+            token = _disc_token(tooth.get("shade"))
+            words = lambda i: [w for w in re.split(r"[\s/()\-]+", i["item_name"].lower()) if w]
+            pick = next((i for i in candidates if any(w.startswith(token) for w in words(i))), candidates[0])
+            disc_of_tooth[idx] = pick["id"]
+
+    rows = []
+    for item in rules:
+        tokens = _rule_tokens(item.get("usage_applies_to"))
+        if item.get("tracks_discs"):
+            matched = [t for idx, t in enumerate(teeth) if disc_of_tooth.get(idx) == item["id"]]
+        else:
+            matched = [t for t in teeth if applies(tokens, t)]
+        if not matched and not (teeth == [] and (not tokens or any(t in case_type for t in tokens))):
+            continue
+        basis = item.get("usage_basis") or "unit"
+        arches = len({"upper" if str(t.get("tooth_number"))[:1] in "12" else "lower" for t in matched
+                      if str(t.get("tooth_number"))[:1] in "1234"}) or 1
+        count = {"unit": max(len(matched), 1), "arch": arches, "case": 1}[basis]
+        per = float(item["usage_amount"])
+        unit = item.get("unit") or "unit"
+        shades = sorted({t.get("shade") for t in matched if t.get("shade")})
+        what = {"unit": f"{count} unit{'s' if count != 1 else ''}", "arch": f"{count} arch{'es' if count != 1 else ''}",
+                "case": "this case"}[basis]
+        rows.append({
+            "inventory_id": item["id"],
+            "item_name": item["item_name"],
+            "unit": unit,
+            "amount": round(per * count, 3),
+            "units": len(matched),
+            "tracks_discs": bool(item.get("tracks_discs")),
+            "reason": f"{what}{' · ' + ', '.join(shades) if shades else ''} × {per:g} {unit} {USAGE_BASIS_LABELS[basis]}",
+        })
+    return rows
+
+
+def _disc_units(disc_ids):
+    """Units milled so far from each disc."""
+    if not disc_ids:
+        return {}
+    rows = supabase_admin.table("zirconia_disc_usage").select("disc_id, units").in_("disc_id", list(disc_ids)).execute().data or []
+    totals = {}
+    for r in rows:
+        totals[r["disc_id"]] = totals.get(r["disc_id"], 0) + int(r["units"])
+    return totals
+
+
+def _open_discs(item_ids):
+    """Open discs of these Inventory items, oldest first, with the units milled from each."""
+    if not item_ids:
+        return {}
+    discs = (supabase_admin.table("zirconia_discs").select("id, inventory_id, label, opened_at")
+             .in_("inventory_id", list(item_ids)).eq("status", "open").order("opened_at").execute().data or [])
+    units = _disc_units([d["id"] for d in discs])
+    by_item = {}
+    for d in discs:
+        by_item.setdefault(d["inventory_id"], []).append({"id": d["id"], "label": d["label"], "units": units.get(d["id"], 0)})
+    return by_item
+
+
+def _parse_material_log(form):
+    """Read and check the material rows sent with a stage change.
+
+    Each row sends log_item, log_amount (non-disc items, in the item's unit), log_disc (an
+    open disc's id), log_new_disc (the ID written on a newly opened disc), log_units (units
+    milled from the disc) and log_used_up ("1" when the disc is finished). Returns
+    (entries, error); entries hold the Inventory item and, for discs, the disc to use.
+    """
+    keys = ("log_item", "log_amount", "log_disc", "log_new_disc", "log_units", "log_used_up")
+    columns = [form.getlist(k) for k in keys]
+    n = len(columns[0])
+    if any(len(c) != n for c in columns):
+        return [], "The material rows were incomplete. Reload the page and try again."
+    rows = [dict(zip(keys, values)) for values in zip(*columns)]
+    rows = [r for r in rows if r["log_item"]]
+    if not rows:
+        return [], "Log at least one material used at this stage."
+    ids = list({r["log_item"] for r in rows})
+    items = {i["id"]: i for i in (supabase_admin.table("inventory").select("*").in_("id", ids).execute().data or [])}
+    entries = []
+    for r in rows:
+        item = items.get(r["log_item"])
+        if not item:
+            return [], "One of the materials is no longer in Inventory. Reload the page and try again."
+        if item.get("tracks_discs"):
+            try:
+                units = int(r["log_units"])
+            except (TypeError, ValueError):
+                units = 0
+            if not 1 <= units <= 99:
+                return [], f"Enter how many units were milled from the {item['item_name']} disc (1–99)."
+            disc, label = None, " ".join((r["log_new_disc"] or "").split())[:40]
+            if r["log_disc"]:
+                found = (supabase_admin.table("zirconia_discs").select("*").eq("id", r["log_disc"])
+                         .eq("inventory_id", item["id"]).execute().data or [])
+                if not found or found[0]["status"] != "open":
+                    return [], f"That {item['item_name']} disc is no longer open. Reload the page and choose another."
+                disc = found[0]
+            elif label:
+                same = [d for d in (supabase_admin.table("zirconia_discs").select("*").eq("inventory_id", item["id"])
+                                    .ilike("label", label).execute().data or []) if d["label"].lower() == label.lower()]
+                if same and same[0]["status"] != "open":
+                    return [], f"Disc {label} of {item['item_name']} was already used up. Check the ID on the box."
+                disc = same[0] if same else None
+            else:
+                return [], f"Choose the open {item['item_name']} disc, or enter the ID written on the new disc's box."
+            entries.append({"item": item, "disc": disc, "new_label": None if disc else label, "units": units,
+                            "used_up": r["log_used_up"] == "1"})
+        else:
+            try:
+                amount = float(r["log_amount"])
+            except (TypeError, ValueError):
+                amount = 0
+            if not 0 < amount <= 1000:
+                return [], f"Enter how much {item['item_name']} was used, in {item.get('unit') or 'units'}."
+            entries.append({"item": item, "amount": round(amount, 3)})
+
+    # Block the stage change when Inventory doesn't have enough of a material: amounts used,
+    # and one sealed disc for each newly opened disc (milling from an open disc needs none).
+    needed = {}
+    for e in entries:
+        if "amount" in e:
+            needed[e["item"]["id"]] = needed.get(e["item"]["id"], 0) + e["amount"]
+        elif e["disc"] is None:
+            needed[e["item"]["id"]] = needed.get(e["item"]["id"], 0) + 1
+    short = []
+    for item_id, need in needed.items():
+        item = items[item_id]
+        have = float(item.get("quantity") or 0)
+        if have + 1e-9 < need:
+            unit = item.get("unit") or "unit"
+            short.append(f"{item['item_name']} (needs {need:g} {unit}, Inventory has {have:g})")
+    if short:
+        return [], ("Not enough stock in Inventory: " + "; ".join(short) + ". The case can't move to this stage "
+                    "until the admin restocks it or corrects the count. Send a request with \"Running low on a "
+                    "material?\" on the job order page.")
+    return entries, None
+
+
+def _log_inventory(item, user_id, action, change, notes):
+    """Change an item's stock by `change` (never below zero) and record it in inventory_logs."""
+    current = float(item.get("quantity") or 0)
+    new = round(max(current + change, 0.0), 3)
+    if new != current:
+        supabase_admin.table("inventory").update({"quantity": new}).eq("id", item["id"]).execute()
+    item["quantity"] = new
+    supabase_admin.table("inventory_logs").insert({
+        "inventory_id": item["id"], "user_id": user_id, "action_type": action,
+        "quantity_changed": round(new - current, 3), "previous_quantity": current, "new_quantity": new,
+        "notes": notes + (" (stock was already 0; count it in Inventory)" if change < 0 and current <= 0 else ""),
+    }).execute()
+
+
+def _apply_material_log(entries, case_id, case_number, stage_label, user_id):
+    """Record checked material rows: deduct amounts, open discs, record units milled per disc."""
+    for e in entries:
+        item = e["item"]
+        unit = item.get("unit") or "unit"
+        try:
+            if "amount" in e:
+                _log_inventory(item, user_id, "case_deduction", -e["amount"],
+                               f"Used {e['amount']:g} {unit} at {stage_label} for Case {case_number}")
+                continue
+            disc = e["disc"]
+            if disc is None:  # a newly opened disc: one whole disc leaves the shelf
+                disc = supabase_admin.table("zirconia_discs").insert({
+                    "inventory_id": item["id"], "label": e["new_label"], "opened_by": user_id,
+                }).execute().data[0]
+                _log_inventory(item, user_id, "disc_opened", -1,
+                               f"Opened disc {disc['label']} at {stage_label} for Case {case_number}")
+            supabase_admin.table("zirconia_disc_usage").insert({
+                "disc_id": disc["id"], "case_id": case_id, "units": e["units"], "logged_by": user_id,
+            }).execute()
+            note = f"Milled {e['units']} unit{'s' if e['units'] != 1 else ''} from disc {disc['label']} at {stage_label} for Case {case_number}"
+            if e["used_up"]:
+                supabase_admin.table("zirconia_discs").update({
+                    "status": "used_up", "used_up_at": _now_iso(), "used_up_by": user_id,
+                }).eq("id", disc["id"]).execute()
+                note += f"; disc used up after {_disc_units([disc['id']]).get(disc['id'], e['units'])} units"
+            _log_inventory(item, user_id, "disc_use", 0, note)
+        except Exception:
+            app.logger.exception("Material log error for %s on case %s", item.get("item_name"), case_number)
 
 
 def _picker_inventory():
     """Inventory items a technician can log material use against, grouped by category."""
     try:
-        items = (supabase_admin.table("inventory").select("id, item_name, category, quantity, unit")
+        items = (supabase_admin.table("inventory").select("id, item_name, category, quantity, unit, tracks_discs")
                  .order("category").order("item_name").execute().data or [])
     except Exception:
         app.logger.exception("Unable to load inventory for the material picker")
@@ -2817,7 +3052,8 @@ def _materials_used(case_number):
     import re
     exact = re.compile(rf"Case {re.escape(case_number)}(?![\w-])")   # DL-0001 must not match DL-00018
     logs = [l for l in logs if exact.search(l.get("notes") or "")
-            and (l.get("action_type") in ("case_deduction", "auto_created_and_deducted") or float(l.get("quantity_changed") or 0) < 0)]
+            and (l.get("action_type") in ("case_deduction", "auto_created_and_deducted", "disc_use", "disc_opened")
+                 or float(l.get("quantity_changed") or 0) < 0)]
     ids = list({l["inventory_id"] for l in logs if l.get("inventory_id")})
     items = {}
     if ids:
@@ -2827,9 +3063,24 @@ def _materials_used(case_number):
         item = items.get(l.get("inventory_id"), {})
         l["item_name"] = item.get("item_name") or "A deleted material"
         unit = item.get("unit") or "unit"
-        # The note records the portion used even when stock was already 0 (no quantity change).
-        portion = re.search(r"(?:Used|Deducted) ([\d.]+)%", l.get("notes") or "")
-        l["portion"] = f"{float(portion.group(1)):g}% of a {unit}" if portion else f"{abs(float(l.get('quantity_changed') or 0)):g} {unit}"
+        notes = l.get("notes") or ""
+        # The note records what was used even when stock was already 0 (no quantity change).
+        milled = re.search(r"Milled (\d+) units? from disc (.+?) at ", notes)
+        opened = re.search(r"Opened disc (.+?) at ", notes)
+        amount = re.search(r"Used ([\d.]+) ", notes)
+        portion = re.search(r"(?:Used|Deducted) ([\d.]+)%", notes)   # entries from before usage rules
+        if milled:
+            l["portion"] = f"{milled.group(1)} unit{'s' if milled.group(1) != '1' else ''} from disc {milled.group(2)}"
+            if "used up" in notes:
+                l["portion"] += " (disc used up)"
+        elif opened:
+            l["portion"] = f"Opened new disc {opened.group(1)} (1 {unit} from stock)"
+        elif portion:
+            l["portion"] = f"{float(portion.group(1)):g}% of a {unit}"
+        elif amount:
+            l["portion"] = f"{float(amount.group(1)):g} {unit}"
+        else:
+            l["portion"] = f"{abs(float(l.get('quantity_changed') or 0)):g} {unit}"
         stage = re.search(r" at (.+?) (?:stage )?for Case", l.get("notes") or "")
         l["stage"] = stage.group(1).strip("[]").replace("_", " ") if stage else ""
     return logs
@@ -2863,6 +3114,27 @@ def _case_file_links(files):
     return files
 
 
+@app.route("/technician/cases/<case_id>/material-plan")
+@role_required("technician")
+def technician_material_plan(case_id):
+    """Material rows to pre-fill when this case moves to `stage`: the usage rules applied to its
+    teeth, plus the open discs of every disc-tracked item (for picking which disc was milled)."""
+    stage = request.args.get("stage")
+    if stage not in MATERIAL_LOG_STAGES:
+        return jsonify(error="This stage doesn't log materials."), 400
+    cases = (supabase_admin.table("dental_cases").select("id, case_type").eq("id", case_id)
+             .eq("technician_id", g.profile["id"]).execute().data or [])
+    if not cases:
+        return jsonify(error="This job order isn't assigned to you."), 404
+    teeth = supabase_admin.table("case_teeth").select("tooth_number, material, shade").eq("case_id", case_id).execute().data or []
+    items = (supabase_admin.table("inventory")
+             .select("id, item_name, unit, usage_stage, usage_applies_to, usage_basis, usage_amount, tracks_discs")
+             .execute().data or [])
+    discs = _open_discs([i["id"] for i in items if i.get("tracks_discs")])
+    return jsonify(rows=_usage_plan(cases[0], teeth, stage, items), discs=discs,
+                   stage_label=dict(BENCH_FLOW).get(stage, stage))
+
+
 @app.route("/technician/cases/<case_id>")
 @role_required("technician")
 def view_case_details(case_id):
@@ -2888,9 +3160,14 @@ def view_case_details(case_id):
         case_history = (supabase_admin.table("case_status_history").select("*, profiles(display_name)")
                         .eq("case_id", case_id).order("created_at").execute().data or [])
 
+        parent = None
+        if case.get("remake_of"):
+            parents = (supabase_admin.table("dental_cases").select("id, case_number")
+                       .eq("id", case["remake_of"]).execute().data or [])
+            parent = parents[0] if parents else None
+
         today = datetime.now(LAB_TZ).date()
         case["due_state"], case["due_label"] = _due_status(case.get("due_date"), today)
-        case["material_mix"] = _material_mix(teeth)
         tooth_chart, teeth_off_chart = _tooth_chart(teeth)
         current = next((i for i, (value, _) in enumerate(BENCH_FLOW) if value == case.get("status")), None)
         next_stages = list(BENCH_FLOW[current + 1:]) if current is not None else []
@@ -2906,6 +3183,7 @@ def view_case_details(case_id):
             teeth=teeth,
             files=files,
             dentist=dentist,
+            parent=parent,
             case_history=case_history,
             material_summary=[{"material": m, "shade": s, "units": n} for (m, s), n in materials.items()],
             bench_statuses=BENCH_STATUSES,
@@ -3243,6 +3521,56 @@ def _job_order_context(case, include_internal=True):
         "teeth_off_chart": teeth_off_chart,
         "material_summary": [{"material": m, "shade": sh, "units": n} for (m, sh), n in materials.items()],
     }
+
+
+def _can_view_case(profile, case_id):
+    """Admins see every case. Dentists and technicians see their own cases, plus any earlier
+    job order that one of their remakes came from (walking down the remake chain)."""
+    if profile.get("role") == "admin":
+        return True
+    uid = profile["id"]
+    level, seen = [case_id], set()
+    for _ in range(10):  # remake chains are short; the cap guards against bad data
+        rows = (
+            supabase_admin.table("dental_cases").select("id, dentist_id, technician_id")
+            .in_("id", level).execute().data or []
+        )
+        if any(uid in (r.get("dentist_id"), r.get("technician_id")) for r in rows):
+            return True
+        seen.update(level)
+        children = (
+            supabase_admin.table("dental_cases").select("id")
+            .in_("remake_of", level).execute().data or []
+        )
+        level = [c["id"] for c in children if c["id"] not in seen]
+        if not level:
+            return False
+    return False
+
+
+@app.route("/job-orders/<case_id>/original")
+@role_required("admin", "technician", "dentist")
+def previous_job_order(case_id):
+    """Read-only summary of an earlier job order, shown in a pop-up from the remake that
+    replaced it: what was prescribed, what went wrong, and how the lab decided."""
+    try:
+        cases = supabase_admin.table("dental_cases").select("*").eq("id", case_id).execute().data or []
+        if not cases or not _can_view_case(g.profile, case_id):
+            return "This job order isn't available to you.", 404
+        case = cases[0]
+        ctx = _job_order_context(case, include_internal=g.profile.get("role") != "dentist")
+        remake_numbers = {rm["id"]: rm["case_number"] for rm in ctx["remakes"]}
+        for r in ctx["reports"]:
+            r["remake_number"] = remake_numbers.get(r.get("remake_case_id"))
+        return render_template(
+            "partials/previous_job_order_body.html",
+            case=case,
+            issue_types=ISSUE_TYPES,
+            **ctx,
+        )
+    except Exception:
+        app.logger.exception("Unable to load previous job order")
+        return "Unable to load this job order. Try again later.", 500
 
 
 @app.route("/admin/cases/<case_id>")
@@ -4446,10 +4774,52 @@ def admin_inventory():
             unassigned_cases=unassigned_cases,
             technicians=technicians,
             milling_cases=milling_cases,
-            qc_cases=qc_cases
+            qc_cases=qc_cases,
+            disc_overview=_disc_overview(inventory_items),
+            stage_labels=dict(BENCH_FLOW),
+            usage_basis_labels=USAGE_BASIS_LABELS,
         )
     except Exception as e:
         return f"Inventory error: {str(e)}", 500
+
+
+def _disc_overview(inventory_items):
+    """Zirconia discs for the Inventory page: open discs with units milled so far, recently
+    used-up discs with their real yield, and the average units per used-up disc for each item."""
+    names = {i["id"]: i["item_name"] for i in inventory_items}
+    try:
+        discs = supabase_admin.table("zirconia_discs").select("*").order("opened_at", desc=True).execute().data or []
+    except Exception:
+        app.logger.warning("zirconia_discs unavailable; run the material usage migration")
+        return {"open": [], "used_up": [], "yields": []}
+    units = _disc_units([d["id"] for d in discs])
+    for d in discs:
+        d["item_name"] = names.get(d["inventory_id"], "A deleted material")
+        d["units"] = units.get(d["id"], 0)
+    used = [d for d in discs if d["status"] == "used_up"]
+    yields = {}
+    for d in used:
+        yields.setdefault(d["item_name"], []).append(d["units"])
+    return {
+        "open": sorted((d for d in discs if d["status"] == "open"), key=lambda d: (d["item_name"], d["opened_at"])),
+        "used_up": used[:15],
+        "yields": [{"item_name": k, "discs": len(v), "average": round(sum(v) / len(v), 1), "lowest": min(v), "highest": max(v)}
+                   for k, v in sorted(yields.items())],
+    }
+
+
+@app.route("/admin/discs/<disc_id>/used-up", methods=["POST"])
+@role_required("admin")
+def admin_mark_disc_used_up(disc_id):
+    """For a disc the technician forgot to mark as used up when it ran out."""
+    updated = (supabase_admin.table("zirconia_discs").update({
+        "status": "used_up", "used_up_at": _now_iso(), "used_up_by": g.profile["id"],
+    }).eq("id", disc_id).eq("status", "open").execute().data or [])
+    if updated:
+        flash(f"Disc {updated[0]['label']} is marked as used up.", "inventory-added")
+    else:
+        flash("That disc was already marked as used up.", "inventory-stale")
+    return redirect(url_for("admin_inventory"))
 
 
 # =========================
@@ -4486,6 +4856,29 @@ def _inventory_details_from_form():
         raise ValueError("Choose a category.")
     if not details["unit"]:
         raise ValueError("Enter the unit, e.g. disc, block, bottle, or gram.")
+
+    # Usage rule: fills in the amount for technicians when a case reaches the stage.
+    stage = request.form.get("usage_stage") or None
+    if stage and stage not in MATERIAL_LOG_STAGES:
+        raise ValueError("Choose the stage this material is used at.")
+    details["usage_stage"] = stage
+    details["tracks_discs"] = request.form.get("tracks_discs") == "1"
+    if stage:
+        raw = (request.form.get("usage_amount") or "").strip()
+        try:
+            amount = float(raw)
+        except ValueError:
+            raise ValueError("Enter how much is used, e.g. 0.05 of a disc per unit.")
+        if amount <= 0:
+            raise ValueError("The amount used must be more than 0.")
+        basis = request.form.get("usage_basis")
+        if basis not in USAGE_BASIS_LABELS:
+            raise ValueError("Choose whether the amount is per unit, per arch or per case.")
+        details["usage_amount"] = round(amount, 4)
+        details["usage_basis"] = basis
+        details["usage_applies_to"] = ", ".join(_rule_tokens(request.form.get("usage_applies_to")))[:200] or None
+    else:
+        details.update(usage_amount=None, usage_basis=None, usage_applies_to=None)
     return details
 
 
@@ -5044,12 +5437,20 @@ def admin_run_forecast():
     return redirect(url_for("admin_forecast_analytics"))
 
 
-@app.route("/admin/forecast/export-csv")
+FORECAST_STATUS_TEXT = {"order_now": "Order now", "order_soon": "Order this month", "enough": "Enough stock",
+                        "untracked": "Not in Inventory"}
+
+
+def _forecast_generated_local(result):
+    """When the forecast was run, in the lab's time zone (None if not recorded)."""
+    ts = _parse_timestamp(result.get("generated_at"))
+    return ts.astimezone(LAB_TZ) if ts else None
+
+
+@app.route("/admin/forecast/export-excel")
 @role_required("admin")
-def admin_forecast_export_csv():
-    import csv
-    import io
-    from flask import make_response
+def admin_forecast_export_excel():
+    """The forecast and order plan as a formatted Excel workbook (same layout as Reports)."""
     from ml_models.engine import stock_plan
 
     done, _, _ = _latest_forecast()
@@ -5057,23 +5458,54 @@ def admin_forecast_export_csv():
         return "No forecast has been run yet.", 404
     result = done["result"]
     inventory = supabase_admin.table("inventory").select("item_name, quantity").execute().data or []
-    out = io.StringIO()
-    writer = csv.writer(out)
-    writer.writerow(["Forecast run", result["generated_at"], "Data", result["source"], "Model", result["best_model"]])
-    writer.writerow([])
-    writer.writerow(["Material", "Week starting", "Forecast units"])
-    for s in result["series"]:
-        for f in s["forecast"]:
-            writer.writerow([s["label"], f["week"], f["units"]])
-    writer.writerow([])
-    writer.writerow(["Material", "Units next 4 weeks", "Cautious units (90%)", "Need (discs/units)", "Reorder point",
-                     "On hand", "Status", "Order quantity", "Order cost (PHP)"])
-    for r in stock_plan(result, inventory):
-        writer.writerow([r["label"], r["units_4w"], r["units_90"], r["need_4w"], r["reorder_point"],
-                         "" if r["on_hand"] is None else r["on_hand"], r["status"], r["order_qty"], r.get("order_cost", "")])
-    response = make_response(out.getvalue())
-    response.headers["Content-Disposition"] = f"attachment; filename=dentalink_forecast_{result['forecast_start']}.csv"
-    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    plan = stock_plan(result, inventory)
+    run_at = _forecast_generated_local(result)
+    start = _lab_day(result.get("forecast_start"))
+
+    plan_rows = []
+    for r in plan:
+        unit = "discs" if r["kind"] == "disc" else "units"
+        plan_rows.append([
+            r["label"], round(r["units_4w"]), round(r["units_90"]), r["need_4w"], unit, r["reorder_point"],
+            "Not tracked" if r["on_hand"] is None else round(float(r["on_hand"]), 2), FORECAST_STATUS_TEXT.get(r["status"], r["status"]),
+            r["order_qty"] or 0, round(r["order_cost"]) if r.get("order_cost") else "—",
+        ])
+    weeks = [f["week"] for f in result["series"][0]["forecast"]] if result["series"] else []
+    best = result["scores"].get(result["best_model"], {})
+    report = {
+        "sections": [
+            {"title": "Order plan",
+             "columns": [("Material", False), ("Forecast, 4 weeks (units)", True), ("Cautious, 90% (units)", True),
+                         ("To be safe", True), ("Unit", False), ("Reorder point", True), ("On hand", True),
+                         ("Status", False), ("Order quantity", True), ("Order cost (PHP)", True)],
+             "rows": plan_rows, "empty": "No materials in the forecast.",
+             "foot": ["Total order cost (zirconia discs)", "", "", "", "", "", "", "", "",
+                      round(sum(r.get("order_cost") or 0 for r in plan if r["kind"] == "disc"))] if plan_rows else None},
+            {"title": "Weekly forecast",
+             "columns": [("Material", False)] + [(f"Week of {_fmt_day(_lab_day(w))}", True) for w in weeks],
+             "rows": [[s["label"]] + [round(f["units"]) for f in s["forecast"]] for s in result["series"]],
+             "empty": "No weekly forecast."},
+            {"title": "Method comparison",
+             "columns": [("Method", False), ("4-week miss (WAPE)", True), ("Next-week miss", True), ("Used for the plan", False)],
+             "rows": [[name, f"{s['wape_4_weeks'] * 100:.1f}%", f"{s['wape_next_week'] * 100:.1f}%",
+                       "Yes" if name == result["best_model"] else ""]
+                      for name, s in sorted(result["scores"].items(), key=lambda kv: kv[1]["wape_4_weeks"])],
+             "empty": "No methods compared."},
+        ],
+        "notes": [
+            f"Method used: {result['best_model']} (about ±{round(best.get('wape_4_weeks', 0) * 100)}% typical 4-week miss). "
+            f"Each method forecast each of the last {result.get('test_weeks')} weeks without seeing them.",
+            ("Learned from " + (f"{result.get('history_weeks')} weeks of job orders simulated from the lab's own figures."
+                                if result.get("source") == "simulated" else f"{result.get('history_weeks')} weeks of DentaLink cases.")
+             + " Units are converted to discs at 18–25 units per disc; \"To be safe\" uses 18. Supplier delivery takes 2–4 working days."),
+        ],
+    }
+    period_label = (f"4 weeks from {_fmt_day(start)}" if start else "Next 4 weeks") + (
+        f" · forecast run {run_at:%b %d, %Y %I:%M %p}" if run_at else "")
+    data = _report_xlsx("Material Forecast & Order Plan", period_label, report, g.profile, datetime.now(LAB_TZ))
+    response = make_response(data)
+    response.headers["Content-Type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response.headers["Content-Disposition"] = f"attachment; filename=DentaLink_Forecast_{result.get('forecast_start', 'latest')}.xlsx"
     return response
 
 
@@ -5087,7 +5519,828 @@ def admin_forecast_report_preview():
         return redirect(url_for("admin_forecast_analytics"))
     inventory = supabase_admin.table("inventory").select("item_name, quantity").execute().data or []
     return render_template("admin_forecast_report.html", profile=g.profile, run=done, result=done["result"],
-                           plan=stock_plan(done["result"], inventory))
+                           plan=stock_plan(done["result"], inventory),
+                           generated_local=_forecast_generated_local(done["result"]),
+                           printed_at=datetime.now(LAB_TZ))
+
+
+# =========================
+# REPORTS: printable summaries for every role
+# =========================
+# Each report builder returns {"sections": [...], "notes": [...]};
+# a section is {"title", "columns": [(label, is_number)], "rows": [[...]], "foot": [...] | None,
+# "empty": text}. reports.html prints any of them, and ?format=xlsx downloads them as an Excel workbook.
+REPORTS = {
+    "admin": [
+        ("job_orders", "Job Orders Summary", "Job orders received by month, prosthesis type, material and clinic, including imported paper job orders."),
+        ("turnaround", "Turnaround & On-Time Delivery", "How long cases took and how many arrived by their due date."),
+        ("remakes", "Remakes & Quality", "Problems clinics reported after delivery and the lab's decisions."),
+        ("materials", "Material Usage & Stock", "Materials used on cases, restocks and current stock levels."),
+    ],
+    "technician": [
+        ("my_production", "My Production Summary", "Cases you completed, by month, type and material."),
+        ("my_workload", "My Workload Sheet", "Your open cases by due date, to print and keep at the bench."),
+    ],
+    "dentist": [
+        ("my_cases", "Case History", "Job orders you sent to the lab; filter by patient for a patient's case record."),
+        ("lab_service", "Lab Service Summary", "On-time delivery, turnaround, issues and remakes for your cases."),
+    ],
+}
+REPORTS_WITHOUT_PERIOD = {"my_workload"}
+REPORT_STATUS_LABELS = {
+    "submitted": "Waiting for the lab", "assigned": "Assigned", "in_progress": "In progress",
+    "cad_designing": "CAD design", "wax_up_or_try_in": "Wax-up / setup", "milling_or_printing": "Milling / printing",
+    "packing_and_curing": "Packing & curing", "finishing_and_quality_check": "Finishing", "pending_admin_review": "Lab QC",
+    "ready_for_dispatch": "Packed for dispatch", "in_transit": "In transit", "delivered": "Delivered",
+    "completed": "Completed", "cancelled": "Cancelled", "needs_revision": "Returned to dentist",
+}
+MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July", "August",
+               "September", "October", "November", "December")
+
+
+def _month_start(d):
+    return d.replace(day=1)
+
+
+def _next_month(d):
+    return d.replace(year=d.year + 1, month=1, day=1) if d.month == 12 else d.replace(month=d.month + 1, day=1)
+
+
+def _report_period(kind, ref):
+    """The reporting period chosen in the toolbar: a month, a quarter, a year, or all time.
+    Returns start (inclusive) and end (exclusive) calendar days in the lab's time zone."""
+    today = datetime.now(LAB_TZ).date()
+    try:
+        if kind == "all":
+            start, end, label = today.replace(year=2000, month=1, day=1), today + timedelta(days=1), "All time"
+        elif kind == "year":
+            y = int(ref)
+            start, end, label = today.replace(year=y, month=1, day=1), today.replace(year=y + 1, month=1, day=1), f"Year {y}"
+        elif kind == "quarter":
+            y, q = (int(x) for x in str(ref).split("-Q"))
+            if not 1 <= q <= 4:
+                raise ValueError(ref)
+            start = today.replace(year=y, month=3 * q - 2, day=1)
+            end = _next_month(_next_month(_next_month(start)))
+            label = f"Q{q} {y} ({MONTH_NAMES[start.month - 1][:3]}–{MONTH_NAMES[start.month + 1][:3]})"
+        else:
+            kind = "month"
+            y, m = (int(x) for x in str(ref).split("-"))
+            start = today.replace(year=y, month=m, day=1)
+            end, label = _next_month(start), f"{MONTH_NAMES[m - 1]} {y}"
+    except (ValueError, TypeError, IndexError):
+        kind, start = "month", _month_start(today)
+        end, label = _next_month(start), f"{MONTH_NAMES[start.month - 1]} {start.year}"
+    ref = {"month": f"{start:%Y-%m}", "quarter": f"{start.year}-Q{(start.month - 1) // 3 + 1}",
+           "year": str(start.year), "all": ""}[kind]
+    return {"kind": kind, "ref": ref, "start": start, "end": end, "label": label}
+
+
+def _period_options():
+    """Choices for the period pickers: the last 3 years of months, 12 quarters, 7 years."""
+    today = datetime.now(LAB_TZ).date()
+    months, d = [], _month_start(today)
+    for _ in range(36):
+        months.append((f"{d:%Y-%m}", f"{MONTH_NAMES[d.month - 1]} {d.year}"))
+        d = (d - timedelta(days=1)).replace(day=1)
+    quarters, y, q = [], today.year, (today.month - 1) // 3 + 1
+    for _ in range(12):
+        quarters.append((f"{y}-Q{q}", f"Q{q} {y}"))
+        y, q = (y - 1, 4) if q == 1 else (y, q - 1)
+    years = [(str(y), str(y)) for y in range(today.year, today.year - 7, -1)]
+    return {"month": months, "quarter": quarters, "year": years}
+
+
+def _lab_day(value):
+    """Calendar day (lab time zone) of a stored timestamp, or of a plain YYYY-MM-DD date."""
+    if not value:
+        return None
+    text = str(value)
+    if len(text) <= 10:
+        try:
+            return datetime.strptime(text[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    ts = _parse_timestamp(text)
+    return ts.astimezone(LAB_TZ).date() if ts else None
+
+
+def _in_period(day, period):
+    return day is not None and period["start"] <= day < period["end"]
+
+
+def _period_months(period, days):
+    """Month rows for a by-month table: every month of the period, or for "All time" the
+    months that have data."""
+    if period["kind"] == "all":
+        return sorted({_month_start(d) for d in days if d})
+    months, d = [], period["start"]
+    while d < period["end"]:
+        months.append(d)
+        d = _next_month(d)
+    return months
+
+
+def _fmt_day(day):
+    return f"{MONTH_NAMES[day.month - 1][:3]} {day.day}, {day.year}" if day else "—"
+
+
+def _fmt_month(day):
+    return f"{MONTH_NAMES[day.month - 1]} {day.year}"
+
+
+def _pct(part, whole):
+    return f"{round(100 * part / whole)}%" if whole else "—"
+
+
+def _avg(values):
+    return f"{sum(values) / len(values):.1f}" if values else "—"
+
+
+def _material_family(name):
+    return (name or "Not specified").replace("_", " ").split(" (")[0].strip().capitalize()
+
+
+def _report_cases(dentist_id=None, technician_id=None):
+    """Sent (non-draft) cases with their teeth and names, plus the derived days reports use."""
+    def query():
+        q = supabase_admin.table("dental_cases").select("*").neq("status", "draft")
+        if dentist_id:
+            q = q.eq("dentist_id", dentist_id)
+        if technician_id:
+            q = q.eq("technician_id", technician_id)
+        return q.order("created_at")
+
+    cases = _fetch_all(query)
+    ids = [c["id"] for c in cases]
+    teeth = []
+    for i in range(0, len(ids), 150):  # keep each request URL short
+        chunk = ids[i:i + 150]
+        teeth += _fetch_all(lambda chunk=chunk: supabase_admin.table("case_teeth")
+                            .select("case_id, tooth_number, material, shade").in_("case_id", chunk).order("case_id"))
+    teeth_by_case = {}
+    for t in teeth:
+        teeth_by_case.setdefault(t["case_id"], []).append(t)
+    people_ids = list({pid for c in cases for pid in (c.get("dentist_id"), c.get("technician_id")) if pid})
+    people = {}
+    if people_ids:
+        rows = (supabase_admin.table("profiles").select("id, display_name, first_name, last_name, clinic_name")
+                .in_("id", people_ids).execute().data or [])
+        people = {p["id"]: p for p in rows}
+
+    for c in cases:
+        c["teeth"] = sorted(teeth_by_case.get(c["id"], []), key=lambda t: str(t.get("tooth_number")))
+        c["units"] = len(c["teeth"])
+        c["received"] = _lab_day(c.get("created_at"))
+        c["delivered"] = _lab_day(c.get("delivered_at")) if c.get("status") in DELIVERED_STATUSES else None
+        c["due"] = _lab_day(c.get("due_date"))
+        c["turnaround"] = (c["delivered"] - c["received"]).days if c["delivered"] and c["received"] else None
+        c["late_days"] = max(0, (c["delivered"] - c["due"]).days) if c["delivered"] and c["due"] else None
+        dentist = people.get(c.get("dentist_id"))
+        c["dentist_name"] = _display_name(dentist, "—")
+        c["clinic"] = (dentist or {}).get("clinic_name") or "Independent practice"
+        c["technician_name"] = _display_name(people.get(c.get("technician_id")), "Unassigned")
+        c["status_label"] = REPORT_STATUS_LABELS.get(c.get("status"), (c.get("status") or "").replace("_", " ").capitalize())
+        c["type_label"] = (c.get("case_type") or "—").replace("_", " ").title()
+        c["material_units"] = {}
+        for t in c["teeth"]:
+            fam = _material_family(t.get("material"))
+            c["material_units"][fam] = c["material_units"].get(fam, 0) + 1
+        groups = {}
+        for t in c["teeth"]:
+            key = (_material_family(t.get("material")), t.get("shade") or "")
+            groups.setdefault(key, []).append(str(t.get("tooth_number")))
+        c["material_text"] = "; ".join(f"{', '.join(nums)}: {m}{' ' + s if s else ''}" for (m, s), nums in groups.items()) or "—"
+        c["teeth_text"] = ", ".join(str(t.get("tooth_number")) for t in c["teeth"]) or "—"
+    return cases
+
+
+def _report_issue_reports():
+    try:
+        return _fetch_all(lambda: supabase_admin.table("case_issue_reports").select("*").order("created_at"))
+    except Exception:
+        app.logger.warning("case_issue_reports unavailable; run the issue reports migration")
+        return []
+
+
+def _count_table(title, label, counts, unit="Job orders", empty="Nothing in this period."):
+    """A two-column table from {name: count}, largest first, with a total row."""
+    rows = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    total = sum(counts.values())
+    return {"title": title, "columns": [(label, False), (unit, True), ("Share", True)],
+            "rows": [[k, v, _pct(v, total)] for k, v in rows],
+            "foot": ["Total", total, "100%" if total else "—"] if rows else None, "empty": empty}
+
+
+def _delivery_by_month(period, delivered):
+    """By-month delivery table: delivered, on time, late, on-time %, average days."""
+    rows = []
+    for m in _period_months(period, [c["delivered"] for c in delivered]):
+        month = [c for c in delivered if _month_start(c["delivered"]) == m]
+        timed = [c for c in month if c["late_days"] is not None]
+        on_time = sum(1 for c in timed if c["late_days"] == 0)
+        rows.append([_fmt_month(m), len(month), on_time, len(timed) - on_time, _pct(on_time, len(timed)),
+                     _avg([c["turnaround"] for c in month if c["turnaround"] is not None])])
+    timed = [c for c in delivered if c["late_days"] is not None]
+    on_time = sum(1 for c in timed if c["late_days"] == 0)
+    return {"title": "By month", "columns": [("Month", False), ("Delivered", True), ("On time", True), ("Late", True),
+                                             ("On-time rate", True), ("Avg. days", True)],
+            "rows": rows, "empty": "No deliveries in this period.",
+            "foot": ["Total", len(delivered), on_time, len(timed) - on_time, _pct(on_time, len(timed)),
+                     _avg([c["turnaround"] for c in delivered if c["turnaround"] is not None])] if rows else None}
+
+
+# ---- Admin reports ----
+def _report_job_orders(period, **_):
+    cases = [c for c in _report_cases() if _in_period(c["received"], period)]
+    entries = [{
+        "ref": c["case_number"], "day": c["received"], "source": "DentaLink", "clinic": c["clinic"],
+        "type": c["type_label"], "units": c["units"], "materials": c["material_units"],
+        "material_text": c["material_text"], "technician": c["technician_name"], "status": c["status_label"],
+        "out": c["delivered"], "remake": bool(c.get("remake_of")), "cancelled": c.get("status") == "cancelled",
+    } for c in cases]
+    for o in _job_orders():
+        day = _lab_day(o.get("lab_in") or o.get("date_sent"))
+        if not _in_period(day, period):
+            continue
+        units = int(o.get("units") or 0)
+        entries.append({
+            "ref": o["jo_ref"], "day": day, "source": "Paper", "clinic": o.get("clinic") or "—",
+            "type": (o.get("case_type") or "—").replace("_", " ").title(), "units": units,
+            "materials": {_material_family(o.get("material")): units}, "material_text": o.get("material") or "—",
+            "technician": o.get("technician") or "—", "status": "Completed" if o.get("lab_out") else "Recorded",
+            "out": _lab_day(o.get("lab_out")), "remake": str(o.get("is_remake") or "").strip().lower() in ("yes", "y", "true", "1"),
+            "cancelled": False,
+        })
+    entries.sort(key=lambda e: (e["day"], e["ref"]))
+    active = [e for e in entries if not e["cancelled"]]
+
+    month_rows = []
+    for m in _period_months(period, [e["day"] for e in entries]):
+        month = [e for e in active if _month_start(e["day"]) == m]
+        month_rows.append([_fmt_month(m), len(month), sum(e["units"] for e in month),
+                           sum(1 for e in month if e["source"] == "DentaLink"), sum(1 for e in month if e["source"] == "Paper"),
+                           sum(1 for e in month if e["remake"])])
+    by_type, by_material, by_clinic = {}, {}, {}
+    for e in active:
+        by_type[e["type"]] = by_type.get(e["type"], 0) + 1
+        by_clinic[e["clinic"]] = by_clinic.get(e["clinic"], 0) + 1
+        for fam, n in e["materials"].items():
+            by_material[fam] = by_material.get(fam, 0) + n
+
+    return {
+        "sections": [
+            {"title": "Job orders by month", "columns": [("Month", False), ("Job orders", True), ("Units", True),
+                                                          ("DentaLink", True), ("Paper", True), ("Remakes", True)],
+             "rows": month_rows, "empty": "No job orders in this period.",
+             "foot": ["Total"] + [sum(r[i] for r in month_rows) for i in range(1, 6)] if month_rows else None},
+            _count_table("By prosthesis type", "Prosthesis type", by_type),
+            _count_table("By material", "Material", by_material, unit="Units"),
+            _count_table("By clinic", "Clinic", by_clinic),
+            {"title": "Job order list", "columns": [("Ref", False), ("Received", False), ("Source", False), ("Clinic", False),
+                                                     ("Type", False), ("Units", True), ("Material", False), ("Technician", False),
+                                                     ("Status", False), ("Out / delivered", False)],
+             "rows": [[e["ref"] + (" (remake)" if e["remake"] else ""), _fmt_day(e["day"]), e["source"], e["clinic"], e["type"],
+                       e["units"], e["material_text"], e["technician"], e["status"], _fmt_day(e["out"])] for e in entries],
+             "empty": "No job orders in this period.", "wide": True},
+        ],
+        "notes": ["DentaLink job orders count from the day they were sent to the lab; paper job orders from their lab-in date "
+                  "(or date sent). Cancelled job orders are listed but not counted in the totals."],
+    }
+
+
+def _report_turnaround(period, **_):
+    delivered = [c for c in _report_cases() if _in_period(c["delivered"], period)]
+    timed = [c for c in delivered if c["late_days"] is not None]
+    by_tech = {}
+    for c in delivered:
+        by_tech.setdefault(c["technician_name"], []).append(c)
+    tech_rows = []
+    for name, rows in sorted(by_tech.items()):
+        t = [c for c in rows if c["late_days"] is not None]
+        ok = sum(1 for c in t if c["late_days"] == 0)
+        tech_rows.append([name, len(rows), sum(c["units"] for c in rows), _pct(ok, len(t)),
+                          _avg([c["turnaround"] for c in rows if c["turnaround"] is not None])])
+    late = sorted((c for c in timed if c["late_days"]), key=lambda c: -c["late_days"])
+    return {
+        "sections": [
+            _delivery_by_month(period, delivered),
+            {"title": "By technician", "columns": [("Technician", False), ("Delivered", True), ("Units", True),
+                                                    ("On-time rate", True), ("Avg. days", True)],
+             "rows": tech_rows, "empty": "No deliveries in this period."},
+            {"title": "Late deliveries", "columns": [("Case", False), ("Clinic", False), ("Technician", False), ("Due", False),
+                                                      ("Delivered", False), ("Days late", True)],
+             "rows": [[c["case_number"], c["clinic"], c["technician_name"], _fmt_day(c["due"]), _fmt_day(c["delivered"]),
+                       c["late_days"]] for c in late],
+             "empty": "Every case in this period was delivered on time."},
+        ],
+        "notes": ["Turnaround is counted from the day the dentist sent the job order to the day the clinic confirmed receipt. "
+                  "Only DentaLink cases are included; paper job orders don't record delivery to the clinic."],
+    }
+
+
+def _report_remakes(period, **_):
+    cases = _report_cases()
+    by_id = {c["id"]: c for c in cases}
+    delivered = [c for c in cases if _in_period(c["delivered"], period)]
+    reports = [r for r in _report_issue_reports() if _in_period(_lab_day(r.get("created_at")), period)]
+    types = {}
+    for r in reports:
+        row = types.setdefault(ISSUE_TYPES.get(r.get("issue_type"), "Other problem"), [0, 0, 0, 0])
+        row[0] += 1
+        row[{"remake_accepted": 1, "no_action": 2}.get(r.get("status"), 3)] += 1
+    month_rows = []
+    for m in _period_months(period, [_lab_day(r.get("created_at")) for r in reports] + [c["delivered"] for c in delivered]):
+        month_reports = [r for r in reports if _month_start(_lab_day(r.get("created_at"))) == m]
+        month_delivered = sum(1 for c in delivered if _month_start(c["delivered"]) == m)
+        month_remakes = sum(1 for r in month_reports if r.get("status") == "remake_accepted")
+        month_rows.append([_fmt_month(m), month_delivered, len(month_reports), month_remakes, _pct(month_remakes, month_delivered)])
+    decision = {"remake_accepted": "Remake accepted", "no_action": "No remake needed", "open": "Under review"}
+    return {
+        "sections": [
+            {"title": "By month", "columns": [("Month", False), ("Delivered", True), ("Issues reported", True),
+                                               ("Remakes", True), ("Remake rate", True)],
+             "rows": month_rows, "empty": "Nothing in this period."},
+            {"title": "By type of problem", "columns": [("Problem", False), ("Reported", True), ("Remade", True),
+                                                         ("No remake", True), ("Under review", True)],
+             "rows": [[k] + v for k, v in sorted(types.items(), key=lambda kv: -kv[1][0])],
+             "empty": "No issues were reported in this period."},
+            {"title": "Issue list", "columns": [("Reported", False), ("Case", False), ("Clinic", False), ("Technician", False),
+                                                 ("Problem", False), ("Details", False), ("Decision", False), ("Remake", False)],
+             "rows": [[_fmt_day(_lab_day(r.get("created_at"))), by_id.get(r["case_id"], {}).get("case_number", "—"),
+                       by_id.get(r["case_id"], {}).get("clinic", "—"), by_id.get(r["case_id"], {}).get("technician_name", "—"),
+                       ISSUE_TYPES.get(r.get("issue_type"), "Other problem"), r.get("details") or "—",
+                       decision.get(r.get("status"), r.get("status") or "—") + (f" ({r['admin_note']})" if r.get("admin_note") else ""),
+                       by_id.get(r.get("remake_case_id"), {}).get("case_number", "—")] for r in reports],
+             "empty": "No issues were reported in this period.", "wide": True},
+        ],
+        "notes": ["Remake rate = remakes accepted ÷ cases delivered in the same period."],
+    }
+
+
+def _report_materials(period, **_):
+    start = datetime(period["start"].year, period["start"].month, period["start"].day, tzinfo=LAB_TZ).isoformat()
+    end = datetime(period["end"].year, period["end"].month, period["end"].day, tzinfo=LAB_TZ).isoformat()
+    items = supabase_admin.table("inventory").select("*").order("item_name").execute().data or []
+    logs = _fetch_all(lambda: supabase_admin.table("inventory_logs").select("inventory_id, action_type, quantity_changed, created_at")
+                      .gte("created_at", start).lt("created_at", end).order("created_at"))
+    totals = {}
+    for l in logs:
+        q = float(l.get("quantity_changed") or 0)
+        t = totals.setdefault(l.get("inventory_id"), {"used": 0.0, "restocked": 0.0, "adjusted": 0.0, "uses": 0})
+        action = l.get("action_type")
+        if action in ("case_deduction", "auto_created_and_deducted", "disc_opened", "disc_use"):
+            t["used"] += -q            # an opened disc counts as one whole disc used
+            t["uses"] += action != "disc_opened"
+        elif q > 0:
+            t["restocked"] += q
+        else:
+            t["adjusted"] += q
+    rows = []
+    for it in items:
+        t = totals.get(it["id"], {"used": 0.0, "restocked": 0.0, "adjusted": 0.0, "uses": 0})
+        qty, reorder = float(it.get("quantity") or 0), float(it.get("minimum_threshold") or 0)
+        status = "Out of stock" if qty <= 0 else ("Low" if qty <= reorder else "OK")
+        rows.append([it.get("item_name"), (it.get("category") or "—").replace("_", " ").capitalize(), it.get("unit") or "unit",
+                     t["uses"], f"{t['used']:g}", f"{t['restocked']:g}", f"{t['adjusted']:g}" if t["adjusted"] else "—",
+                     f"{qty:g}", f"{reorder:g}", status])
+    try:
+        requests_ = [r for r in _fetch_all(lambda: supabase_admin.table("material_requests")
+                                           .select("item_name, status, created_at, technician_id, case_id").order("created_at"))
+                     if _in_period(_lab_day(r.get("created_at")), period)]
+    except Exception:
+        requests_ = []
+    req_counts = {}
+    for r in requests_:
+        row = req_counts.setdefault(r.get("item_name") or "—", [0, 0, 0, 0])
+        row[0] += 1
+        row[{"fulfilled": 1, "dismissed": 2}.get(r.get("status"), 3)] += 1
+    return {
+        "sections": [
+            {"title": "Materials", "columns": [("Material", False), ("Category", False), ("Unit", False), ("Uses", True),
+                                                ("Used", True), ("Restocked", True), ("Adjusted", True), ("On hand now", True),
+                                                ("Reorder at", True), ("Status", False)],
+             "rows": rows, "empty": "No materials in inventory.", "wide": True},
+            {"title": "Restock requests from technicians", "columns": [("Material", False), ("Requests", True),
+                                                                        ("Restocked", True), ("Dismissed", True), ("Pending", True)],
+             "rows": [[k] + v for k, v in sorted(req_counts.items(), key=lambda kv: -kv[1][0])],
+             "empty": "No restock requests in this period."},
+        ],
+        "notes": ["Used, Restocked and Adjusted cover the selected period; On hand and Status are today's stock. "
+                  "Adjusted is the net of stock-count corrections. For what to order next, see the Forecast Analytics report.",
+                  "Zirconia discs count as used when they are opened (one whole disc each); Uses counts the cases milled "
+                  "from them. Real units per disc are on the Inventory page under Zirconia discs."],
+    }
+
+
+# ---- Technician reports ----
+def _report_my_production(period, profile, **_):
+    cases = _report_cases(technician_id=profile["id"])
+    done = [c for c in cases if _in_period(c["delivered"], period)]
+    timed = [c for c in done if c["late_days"] is not None]
+    on_time = sum(1 for c in timed if c["late_days"] == 0)
+    by_type, by_material = {}, {}
+    for c in done:
+        by_type[c["type_label"]] = by_type.get(c["type_label"], 0) + 1
+        for fam, n in c["material_units"].items():
+            by_material[fam] = by_material.get(fam, 0) + n
+    month_rows = []
+    for m in _period_months(period, [c["delivered"] for c in done]):
+        month = [c for c in done if _month_start(c["delivered"]) == m]
+        t = [c for c in month if c["late_days"] is not None]
+        month_rows.append([_fmt_month(m), len(month), sum(c["units"] for c in month), _pct(sum(1 for c in t if c["late_days"] == 0), len(t)),
+                           _avg([c["turnaround"] for c in month if c["turnaround"] is not None])])
+    return {
+        "sections": [
+            {"title": "Completed by month", "columns": [("Month", False), ("Cases", True), ("Units", True),
+                                                         ("On-time rate", True), ("Avg. days", True)],
+             "rows": month_rows, "empty": "No cases completed in this period.",
+             "foot": ["Total", len(done), sum(c["units"] for c in done), _pct(on_time, len(timed)),
+                      _avg([c["turnaround"] for c in done if c["turnaround"] is not None])] if month_rows else None},
+            _count_table("By prosthesis type", "Prosthesis type", by_type, unit="Cases"),
+            _count_table("By material", "Material", by_material, unit="Units"),
+            {"title": "Completed cases", "columns": [("Case", False), ("Clinic", False), ("Type", False), ("Units", True),
+                                                      ("Material / shade", False), ("Received", False), ("Due", False),
+                                                      ("Delivered", False), ("Days late", True)],
+             "rows": [[c["case_number"] + (" (remake)" if c.get("remake_of") else ""), c["clinic"], c["type_label"], c["units"],
+                       c["material_text"], _fmt_day(c["received"]), _fmt_day(c["due"]), _fmt_day(c["delivered"]),
+                       c["late_days"] if c["late_days"] is not None else "—"] for c in sorted(done, key=lambda c: c["delivered"])],
+             "empty": "No cases completed in this period.", "wide": True},
+        ],
+        "notes": ["Cases count in the month the clinic received them."],
+    }
+
+
+def _report_my_workload(period, profile, **_):
+    today = datetime.now(LAB_TZ).date()
+    cases = [c for c in _report_cases(technician_id=profile["id"]) if c.get("status") in BENCH_STATUSES]
+    cases.sort(key=lambda c: (not c.get("is_rush"), c["due"] or today.replace(year=today.year + 50), c["case_number"]))
+    stage = dict(BENCH_FLOW)
+    rows = []
+    for c in cases:
+        flags = [f for f, on in (("RUSH", c.get("is_rush")), ("Remake", c.get("remake_of"))) if on]
+        if c["due"] and c["due"] < today:
+            flags.append(f"Overdue {(today - c['due']).days}d")
+        rows.append(["☐", c["case_number"], _fmt_day(c["due"]), c["clinic"], c.get("patient_name") or "—", c["type_label"],
+                     c["material_text"], stage.get(c.get("status"), c["status_label"]), ", ".join(flags) or "—",
+                     c.get("instructions") or "—"])
+    return {
+        "sections": [
+            {"title": "Open cases (rush first, then by due date)",
+             "columns": [("Done", False), ("Case", False), ("Due", False), ("Clinic", False), ("Patient", False), ("Type", False),
+                         ("Teeth: material / shade", False), ("Stage", False), ("Flags", False), ("Instructions", False)],
+             "rows": rows, "empty": "No open cases on your bench.", "wide": True},
+        ],
+        "notes": [f"Snapshot of your bench on {_fmt_day(today)}. Cases waiting for admin QC or dispatch are not listed."],
+    }
+
+
+# ---- Dentist reports ----
+def _report_my_cases(period, profile, patient="", **_):
+    cases = [c for c in _report_cases(dentist_id=profile["id"]) if _in_period(c["received"], period)]
+    if patient:
+        needle = " ".join(patient.split()).casefold()
+        cases = [c for c in cases if needle in " ".join((c.get("patient_name") or "").split()).casefold()]
+    active = [c for c in cases if c.get("status") != "cancelled"]
+    month_rows = []
+    for m in _period_months(period, [c["received"] for c in cases]):
+        month = [c for c in active if _month_start(c["received"]) == m]
+        month_rows.append([_fmt_month(m), len(month), sum(c["units"] for c in month),
+                           sum(1 for c in month if c["delivered"]), sum(1 for c in month if c.get("remake_of"))])
+    return {
+        "sections": [
+            {"title": "By month", "columns": [("Month", False), ("Job orders", True), ("Units", True), ("Delivered", True), ("Remakes", True)],
+             "rows": month_rows, "empty": "No job orders in this period.",
+             "foot": ["Total"] + [sum(r[i] for r in month_rows) for i in range(1, 5)] if month_rows else None},
+            {"title": "Job orders", "columns": [("Case", False), ("Sent", False), ("Patient", False), ("Type", False),
+                                                 ("Teeth: material / shade", False), ("Units", True), ("Status", False),
+                                                 ("Due", False), ("Delivered", False)],
+             "rows": [[c["case_number"] + (" (remake)" if c.get("remake_of") else ""), _fmt_day(c["received"]),
+                       c.get("patient_name") or "—", c["type_label"], c["material_text"], c["units"], c["status_label"],
+                       _fmt_day(c["due"]), _fmt_day(c["delivered"])] for c in cases],
+             "empty": "No job orders match." if patient else "No job orders in this period.", "wide": True},
+        ],
+        "notes": ["Drafts that were never sent are not included."],
+    }
+
+
+def _report_lab_service(period, profile, **_):
+    cases = _report_cases(dentist_id=profile["id"])
+    by_id = {c["id"]: c for c in cases}
+    delivered = [c for c in cases if _in_period(c["delivered"], period)]
+    reports = [r for r in _report_issue_reports() if r.get("case_id") in by_id and _in_period(_lab_day(r.get("created_at")), period)]
+    decision = {"remake_accepted": "Remake accepted", "no_action": "No remake needed", "open": "Under review"}
+    return {
+        "sections": [
+            _delivery_by_month(period, delivered),
+            {"title": "Issues you reported", "columns": [("Reported", False), ("Case", False), ("Patient", False), ("Problem", False),
+                                                          ("Lab's decision", False), ("Remake", False)],
+             "rows": [[_fmt_day(_lab_day(r.get("created_at"))), by_id[r["case_id"]]["case_number"],
+                       by_id[r["case_id"]].get("patient_name") or "—", ISSUE_TYPES.get(r.get("issue_type"), "Other problem"),
+                       decision.get(r.get("status"), "—") + (f" ({r['admin_note']})" if r.get("admin_note") else ""),
+                       by_id.get(r.get("remake_case_id"), {}).get("case_number", "—")] for r in reports],
+             "empty": "You didn't report any issues in this period.", "wide": True},
+        ],
+        "notes": ["Turnaround is counted from the day you sent the job order to the day your clinic confirmed receipt."],
+    }
+
+
+REPORT_BUILDERS = {
+    "job_orders": _report_job_orders, "turnaround": _report_turnaround, "remakes": _report_remakes,
+    "materials": _report_materials, "my_production": _report_my_production, "my_workload": _report_my_workload,
+    "my_cases": _report_my_cases, "lab_service": _report_lab_service,
+}
+
+
+REPORT_CELL_CHARS = 140  # longer text is shortened on the printed page (the Excel file keeps it all)
+
+
+def _clip_cell(cell):
+    if isinstance(cell, str) and len(cell) > REPORT_CELL_CHARS:
+        return cell[:REPORT_CELL_CHARS - 1].rstrip() + "…"
+    return cell
+
+
+REPORT_PAGE_SIZES = (15, 20, 25, 30, 40)
+REPORT_DEFAULT_PAGE_SIZE = 25
+
+
+def _paginate_report(report, limit):
+    """Split a report's tables into printed pages of about `limit` table rows each.
+
+    A table that doesn't fit continues on the next page ("continued", headings repeated);
+    its total row appears only after its last row. Rows of wide detail lists count 1.5,
+    since their text wraps. Each section heading costs 3 rows; the notes and sign-off on
+    the last page cost 6. Returns a list of pages, each a list of section chunks.
+    """
+    pages, page, used = [], [], 0.0
+
+    def turn_page():
+        nonlocal page, used
+        pages.append(page)
+        page, used = [], 0.0
+
+    for s in report["sections"]:
+        weight = 1.5 if s.get("wide") else 1.0
+        rows = s["rows"]
+        if not rows:
+            if page and used + 3 > limit:
+                turn_page()
+            page.append(dict(s, continued=False, show_foot=False))
+            used += 3
+            continue
+        start = 0
+        while start < len(rows):
+            room = int((limit - used - 3) // weight)
+            left = len(rows) - start
+            # Don't start a table with just a row or two at the bottom of a page.
+            if page and room < min(3, left):
+                turn_page()
+                continue
+            chunk = rows[start:start + max(room, 1)]
+            end = start + len(chunk)
+            last = end >= len(rows)
+            chunk = [[_clip_cell(cell) for cell in row] for row in chunk]
+            page.append(dict(s, rows=chunk, continued=start > 0, show_foot=last and bool(s.get("foot")),
+                             first_row=start + 1, total_rows=len(rows)))
+            used += 3 + len(chunk) * weight + (1 if last and s.get("foot") else 0)
+            start = end
+            if not last:
+                turn_page()
+    if page and used + 6 > limit:
+        turn_page()
+    pages.append(page)
+    return pages
+
+
+def _excel_value(cell):
+    """Numbers and percentages as real Excel numbers (so they sum and sort); text unchanged.
+    Returns (value, number_format or None)."""
+    import re
+    if isinstance(cell, bool) or cell is None:
+        return cell, None
+    if isinstance(cell, int):
+        return cell, "#,##0"
+    if isinstance(cell, float):
+        return cell, "#,##0.0"
+    text = str(cell)
+    if re.fullmatch(r"-?\d+(\.\d+)?%", text):
+        return float(text[:-1]) / 100, "0.0%" if "." in text else "0%"
+    if re.fullmatch(r"-?\d+", text):
+        return int(text), "#,##0"
+    if re.fullmatch(r"-?\d+\.\d+", text):
+        return float(text), "#,##0.0"
+    return text, None
+
+
+def _report_xlsx(title, period_label, report, profile, generated_at):
+    """The report as a formatted Excel workbook: one worksheet per table, each with the
+    report heading, a styled header row (repeated when printed, filterable, frozen),
+    borders, real numbers, a bold total row, fitted column widths and the report notes."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    dark, accent, muted = "0F172A", "0284C7", "64748B"
+    thin = Side(style="thin", color="CBD5E1")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor=accent)
+    total_fill = PatternFill("solid", fgColor="F1F5F9")
+    stripe_fill = PatternFill("solid", fgColor="F8FAFC")
+    prepared = f"Prepared for {profile.get('display_name') or profile.get('first_name') or 'user'} · generated {generated_at:%b %d, %Y %I:%M %p}"
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    used_names = set()
+    for section in report["sections"]:
+        name = "".join(ch for ch in section["title"] if ch not in '[]:*?/\\')[:31] or "Sheet"
+        base, n = name, 2
+        while name.lower() in used_names:
+            name = f"{base[:28]} {n}"
+            n += 1
+        used_names.add(name.lower())
+        ws = wb.create_sheet(name)
+        ncols = len(section["columns"])
+        last_col = get_column_letter(ncols)
+
+        ws["A1"] = title
+        ws["A1"].font = Font(size=14, bold=True, color=dark)
+        ws["A2"] = f"Mrkzter Dental Laboratory · DentaLink LIS · {period_label}"
+        ws["A2"].font = Font(size=10, color=muted)
+        ws["A3"] = prepared
+        ws["A3"].font = Font(size=9, italic=True, color=muted)
+        ws["A5"] = section["title"]
+        ws["A5"].font = Font(size=12, bold=True, color=dark)
+
+        head_row = 6
+        for col, (label, is_num) in enumerate(section["columns"], start=1):
+            c = ws.cell(row=head_row, column=col, value=label)
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = header_fill
+            c.border = border
+            c.alignment = Alignment(horizontal="right" if is_num else "left", vertical="center", wrap_text=True)
+        ws.row_dimensions[head_row].height = 20
+
+        r = head_row
+        for i, row in enumerate(section["rows"]):
+            r += 1
+            for col, cell in enumerate(row, start=1):
+                value, fmt = _excel_value(cell)
+                c = ws.cell(row=r, column=col, value=value)
+                c.border = border
+                is_num = section["columns"][col - 1][1]
+                c.alignment = Alignment(horizontal="right" if is_num else "left", vertical="top", wrap_text=not is_num)
+                if fmt and is_num:
+                    c.number_format = fmt
+                if i % 2:
+                    c.fill = stripe_fill
+        if not section["rows"]:
+            r += 1
+            ws.cell(row=r, column=1, value=section.get("empty") or "No data.").font = Font(italic=True, color=muted)
+        elif section.get("foot"):
+            r += 1
+            for col, cell in enumerate(section["foot"], start=1):
+                value, fmt = _excel_value(cell)
+                c = ws.cell(row=r, column=col, value=value)
+                c.font = Font(bold=True, color=dark)
+                c.fill = total_fill
+                c.border = Border(left=thin, right=thin, bottom=thin, top=Side(style="medium", color=dark))
+                is_num = section["columns"][col - 1][1]
+                c.alignment = Alignment(horizontal="right" if is_num else "left")
+                if fmt and is_num:
+                    c.number_format = fmt
+
+        if report.get("notes"):
+            r += 2
+            for note in report["notes"]:
+                c = ws.cell(row=r, column=1, value=note)
+                c.font = Font(size=9, italic=True, color=muted)
+                c.alignment = Alignment(wrap_text=True, vertical="top")
+                ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=max(ncols, 4))
+                ws.row_dimensions[r].height = 30
+                r += 1
+
+        # Column widths from the longest value in each column (title rows excluded).
+        for col in range(1, ncols + 1):
+            values = [section["columns"][col - 1][0]] + [row[col - 1] for row in section["rows"]] + list(section.get("foot") or [])[col - 1:col]
+            longest = max((len(str(v)) for v in values if v is not None), default=8)
+            ws.column_dimensions[get_column_letter(col)].width = min(max(longest + 2, 10), 50)
+
+        if section["rows"]:
+            ws.auto_filter.ref = f"A{head_row}:{last_col}{head_row + len(section['rows'])}"
+        ws.freeze_panes = ws.cell(row=head_row + 1, column=1)
+        ws.print_title_rows = f"{head_row}:{head_row}"
+        ws.page_setup.orientation = "landscape" if ncols > 6 else "portrait"
+        ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.oddFooter.center.text = "Page &P of &N"
+        ws.sheet_view.showGridLines = False
+
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+@app.route("/reports")
+@role_required("admin", "technician", "dentist")
+def reports():
+    """Printable reports; each role sees only its own reports and its own data."""
+    role = g.profile.get("role")
+    available = REPORTS[role]
+    keys = [key for key, _, _ in available]
+    key = request.args.get("report") if request.args.get("report") in keys else keys[0]
+    title, description = next((t, d) for k, t, d in available if k == key)
+    period = _report_period(request.args.get("period", "month"), request.args.get("ref"))
+    patient = " ".join(request.args.get("patient", "").split())[:120] if key == "my_cases" else ""
+    try:
+        report = REPORT_BUILDERS[key](period, profile=g.profile, patient=patient)
+    except Exception:
+        app.logger.exception("Unable to build report %s", key)
+        return "Unable to build this report. Check the server logs for details.", 500
+
+    period_label = "Current snapshot" if key in REPORTS_WITHOUT_PERIOD else period["label"]
+    if patient:
+        period_label += f" · Patient: {patient}"
+    if request.args.get("format") == "xlsx":
+        response = make_response(_report_xlsx(title, period_label, report, g.profile, datetime.now(LAB_TZ)))
+        response.headers["Content-Type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        response.headers["Content-Disposition"] = (
+            f"attachment; filename=DentaLink_{title.replace(' & ', '_').replace(' ', '_')}_{period['ref'] or 'all_time'}.xlsx")
+        return response
+
+    patient_names = []
+    if key == "my_cases":
+        rows = (supabase_admin.table("dental_cases").select("patient_name").eq("dentist_id", g.profile["id"])
+                .neq("status", "draft").execute().data or [])
+        patient_names = sorted({" ".join(r["patient_name"].split()) for r in rows if r.get("patient_name")}, key=str.casefold)
+    back = {"admin": url_for("admin_dashboard"), "technician": url_for("technician_dashboard"),
+            "dentist": url_for("dentist_dashboard")}[role]
+    try:
+        page_size = int(request.args.get("rows", REPORT_DEFAULT_PAGE_SIZE))
+    except ValueError:
+        page_size = REPORT_DEFAULT_PAGE_SIZE
+    if page_size not in REPORT_PAGE_SIZES:
+        page_size = REPORT_DEFAULT_PAGE_SIZE
+    # "Clear filters" shows only when something differs from the defaults (this month, all patients, 25 rows).
+    default_period = _report_period("month", None)
+    filters_active = (
+        (key not in REPORTS_WITHOUT_PERIOD and (period["kind"], period["ref"]) != (default_period["kind"], default_period["ref"]))
+        or bool(patient)
+        or page_size != REPORT_DEFAULT_PAGE_SIZE
+    )
+    return render_template(
+        "reports.html",
+        profile=g.profile,
+        role=role,
+        available=available,
+        key=key,
+        title=title,
+        description=description,
+        period=period,
+        period_label=period_label,
+        uses_period=key not in REPORTS_WITHOUT_PERIOD,
+        period_options=_period_options(),
+        patient=patient,
+        patient_names=patient_names,
+        report=report,
+        pages=_paginate_report(report, page_size),
+        page_size=page_size,
+        page_sizes=REPORT_PAGE_SIZES,
+        filters_active=filters_active,
+        back=back,
+        generated_at=datetime.now(LAB_TZ),
+    )
+
+
+@app.route("/job-orders/<case_id>/print")
+@role_required("admin", "technician", "dentist")
+def print_job_order(case_id):
+    """One-page printable job order slip (prescription, teeth, instructions, sign-off lines)."""
+    try:
+        cases = supabase_admin.table("dental_cases").select("*").eq("id", case_id).execute().data or []
+        if not cases or not _can_view_case(g.profile, case_id):
+            return "This job order isn't available to you.", 404
+        case = cases[0]
+        ctx = _job_order_context(case, include_internal=g.profile.get("role") != "dentist")
+        dentist = {}
+        if case.get("dentist_id"):
+            rows = (supabase_admin.table("profiles").select("display_name, first_name, last_name, clinic_name, phone, professional_id")
+                    .eq("id", case["dentist_id"]).execute().data or [])
+            dentist = rows[0] if rows else {}
+        return render_template(
+            "job_order_print.html",
+            profile=g.profile,
+            case=case,
+            dentist=dentist,
+            status_label=REPORT_STATUS_LABELS.get(case.get("status"), (case.get("status") or "").replace("_", " ").capitalize()),
+            generated_at=datetime.now(LAB_TZ),
+            **ctx,
+        )
+    except Exception:
+        app.logger.exception("Unable to print job order")
+        return "Unable to load this job order. Check the server logs for details.", 500
 
 
 # =========================

@@ -1,0 +1,225 @@
+{# Confirmations for the dentist's job order form (New Lab Intake pop-up and the Edit page).
+   Include once after the form. It looks for:
+     form[data-intake-confirm]     the job order form (submit buttons name="submit_action",
+                                   value "send" or "draft")
+     [data-intake-cancel]          Cancel / close controls. A link navigates to its href;
+                                   anything else calls window.closeModal().
+   Send and Save as draft always ask first. Cancel asks only when something was entered or
+   changed, and offers to save a draft instead. window.IntakeConfirm.requestCancel() lets
+   other code (e.g. clicking outside the pop-up) go through the same check. #}
+<style>
+    .ic-overlay { position: fixed; inset: 0; z-index: 2200; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, .5); }
+    .ic-overlay.open { display: flex; }
+    .ic-card { width: 100%; max-width: 460px; background: #FFFFFF; border-radius: 14px; padding: 24px; box-shadow: 0 24px 48px rgba(15, 23, 42, .25); font-family: inherit; text-align: left; }
+    .ic-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+    .ic-icon { flex: 0 0 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .ic-icon.send { background: #E0F2FE; color: #0284C7; }
+    .ic-icon.draft { background: #FEF3C7; color: #B45309; }
+    .ic-icon.discard { background: #FEF2F2; color: #B91C1C; }
+    .ic-title { margin: 0 0 6px; font-size: 17px; font-weight: 700; color: #0F172A; }
+    .ic-text { margin: 0; font-size: 14px; line-height: 1.5; color: #475569; }
+    .ic-summary { margin: 10px 0 0; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+    .ic-summary dt { color: #64748B; font-weight: 600; }
+    .ic-summary dd { margin: 0; color: #0F172A; font-weight: 600; overflow-wrap: anywhere; }
+    .ic-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .ic-btn { padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; }
+    .ic-btn:hover { border-color: #94A3B8; }
+    .ic-btn.send { background: #0284C7; border-color: #0284C7; color: #FFFFFF; }
+    .ic-btn.send:hover { background: #0369A1; }
+    .ic-btn.draft { background: #FFFBEB; border-color: #F59E0B; color: #92400E; }
+    .ic-btn.draft:hover { background: #FEF3C7; }
+    .ic-btn.discard { background: #B91C1C; border-color: #B91C1C; color: #FFFFFF; }
+    .ic-btn.discard:hover { background: #991B1B; }
+    .ic-btn:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+</style>
+
+<div class="ic-overlay" id="icDialog" role="alertdialog" aria-modal="true" aria-labelledby="icTitle" aria-describedby="icText">
+    <div class="ic-card">
+        <div class="ic-head">
+            <div class="ic-icon" id="icIcon" aria-hidden="true"></div>
+            <div style="min-width: 0; flex: 1;">
+                <h2 class="ic-title" id="icTitle"></h2>
+                <p class="ic-text" id="icText"></p>
+                <dl class="ic-summary" id="icSummary" hidden></dl>
+            </div>
+        </div>
+        <div class="ic-actions">
+            <button type="button" class="ic-btn" id="icBack"></button>
+            <button type="button" class="ic-btn" id="icAlt" hidden></button>
+            <button type="button" class="ic-btn" id="icOk"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const form = document.querySelector('form[data-intake-confirm]');
+    if (!form) return;
+    const dialog = document.getElementById('icDialog');
+    const icon = document.getElementById('icIcon');
+    const backBtn = document.getElementById('icBack');
+    const altBtn = document.getElementById('icAlt');
+    const okBtn = document.getElementById('icOk');
+    const summary = document.getElementById('icSummary');
+    const draftBtn = form.querySelector('[name="submit_action"][value="draft"]');
+
+    const ICONS = {
+        send: '<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>',
+        draft: '<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>',
+        discard: '<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>',
+    };
+
+    // "Dirty" = the dentist typed, picked or clicked something. Values the page fills in
+    // by script (saved drafts) don't fire these events, so they don't count.
+    let dirty = false;
+    form.addEventListener('input', () => { dirty = true; });
+    form.addEventListener('change', () => { dirty = true; });
+    form.addEventListener('click', (e) => { if (e.target.closest('.tooth-btn, [onclick*="Preset"], [onclick*="clearAllTeeth"]')) dirty = true; });
+
+    // ---- dialog ----
+    let actions = {};
+    let opener = null;
+    function show(opts) {
+        opener = document.activeElement;
+        icon.className = 'ic-icon ' + opts.tone;
+        icon.innerHTML = ICONS[opts.tone];
+        document.getElementById('icTitle').textContent = opts.title;
+        document.getElementById('icText').textContent = opts.text;
+        summary.replaceChildren();
+        summary.hidden = !opts.summary;
+        (opts.summary || []).forEach(([k, v]) => {
+            const dt = document.createElement('dt'); dt.textContent = k;
+            const dd = document.createElement('dd'); dd.textContent = v;
+            summary.append(dt, dd);
+        });
+        backBtn.textContent = opts.back;
+        okBtn.textContent = opts.ok;
+        okBtn.className = 'ic-btn ' + opts.tone;
+        altBtn.hidden = !opts.alt;
+        if (opts.alt) { altBtn.textContent = opts.alt; altBtn.className = 'ic-btn draft'; }
+        actions = { ok: opts.onOk, alt: opts.onAlt };
+        dialog.classList.add('open');
+        backBtn.focus();
+    }
+    function hide(restoreFocus) {
+        dialog.classList.remove('open');
+        if (restoreFocus && opener && opener.focus) opener.focus();
+    }
+    backBtn.addEventListener('click', () => hide(true));
+    okBtn.addEventListener('click', () => { hide(false); actions.ok && actions.ok(); });
+    altBtn.addEventListener('click', () => { hide(false); actions.alt && actions.alt(); });
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) hide(true); });
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && dialog.classList.contains('open')) { e.stopPropagation(); hide(true); }
+    }, true);
+
+    // ---- send / save draft ----
+    function sendSummary() {
+        const val = (sel) => { const el = form.querySelector(sel); return el ? el.value.trim() : ''; };
+        const type = form.querySelector('#case_type');
+        const teeth = Array.from(form.querySelectorAll('input[name="tooth_number"]')).map((i) => i.value);
+        const due = val('#due_date');
+        const stl = form.querySelector('#stl_file'), photos = form.querySelector('#patient_smile');
+        const nStl = stl ? stl.files.length : 0, nPhotos = photos ? photos.files.length : 0;
+        const rows = [['Patient', val('#patient_name') || '—']];
+        if (type && type.selectedIndex > 0) rows.push(['Prosthesis', type.options[type.selectedIndex].text]);
+        rows.push(['Teeth', teeth.length ? teeth.length + ' unit' + (teeth.length !== 1 ? 's' : '') + ' (' + teeth.join(', ') + ')' : 'None selected']);
+        if (due) rows.push(['Due', new Date(due + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })]);
+        const files = [];
+        if (nStl) files.push(nStl + ' STL scan');
+        if (nPhotos) files.push(nPhotos + ' photo' + (nPhotos !== 1 ? 's' : ''));
+        rows.push([form.dataset.intakeMode === 'edit' ? 'New files' : 'Files', files.length ? files.join(', ') : 'None attached']);
+        return rows;
+    }
+
+    let confirmed = false;
+    let skipConfirmOnce = false;
+    function submitNow(action, button) {
+        confirmed = true;
+        let hidden = form.querySelector('input[type="hidden"][name="submit_action"]');
+        if (!hidden) {
+            hidden = document.createElement('input');
+            hidden.type = 'hidden'; hidden.name = 'submit_action';
+            form.appendChild(hidden);
+        }
+        hidden.value = action;  // the disabled buttons below don't send their own value
+        form.querySelectorAll('[name="submit_action"]').forEach((b) => { if (b !== hidden) b.disabled = true; });
+        if (button) {
+            button.dataset.icLabel = button.textContent;
+            button.textContent = action === 'send' ? 'Sending…' : 'Saving…';
+        }
+        HTMLFormElement.prototype.submit.call(form);
+    }
+
+    // Older browsers don't report e.submitter; remember the last submit button clicked.
+    let lastClicked = null;
+    form.addEventListener('click', (e) => {
+        const b = e.target.closest('button[name="submit_action"]');
+        if (b) lastClicked = b;
+    });
+    // Coming back with the browser's Back button: make the buttons usable again.
+    window.addEventListener('pageshow', (e) => {
+        if (!e.persisted) return;
+        confirmed = false;
+        form.querySelectorAll('button[name="submit_action"]').forEach((b) => { b.disabled = false; if (b.dataset.icLabel) b.textContent = b.dataset.icLabel; });
+        const hidden = form.querySelector('input[type="hidden"][name="submit_action"]');
+        if (hidden) hidden.remove();
+    });
+
+    // The submit event only fires after the browser's own checks (required fields) pass.
+    form.addEventListener('submit', (e) => {
+        if (confirmed) return;
+        e.preventDefault();
+        const button = e.submitter || lastClicked;
+        const action = button ? button.value : 'send';
+        if (skipConfirmOnce) { skipConfirmOnce = false; submitNow(action, button); return; }
+        if (action === 'draft') {
+            show({
+                tone: 'draft', title: 'Save as draft?',
+                text: "It won't be sent to the lab yet. You can finish and send it anytime from your Drafts tab.",
+                back: 'Go back', ok: 'Save draft', onOk: () => submitNow('draft', button),
+            });
+        } else {
+            show({
+                tone: 'send', title: 'Send this job order to the lab?',
+                text: "Please check the details below. Once it's sent, you won't be able to edit it.",
+                summary: sendSummary(),
+                back: 'Go back', ok: 'Send to lab', onOk: () => submitNow('send', button),
+            });
+        }
+    });
+
+    // ---- cancel ----
+    function discard(proceed) {
+        form.reset();  // also clears the upload previews (they listen for reset)
+        if (typeof window.clearAllTeeth === 'function') window.clearAllTeeth();
+        dirty = false;
+        proceed();
+    }
+    function requestCancel(proceed) {
+        if (!dirty) { proceed(); return; }
+        const editing = form.dataset.intakeMode === 'edit';
+        show({
+            tone: 'discard',
+            title: editing ? 'Discard your changes?' : 'Discard this job order?',
+            text: editing
+                ? "The changes you made on this page will be lost. To keep them, save them as a draft instead."
+                : "What you entered will be lost. To keep it, save it as a draft instead.",
+            back: 'Keep editing',
+            alt: draftBtn ? 'Save as draft' : null,
+            // Already chosen in this dialog, so skip the second "Save as draft?" question.
+            onAlt: () => { skipConfirmOnce = true; draftBtn.click(); setTimeout(() => { skipConfirmOnce = false; }, 0); },
+            ok: 'Discard', onOk: () => discard(proceed),
+        });
+    }
+    document.querySelectorAll('[data-intake-cancel]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            const href = el.getAttribute('href');
+            requestCancel(href ? () => { window.location.href = href; } : () => window.closeModal && window.closeModal());
+        });
+    });
+
+    window.IntakeConfirm = { requestCancel, isDirty: () => dirty };
+})();
+</script>
