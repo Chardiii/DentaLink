@@ -1,0 +1,343 @@
+{# Material log rows for a stage change (technician dashboard pop-up and job order page).
+
+   Include once per page with `inventory_items` (from app._picker_inventory) in context. Then:
+     MaterialLog.load(container, caseId, stage, hintEl)  fetch the case's material plan and
+         pre-fill rows: amounts from each item's usage rule, and for zirconia discs the units
+         to mill with the open disc picked (or a new disc to enter when none is open)
+     MaterialLog.addRow(container)                      an empty row
+     MaterialLog.collect(container) -> {error} | {rows} check the rows (at least one needed)
+     MaterialLog.attach(form, rows)                     add the rows to the form as hidden
+         log_item / log_amount / log_disc / log_new_disc / log_units / log_used_up fields
+     MaterialLog.confirm(rows, caseNumber, stageName) -> Promise<boolean>  "Are you sure?"
+         dialog listing what will be recorded (stock changes can't be undone from here)
+     MaterialLog.explain(result, caseId)                why collect() refused, in the same
+         dialog; for short stock it offers "Request restock" (notifies the admin) #}
+<style>
+    .ml-row { border: 1px solid var(--border-color, #E2E8F0); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: #FFFFFF; display: grid; gap: 8px; }
+    .ml-reason { font-size: 11.5px; color: #0369A1; background: #F0F9FF; border-radius: 6px; padding: 3px 8px; justify-self: start; }
+    .ml-reason:empty { display: none; }
+    .ml-main, .ml-disc { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; }
+    .ml-row label { display: grid; gap: 3px; font-size: 11px; font-weight: 700; color: var(--text-muted, #64748B); text-transform: uppercase; letter-spacing: .03em; }
+    .ml-row select, .ml-row input[type="number"], .ml-row input[type="text"] { padding: 7px 9px; border: 1px solid var(--border-color, #E2E8F0); border-radius: 7px; font: inherit; font-size: 13px; text-transform: none; letter-spacing: 0; color: #0F172A; background: #FFFFFF; }
+    .ml-row .ml-item { min-width: 240px; flex: 1; }
+    .ml-row .ml-amount, .ml-row .ml-units { width: 96px; }
+    .ml-unit { font-size: 12px; font-weight: 600; color: var(--text-muted, #64748B); text-transform: none; letter-spacing: 0; padding-bottom: 8px; }
+    .ml-amount-wrap { display: flex !important; align-items: flex-end; gap: 6px !important; }
+    .ml-amount-wrap > span:first-child { display: grid; gap: 3px; }
+    .ml-row label.ml-check { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; color: #0F172A; padding-bottom: 8px; }
+    .ml-remove { margin-left: auto; background: transparent; border: 1px solid var(--border-color, #E2E8F0); border-radius: 7px; color: #B91C1C; width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+    .ml-remove:hover { background: #FEF2F2; }
+    .ml-row .invalid { border-color: #EF4444 !important; }
+    .ml-row [hidden] { display: none !important; }
+
+    .ml-confirm { position: fixed; inset: 0; z-index: 1100; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, .5); }
+    .ml-confirm.open { display: flex; }
+    .ml-confirm-card { width: 100%; max-width: 480px; background: #FFFFFF; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 48px rgba(15, 23, 42, .25); font-family: inherit; }
+    .ml-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
+    .ml-icon { flex: 0 0 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .ml-icon.send { background: #E0F2FE; color: #0284C7; }
+    .ml-icon.block { background: #FEF2F2; color: #B91C1C; }
+    .ml-icon.warn { background: #FFFBEB; color: #B45309; }
+    .ml-icon.done { background: #ECFDF5; color: #047857; }
+    .ml-confirm-card h2 { margin: 2px 0 4px; font-size: 17px; color: #0F172A; }
+    .ml-confirm-card p { margin: 0; font-size: 13.5px; color: #475569; line-height: 1.5; }
+    .ml-confirm-card .ml-foot { margin: 0 0 14px; font-size: 12.5px; }
+    .ml-confirm-card .ml-foot:empty, .ml-confirm-list:empty { display: none; }
+    .ml-confirm-list li.short span:last-child { color: #B91C1C; }
+    .ml-confirm-list { list-style: none; margin: 0 0 14px; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+    .ml-confirm-list li { font-size: 13px; color: #0F172A; display: flex; justify-content: space-between; gap: 12px; }
+    .ml-confirm-list li span:last-child { font-weight: 700; white-space: nowrap; text-align: right; }
+    .ml-confirm-list li.note span:last-child { color: #B45309; }
+    .ml-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .ml-confirm-actions button { padding: 9px 16px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; }
+    .ml-confirm-actions .ok { background: #0284C7; border-color: #0284C7; color: #FFFFFF; }
+    .ml-confirm-actions .ok:hover { background: #0369A1; }
+    .ml-confirm-actions button:disabled { opacity: .6; cursor: wait; }
+    .ml-confirm-actions button:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+</style>
+
+<div class="ml-confirm" id="mlConfirm" role="alertdialog" aria-modal="true" aria-labelledby="mlConfirmTitle" aria-describedby="mlConfirmText">
+    <div class="ml-confirm-card">
+        <div class="ml-head">
+            <div class="ml-icon" id="mlConfirmIcon" aria-hidden="true"></div>
+            <div style="min-width: 0; flex: 1;">
+                <h2 id="mlConfirmTitle"></h2>
+                <p id="mlConfirmText"></p>
+            </div>
+        </div>
+        <ul class="ml-confirm-list" id="mlConfirmList"></ul>
+        <p class="ml-foot" id="mlConfirmFoot"></p>
+        <div class="ml-confirm-actions" id="mlConfirmActions"></div>
+    </div>
+</div>
+
+<template id="mlRowTpl">
+    <div class="ml-row">
+        <div class="ml-reason"></div>
+        <div class="ml-main">
+            <label>Material
+                <select class="ml-item">
+                    <option value="">Choose from Inventory…</option>
+                    {% for category, items in (inventory_items or []) | groupby('category') %}
+                        <optgroup label="{{ category }}">
+                            {% for item in items %}<option value="{{ item.id }}" data-unit="{{ item.unit or 'unit' }}" data-qty="{{ '%g' | format((item.quantity or 0) | float) }}"{% if item.tracks_discs %} data-discs="1"{% endif %}>{{ item.item_name }} ({{ '%g' | format((item.quantity or 0) | float) }} {{ item.unit or '' }} left)</option>{% endfor %}
+                        </optgroup>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="ml-amount-wrap"><span>Amount used<input type="number" class="ml-amount" min="0" step="any"></span><span class="ml-unit"></span></label>
+            <button type="button" class="ml-remove" title="Remove this material" aria-label="Remove this material">×</button>
+        </div>
+        <div class="ml-disc" hidden>
+            <label>Disc (ID on the box)
+                <select class="ml-disc-select"></select>
+            </label>
+            <label class="ml-new-wrap" hidden>New disc's ID
+                <input type="text" class="ml-new-label" maxlength="40" placeholder="e.g. A2-014">
+            </label>
+            <label>Units milled
+                <input type="number" class="ml-units" min="1" max="99" step="1">
+            </label>
+            <label class="ml-check"><input type="checkbox" class="ml-used-up"> Disc is now used up</label>
+        </div>
+    </div>
+</template>
+
+<script>
+window.MaterialLog = (function () {
+    const tpl = document.getElementById('mlRowTpl');
+    let discs = {};   // inventory id -> [{id, label, units}] open discs, from the last plan
+
+    function fillDiscs(row, itemId) {
+        const select = row.querySelector('.ml-disc-select');
+        select.replaceChildren(new Option('Choose the open disc…', ''));
+        (discs[itemId] || []).forEach((d) => select.add(new Option(`${d.label} (${d.units} unit${d.units === 1 ? '' : 's'} milled so far)`, d.id)));
+        select.add(new Option('+ Open a new disc (enter its ID)', '__new'));
+        const open = discs[itemId] || [];
+        select.value = open.length === 1 ? open[0].id : (open.length ? '' : '__new');
+        syncNew(row);
+    }
+    function syncNew(row) {
+        row.querySelector('.ml-new-wrap').hidden = row.querySelector('.ml-disc-select').value !== '__new';
+    }
+    function syncRow(row) {
+        const opt = row.querySelector('.ml-item').selectedOptions[0];
+        const isDisc = !!(opt && opt.dataset.discs);
+        row.querySelector('.ml-amount-wrap').hidden = isDisc;
+        row.querySelector('.ml-disc').hidden = !isDisc;
+        row.querySelector('.ml-unit').textContent = opt && opt.value ? opt.dataset.unit : '';
+        if (isDisc) fillDiscs(row, opt.value);
+    }
+    function addRow(container, preset) {
+        container.append(tpl.content.cloneNode(true));
+        const row = container.lastElementChild;
+        row.querySelector('.ml-item').addEventListener('change', () => syncRow(row));
+        row.querySelector('.ml-disc-select').addEventListener('change', () => syncNew(row));
+        row.querySelector('.ml-remove').addEventListener('click', () => row.remove());
+        if (preset) {
+            row.querySelector('.ml-item').value = preset.inventory_id;
+            row.querySelector('.ml-reason').textContent = 'Suggested: ' + preset.reason;
+            syncRow(row);
+            if (preset.tracks_discs) row.querySelector('.ml-units').value = preset.units || '';
+            else row.querySelector('.ml-amount').value = preset.amount;
+        }
+        return row;
+    }
+    async function load(container, caseId, stage, hintEl) {
+        container.replaceChildren();
+        if (hintEl) hintEl.textContent = 'Loading the materials for this case…';
+        try {
+            const res = await fetch(`/technician/cases/${encodeURIComponent(caseId)}/material-plan?stage=${encodeURIComponent(stage)}`,
+                                    { credentials: 'same-origin' });
+            const plan = await res.json();
+            if (!res.ok) throw new Error(plan.error || 'error');
+            discs = plan.discs || {};
+            (plan.rows || []).forEach((r) => addRow(container, r));
+            if (!plan.rows || !plan.rows.length) addRow(container);
+            if (hintEl) hintEl.textContent = plan.rows && plan.rows.length
+                ? 'Amounts are calculated from the prescription. Check them and change any that differ, then add anything else used.'
+                : 'No usage rule matches this case at this stage. Choose the material used and enter the amount.';
+        } catch (e) {
+            discs = {};
+            addRow(container);
+            if (hintEl) hintEl.textContent = "The suggested amounts couldn't be loaded. Choose the material used and enter the amount.";
+        }
+    }
+    function collect(container) {
+        const rows = [];
+        let bad = null;
+        container.querySelectorAll('.ml-row').forEach((row) => {
+            row.querySelectorAll('.invalid').forEach((el) => el.classList.remove('invalid'));
+            const item = row.querySelector('.ml-item');
+            const opt = item.selectedOptions[0];
+            const amount = row.querySelector('.ml-amount');
+            const discSel = row.querySelector('.ml-disc-select');
+            const newLabel = row.querySelector('.ml-new-label');
+            const units = row.querySelector('.ml-units');
+            if (!item.value) {
+                if (amount.value || units.value) { item.classList.add('invalid'); bad = bad || 'Choose the material for every row, or remove the row.'; }
+                return;   // an untouched empty row is ignored
+            }
+            // _name / _what / _note describe the row for the confirmation; only log_* fields are sent.
+            const name = opt.textContent.replace(/\s*\([^()]*left\)\s*$/, '');
+            if (opt.dataset.discs) {
+                const n = Number(units.value);
+                const isNew = discSel.value === '__new';
+                const usedUp = row.querySelector('.ml-used-up').checked;
+                if (!discSel.value) { discSel.classList.add('invalid'); bad = bad || 'Choose which disc was milled from.'; }
+                if (isNew && !newLabel.value.trim()) { newLabel.classList.add('invalid'); bad = bad || "Enter the ID written on the new disc's box."; }
+                if (!(Number.isInteger(n) && n >= 1 && n <= 99)) { units.classList.add('invalid'); bad = bad || 'Enter the units milled from the disc (1–99).'; }
+                const discLabel = isNew ? newLabel.value.trim() : (discSel.selectedOptions[0] ? discSel.selectedOptions[0].textContent.replace(/\s*\(.*\)$/, '') : '');
+                const notes = [];
+                if (isNew) notes.push('new disc: 1 disc taken from stock');
+                if (usedUp) notes.push('disc marked used up');
+                rows.push({ log_item: item.value, log_amount: '', log_disc: isNew ? '' : discSel.value,
+                            log_new_disc: isNew ? newLabel.value.trim() : '', log_units: units.value,
+                            log_used_up: usedUp ? '1' : '0',
+                            _name: name, _what: `${n} unit${n === 1 ? '' : 's'} from disc ${discLabel}`, _note: notes.join(' · ') });
+            } else {
+                const a = Number(amount.value);
+                if (!(a > 0 && a <= 1000)) { amount.classList.add('invalid'); bad = bad || 'Enter the amount used for every material.'; }
+                rows.push({ log_item: item.value, log_amount: amount.value, log_disc: '', log_new_disc: '', log_units: '', log_used_up: '0',
+                            _name: name, _what: `${a} ${opt.dataset.unit}`, _note: '' });
+            }
+        });
+        if (bad) return { error: bad };
+        if (!rows.length) return { error: 'Log at least one material used at this stage.' };
+
+        // Not enough in Inventory blocks the move (the server checks again with live stock):
+        // amounts used, and one sealed disc per newly opened disc.
+        const need = {};
+        container.querySelectorAll('.ml-row').forEach((row) => {
+            const opt = row.querySelector('.ml-item').selectedOptions[0];
+            if (!opt || !opt.value) return;
+            const n = opt.dataset.discs
+                ? (row.querySelector('.ml-disc-select').value === '__new' ? 1 : 0)
+                : Number(row.querySelector('.ml-amount').value);
+            if (!need[opt.value]) need[opt.value] = { opt, total: 0, rows: [] };
+            need[opt.value].total += n;
+            need[opt.value].rows.push(row);
+        });
+        const short = Object.values(need).filter((x) => Number(x.opt.dataset.qty) + 1e-9 < x.total);
+        if (short.length) {
+            short.forEach((x) => x.rows.forEach((row) => row.querySelector('.ml-item').classList.add('invalid')));
+            return { error: 'Not enough stock in Inventory.',
+                     short: short.map((x) => ({ name: x.opt.textContent.replace(/\s*\([^()]*left\)\s*$/, ''),
+                                               need: `${Math.round(x.total * 1000) / 1000} ${x.opt.dataset.unit}`,
+                                               have: `${x.opt.dataset.qty} ${x.opt.dataset.unit}` })) };
+        }
+        return { rows };
+    }
+    function attach(form, rows) {
+        form.querySelectorAll('input[type="hidden"][name^="log_"]').forEach((el) => el.remove());
+        rows.forEach((r) => Object.entries(r).forEach(([name, value]) => {
+            if (!name.startsWith('log_')) return;
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = name; input.value = value;
+            form.appendChild(input);
+        }));
+    }
+
+    // ---- Dialog: the confirmation and every message in this flow share one styled dialog ----
+    const ICONS = {
+        send: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
+        block: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>',
+        warn: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>',
+        done: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+    };
+    const dlg = document.getElementById('mlConfirm');
+    const actions = document.getElementById('mlConfirmActions');
+    let settle = null;
+    function closeDialog(answer) {
+        dlg.classList.remove('open');
+        if (settle) { const s = settle; settle = null; s(answer); }
+    }
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDialog(false); });
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && dlg.classList.contains('open')) { e.stopPropagation(); closeDialog(false); }
+    }, true);
+
+    // opts: {tone, title, text, items: [{left, right, cls}], foot, buttons: [{label, value, primary}]}
+    function openDialog(opts) {
+        const icon = document.getElementById('mlConfirmIcon');
+        icon.className = 'ml-icon ' + opts.tone;
+        icon.innerHTML = ICONS[opts.tone];
+        document.getElementById('mlConfirmTitle').textContent = opts.title;
+        document.getElementById('mlConfirmText').textContent = opts.text || '';
+        document.getElementById('mlConfirmFoot').textContent = opts.foot || '';
+        const list = document.getElementById('mlConfirmList');
+        list.replaceChildren();
+        (opts.items || []).forEach((it) => {
+            const li = document.createElement('li');
+            if (it.cls) li.className = it.cls;
+            li.append(Object.assign(document.createElement('span'), { textContent: it.left || '' }),
+                      Object.assign(document.createElement('span'), { textContent: it.right || '' }));
+            list.append(li);
+        });
+        actions.replaceChildren();
+        opts.buttons.forEach((b) => {
+            const btn = Object.assign(document.createElement('button'), { type: 'button', textContent: b.label });
+            if (b.primary) btn.className = 'ok';
+            btn.addEventListener('click', () => closeDialog(b.value));
+            actions.append(btn);
+        });
+        dlg.classList.add('open');
+        actions.firstElementChild.focus();
+        return new Promise((resolve) => { settle = resolve; });
+    }
+
+    // "Are you sure?" with the list of what will be recorded. Resolves true on Save & advance.
+    function confirm(rows, caseNumber, stageName) {
+        const items = [];
+        rows.forEach((r) => {
+            items.push({ left: r._name, right: r._what });
+            if (r._note) items.push({ left: '', right: r._note, cls: 'note' });
+        });
+        return openDialog({
+            tone: 'send', title: `Move ${caseNumber ? '#' + caseNumber : 'this case'} to ${stageName}?`,
+            text: 'These materials will be deducted from Inventory and recorded on the job order.', items,
+            buttons: [{ label: 'Go back', value: false }, { label: 'Save & advance', value: true, primary: true }],
+        }).then((v) => v === true);
+    }
+
+    // Why the rows can't be saved. Not enough stock offers to send restock requests to the admin
+    // for the short materials (the same requests as "Running low on a material?").
+    async function explain(result, caseId) {
+        if (!result.short) {
+            await openDialog({ tone: 'warn', title: 'Check the material log', text: result.error,
+                               buttons: [{ label: 'OK', value: true, primary: true }] });
+            return;
+        }
+        const choice = await openDialog({
+            tone: 'block', title: 'Not enough stock to move this case',
+            text: "Inventory doesn't have enough of these materials for this stage:",
+            items: result.short.map((s) => ({ left: s.name, right: `needs ${s.need} · has ${s.have}`, cls: 'short' })),
+            foot: 'The case stays at its current stage until the admin restocks or corrects the count.',
+            buttons: [{ label: 'Go back', value: false }, { label: 'Request restock', value: 'request', primary: true }],
+        });
+        if (choice !== 'request') return;
+        const token = (document.querySelector('input[name="csrf_token"]') || {}).value || '';
+        let sent = 0;
+        for (const s of result.short) {
+            const body = new FormData();
+            body.append('csrf_token', token);
+            body.append('item_name', s.name);
+            try {
+                const res = await fetch(`/technician/cases/${encodeURIComponent(caseId)}/request-material`,
+                                        { method: 'POST', body, credentials: 'same-origin' });
+                if (res.ok) sent += 1;
+            } catch (e) { /* counted as not sent */ }
+        }
+        await openDialog(sent === result.short.length
+            ? { tone: 'done', title: 'Restock request sent',
+                text: 'The admin was notified and will see it under Restock Requests:',
+                items: result.short.map((s) => ({ left: s.name, right: `needs ${s.need}` })),
+                foot: "You'll get a notification when it's restocked. Then move the case again.",
+                buttons: [{ label: 'OK', value: true, primary: true }] }
+            : { tone: 'warn', title: "The request couldn't be sent",
+                text: 'Check your connection and try again, or tell the admin directly.',
+                buttons: [{ label: 'OK', value: true, primary: true }] });
+    }
+    return { load, addRow, collect, attach, confirm, explain };
+})();
+</script>
