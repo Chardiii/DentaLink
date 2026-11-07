@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1830 1527" width="1830" height="1527">
+<title>DentaLink System Communication and Interaction</title><defs><marker id="ah" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#44546a"/></marker><marker id="ah-r" viewBox="0 0 12 12" refX="1" refY="6" markerWidth="7" markerHeight="7" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#44546a"/></marker><marker id="ah-gold" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#bf9000"/></marker><marker id="ah-gold-r" viewBox="0 0 12 12" refX="1" refY="6" markerWidth="7" markerHeight="7" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#bf9000"/></marker></defs>
+<rect width="1830" height="1527" fill="#fff"/>
+<rect x="152" y="33" width="1594" height="203" rx="26" fill="#fff" stroke="#2f5597" stroke-width="2.5"/>
+<text x="949.0" y="57.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle" dominant-baseline="central">Client Tier – Web Browser</text>
+<rect x="175" y="113" width="239" height="100" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="294.5" y="146.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Laboratory</text>
+<text x="294.5" y="179.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Administrator</text>
+<rect x="575" y="113" width="205" height="100" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="677.5" y="146.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Laboratory</text>
+<text x="677.5" y="179.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Technician</text>
+<rect x="940" y="113" width="336" height="100" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="1108.0" y="146.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Partner Dentist</text>
+<text x="1108.0" y="179.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">(computer or phone)</text>
+<rect x="1437" y="113" width="286" height="100" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="1580.0" y="146.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Phone Camera</text>
+<text x="1580.0" y="179.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">(scans QR label)</text>
+<rect x="133" y="358" width="1089" height="803" rx="26" fill="#fff" stroke="#2f5597" stroke-width="2.5"/>
+<text x="677.5" y="382.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle" dominant-baseline="central">Application Tier – Railway Cloud Platform</text>
+<rect x="491" y="438" width="372" height="100" rx="28" fill="#fff" stroke="#2f5597" stroke-width="2.5"/>
+<text x="677" y="488.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Gunicorn WSGI Server</text>
+<line x1="678" y1="538" x2="678" y2="681" stroke="#44546a" stroke-width="3" marker-end="url(#ah)"/>
+<line x1="678" y1="236" x2="678" y2="438" stroke="#44546a" stroke-width="3" marker-end="url(#ah)" marker-start="url(#ah-r)"/>
+<text x="694" y="303.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="24" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">HTTPS requests and responses</text>
+<rect x="157" y="681" width="1041" height="458" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="678" y="709.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="28" font-weight="bold" fill="#000" text-anchor="middle" dominant-baseline="central">Flask 3.1 Application</text>
+<text x="174" y="773.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">• Routes and Jinja2 pages with role-based access and CSRF protection</text>
+<text x="174" y="834.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">• Live updates API, polled by open pages every 10 seconds</text>
+<text x="174" y="895.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">• QR dispatch label generator (qrcode)</text>
+<text x="174" y="956.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">• Forecasting engine in a background process (pandas, NumPy, scikit-learn)</text>
+<text x="174" y="1017.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">• Backup scheduler, checked every minute</text>
+<text x="174" y="1078.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">• Excel report files (openpyxl)</text>
+<rect x="1420" y="422" width="320" height="133" rx="28" fill="#fff2cc" stroke="#bf9000" stroke-width="2.5"/>
+<text x="1580.0" y="455.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">jsDelivr CDN</text>
+<text x="1580.0" y="488.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">(three.js library</text>
+<text x="1580.0" y="521.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">for the STL viewer)</text>
+<line x1="1484" y1="422" x2="1178" y2="214" stroke="#bf9000" stroke-width="3" stroke-dasharray="14 10" marker-end="url(#ah-gold)"/>
+<text x="1437" y="287.8" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="24" font-weight="normal" fill="#7f6000" text-anchor="middle" dominant-baseline="central">loaded by</text>
+<text x="1437" y="318.2" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="24" font-weight="normal" fill="#7f6000" text-anchor="middle" dominant-baseline="central">the browser</text>
+<rect x="1400" y="769" width="406" height="134" rx="28" fill="#fff2cc" stroke="#bf9000" stroke-width="2.5"/>
+<text x="1603.0" y="803.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Brevo Email API</text>
+<text x="1603.0" y="836.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">(account approval, rejection,</text>
+<text x="1603.0" y="869.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">and backup failure emails)</text>
+<line x1="1198" y1="836" x2="1400" y2="836" stroke="#44546a" stroke-width="3" marker-end="url(#ah)"/>
+<text x="1300" y="811.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="24" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">sends emails</text>
+<line x1="678" y1="1161" x2="678" y2="1253" stroke="#44546a" stroke-width="3" marker-end="url(#ah)" marker-start="url(#ah-r)"/>
+<text x="694" y="1212.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="24" font-weight="normal" fill="#000" text-anchor="start" dominant-baseline="central">reads and writes data</text>
+<rect x="33" y="1253" width="1227" height="240" rx="26" fill="#fff" stroke="#2f5597" stroke-width="2.5"/>
+<text x="646.5" y="1277.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle" dominant-baseline="central">Data Tier – Supabase</text>
+<rect x="50" y="1345" width="370" height="114" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="235.0" y="1369.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Supabase Storage</text>
+<text x="235.0" y="1402.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">(STL files, photos,</text>
+<text x="235.0" y="1435.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">backups)</text>
+<path d="M452,1346 L452,1459 A226.0,11 0 0 0 904,1459 L904,1346" fill="#e2efda" stroke="#548235" stroke-width="2.5"/>
+<ellipse cx="678.0" cy="1346" rx="226.0" ry="11" fill="#e2efda" stroke="#548235" stroke-width="2.5"/>
+<text x="678.0" y="1392.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">PostgreSQL Database</text>
+<text x="678.0" y="1425.0" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">(19 tables, row-level security)</text>
+<rect x="985" y="1352" width="252" height="100" rx="28" fill="#dfe9f6" stroke="#2f5597" stroke-width="2.5"/>
+<text x="1111.0" y="1385.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Supabase</text>
+<text x="1111.0" y="1418.5" font-family="Arial, Liberation Sans, Helvetica, sans-serif" font-size="26" font-weight="normal" fill="#000" text-anchor="middle" dominant-baseline="central">Authentication</text>
+</svg>
