@@ -145,6 +145,7 @@
 <body>
     {% from 'partials/case_files.html' import file_grid, file_viewer %}
     {% from 'partials/tooth_chart.html' import tooth_chart as draw_tooth_chart %}
+    {% from 'partials/previous_job_order.html' import prev_jo_button, prev_jo_dialog %}
     {% set status = case.status %}
     {% set status_labels = {
         "submitted": "Waiting for the lab", "assigned": "Assigned to a technician", "in_progress": "In production",
@@ -180,10 +181,16 @@
                 <p>Clinic portal · {{ profile.display_name or 'Dentist' }}</p>
             </div>
         </div>
-        <a class="btn btn-ghost" href="{{ url_for('dentist_dashboard') }}">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-            Back to my cases
-        </a>
+        <div style="display: flex; gap: 8px;">
+            <a class="btn btn-ghost" href="{{ url_for('print_job_order', case_id=case.id) }}" target="_blank" rel="noopener">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print job order
+            </a>
+            <a class="btn btn-ghost" href="{{ url_for('dentist_dashboard') }}">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to my cases
+            </a>
+        </div>
     </header>
 
     <main class="container">
@@ -211,7 +218,7 @@
 
             {% if parent or remakes %}
                 <div class="links">
-                    {% if parent %}<span class="link-row">Remake of <a href="{{ url_for('dentist_case_summary', case_id=parent.id) }}">#{{ parent.case_number }}</a>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>{% endif %}
+                    {% if parent %}<span class="link-row">Remake of <a href="{{ url_for('dentist_case_summary', case_id=parent.id) }}">#{{ parent.case_number }}</a>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>{{ prev_jo_button(parent.id, 'View original job order #' ~ parent.case_number) }}{% endif %}
                     {% for rm in remakes %}
                         <span class="link-row">Remake <a href="{{ url_for('dentist_case_summary', case_id=rm.id) if rm.status not in ['draft', 'needs_revision'] else url_for('edit_dental_case', case_id=rm.id) }}">#{{ rm.case_number }}</a> · {{ status_labels.get(rm.status, rm.status | replace('_', ' ') | capitalize) if rm.status != 'needs_revision' else 'Waiting for your update' }} · due {{ rm.due_date }}</span>
                     {% endfor %}
@@ -383,6 +390,7 @@
     </main>
 
     {{ file_viewer() }}
+    {{ prev_jo_dialog() }}
     {% include 'partials/action_notice.html' %}
     <script>
         // Show stored UTC times in the viewer's local time; plain dates stay calendar dates.

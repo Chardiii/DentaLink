@@ -288,12 +288,12 @@
                     <svg width="18" height="18" fill="none" stroke="var(--accent-yellow)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                     {% if case.remake_of %}Update Remake: #{{ case.case_number }}{% elif case.status == 'needs_revision' %}Revise Prescription: #{{ case.case_number }}{% else %}Edit Draft Prescription: #{{ case.case_number }}{% endif %}
                 </h2>
-                <a href="{{ url_for('dentist_dashboard') }}" class="close-btn" title="Close and return to Dashboard">
+                <a href="{{ url_for('dentist_dashboard') }}" class="close-btn" title="Close and return to Dashboard" data-intake-cancel>
                     <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </a>
             </div>
 
-            <form method="POST" action="{{ url_for('edit_dental_case', case_id=case.id) }}" id="dental-case-form" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('edit_dental_case', case_id=case.id) }}" id="dental-case-form" enctype="multipart/form-data" data-intake-confirm data-intake-mode="edit">
                 <div class="modal-body">
                     {% if case.status == 'needs_revision' and (case.revision_notes or case.remake_of) %}
                         <div style="margin-bottom: 18px; padding: 12px 14px; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; background: rgba(239, 68, 68, 0.06); font-size: 13px; color: #334155;">
@@ -426,7 +426,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <a href="{{ url_for('dentist_dashboard') }}" class="btn btn-outline">Cancel</a>
+                    <a href="{{ url_for('dentist_dashboard') }}" class="btn btn-outline" data-intake-cancel>Cancel</a>
                     <button type="submit" class="btn btn-outline" name="submit_action" value="draft" style="border-color: var(--accent-yellow); color: var(--accent-yellow);">
                         Save Draft Updates
                     </button>
@@ -601,12 +601,10 @@
         submitBtn.addEventListener("click", function(e) {
             if (selectedTeeth.size === 0) { 
                 e.preventDefault();
-                alert("Please select at least one tooth on the odontogram."); 
-                return false; 
+                alert("Please select at least one tooth on the odontogram.");
+                return false;
             }
-            if (!confirm("Dispatch completed prescription order to Mrkzter Dental Laboratory?")) {
-                e.preventDefault();
-            }
+            // The "Send this job order?" confirmation comes from partials/intake_confirm.html.
         });
 
         // =====================================
@@ -642,5 +640,6 @@
             }
         });
     </script>
+    {% include 'partials/intake_confirm.html' %}
 </body>
 </html>
