@@ -1,7 +1,6 @@
 import os
 import json
 import secrets
-import tempfile
 import uuid
 import zipfile
 from functools import wraps
@@ -107,8 +106,20 @@ BACKUP_TABLES = (
     "material_requests",
     "notifications",
     "login_history",
+    # Added later; listed after the tables they reference so a restore inserts them in order.
+    "case_dispatches",
+    "case_dispatch_events",
+    "case_issue_reports",
+    "job_order_history",
+    "forecast_runs",
+    "zirconia_discs",
+    "zirconia_disc_usage",
 )
+# Tables every DentaLink backup has had; older backups may lack the ones added after them.
+BACKUP_CORE_TABLES = BACKUP_TABLES[:9]
 BACKUP_STORAGE_BUCKETS = ("dental-case-files",)
+BACKUP_BUCKET = "system-backups"          # where saved backups (scheduled and manual) are kept
+BACKUP_MAX_BYTES = 45 * 1024 * 1024       # Supabase's free plan accepts uploads up to 50 MB
 LOGIN_HISTORY_PAGE_SIZE = 100
 LOGIN_EVENT_TYPES = ("all", "success", "failed", "blocked", "logout")
 LOGIN_HISTORY_PERIODS = {"all": None, "24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
@@ -760,98 +771,353 @@ def admin_backup():
             "admin_backup.html",
             profile=profile,
             csrf_token=_csrf_token(),
+            **_backup_page_context(),
         )
     except Exception:
         app.logger.exception("Unable to open the admin backup page")
         return "Unable to load backup page.", 500
 
 
+def _build_backup_zip():
+    """The full backup ZIP (every backed-up table, every case file, a manifest) as bytes.
+    Used by the Download button and by scheduled backups alike."""
+    import io
+    buffer = io.BytesIO()
+    created_at = datetime.utcnow().isoformat() + "Z"
+    storage_manifest = []
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
+        for table_name in BACKUP_TABLES:
+            rows = _backup_table_rows(table_name)
+            archive.writestr(f"database/{table_name}.json", json.dumps(rows, ensure_ascii=False, default=str))
+
+        for bucket_name in BACKUP_STORAGE_BUCKETS:
+            bucket = supabase_admin.storage.from_(bucket_name)
+            for object_path, metadata in _storage_objects(bucket):
+                if not _safe_archive_path(object_path):
+                    raise ValueError(f"Unsafe storage object path in {bucket_name}")
+                archive.writestr(f"storage/{bucket_name}/{object_path}", bucket.download(object_path))
+                object_metadata = metadata.get("metadata") or {}
+                storage_manifest.append({
+                    "bucket": bucket_name,
+                    "path": object_path,
+                    "content_type": object_metadata.get("mimetype")
+                    or object_metadata.get("contentType")
+                    or "application/octet-stream",
+                })
+
+        manifest = {
+            "format": "dentalink-app-backup",
+            "version": 1,
+            "created_at": created_at,
+            "database_tables": list(BACKUP_TABLES),
+            "storage_objects": storage_manifest,
+            "configuration": {
+                "values": {"APP_URL": APP_URL, "SUPABASE_URL": SUPABASE_URL},
+                "redacted": ["FLASK_SECRET_KEY", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "BREVO_SMTP_PASS"],
+            },
+            "encrypted": False,
+            "limitations": [
+                "This archive does not include database schema or Supabase Auth accounts.",
+                "Restore merges records into the existing schema and does not delete newer records.",
+            ],
+        }
+        archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+    return buffer.getvalue()
+
+
+# ---------- Saved backups (system-backups bucket) and the schedule ----------
+BACKUP_FREQUENCIES = ("off", "daily", "weekly", "monthly")
+WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+BACKUP_STALE_MINUTES = 30   # a "running" backup older than this died with its server process
+
+
+def _backup_settings():
+    rows = supabase_admin.table("backup_settings").select("*").eq("id", 1).execute().data or []
+    return rows[0] if rows else {"frequency": "off", "time_of_day": "12:00", "weekday": 6, "month_day": 1, "keep_count": 7}
+
+
+def _backup_slot(settings, now, step):
+    """The scheduled time at or before `now` (step=0) or the one after it (step=1), in lab time;
+    None when backups are off."""
+    freq = settings.get("frequency")
+    if freq not in ("daily", "weekly", "monthly"):
+        return None
+    hour, minute = (int(x) for x in (settings.get("time_of_day") or "12:00").split(":"))
+    local = now.astimezone(LAB_TZ)
+
+    def at(d):
+        return datetime(d.year, d.month, d.day, hour, minute, tzinfo=LAB_TZ)
+
+    if freq == "daily":
+        slot = at(local.date())
+        last = slot if slot <= local else slot - timedelta(days=1)
+        return last if step == 0 else last + timedelta(days=1)
+    if freq == "weekly":
+        day = local.date() - timedelta(days=(local.weekday() - int(settings.get("weekday", 6))) % 7)
+        slot = at(day)
+        last = slot if slot <= local else slot - timedelta(days=7)
+        return last if step == 0 else last + timedelta(days=7)
+    day_no = int(settings.get("month_day", 1))
+    last = at(local.date().replace(day=day_no))
+    if last > local:   # this month's date hasn't come yet: the last one was last month's
+        last = at((local.date().replace(day=1) - timedelta(days=1)).replace(day=day_no))
+    if step == 0:
+        return last
+    return at((last.date().replace(day=28) + timedelta(days=4)).replace(day=day_no))
+
+
+def _save_backup(kind, data, user_id=None, due_at=None, run_id=None):
+    """Store a backup ZIP in the system-backups bucket and record it; returns the run row.
+    A scheduled run's row already exists (it was claimed first); otherwise one is created."""
+    if len(data) > BACKUP_MAX_BYTES:
+        raise ValueError(f"The backup is too large to store ({len(data) / 1048576:.1f} MB; the limit is "
+                         f"{BACKUP_MAX_BYTES // 1048576} MB). Download backups from this page instead.")
+    stamp = datetime.now(LAB_TZ)
+    # The short suffix keeps two backups made in the same second from overwriting each other.
+    path = f"{kind}/dentalink-backup-{stamp:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}.zip"
+    supabase_admin.storage.from_(BACKUP_BUCKET).upload(path, data, {"content-type": "application/zip", "upsert": "true"})
+    done = {"status": "succeeded", "finished_at": _now_iso(), "file_path": path, "size_bytes": len(data)}
+    if run_id:
+        row = supabase_admin.table("backup_runs").update(done).eq("id", run_id).execute().data[0]
+    else:
+        row = supabase_admin.table("backup_runs").insert(dict(done, kind=kind, created_by=user_id, due_at=due_at)).execute().data[0]
+    _prune_backups()
+    return row
+
+
+def _prune_backups():
+    """Keep only the newest saved backups (the schedule's keep_count); delete older files."""
+    keep = int(_backup_settings().get("keep_count") or 7)
+    saved = (supabase_admin.table("backup_runs").select("id, file_path").eq("status", "succeeded")
+             .order("started_at", desc=True).execute().data or [])
+    saved = [r for r in saved if r.get("file_path")]
+    for old in saved[keep:]:
+        try:
+            supabase_admin.storage.from_(BACKUP_BUCKET).remove([old["file_path"]])
+        except Exception:
+            app.logger.exception("Unable to delete old backup %s", old["file_path"])
+        supabase_admin.table("backup_runs").update({"file_path": None}).eq("id", old["id"]).execute()
+
+
+def _admin_emails():
+    """(email, name) for every approved admin: the address each one signs in with."""
+    admins = (supabase_admin.table("profiles").select("id, display_name, first_name")
+              .eq("role", "admin").eq("status", "approved").execute().data or [])
+    out = []
+    for a in admins:
+        try:
+            user = supabase_admin.auth.admin.get_user_by_id(a["id"])
+            email = getattr(getattr(user, "user", None), "email", None)
+            if email:
+                out.append((email, _display_name(a, "Administrator")))
+        except Exception:
+            app.logger.exception("Unable to look up admin email for %s", a["id"])
+    return out
+
+
+def _send_plain_email(recipient, name, subject, html):
+    """Send one email through Brevo (the same account as the approval emails)."""
+    api_key = os.getenv("BREVO_SMTP_PASS")
+    sender = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+    if not api_key or not recipient:
+        app.logger.warning("Email not sent (%s): Brevo key or recipient missing", subject)
+        return
+    payload = {"sender": {"name": "DentaLink LIS", "email": sender}, "to": [{"email": recipient, "name": name}],
+               "subject": subject, "htmlContent": html}
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email", data=json.dumps(payload).encode("utf-8"),
+        headers={"accept": "application/json", "api-key": api_key, "content-type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        resp.read()
+
+
+def _alert_backup_failed(kind, due_at, error):
+    """Tell every admin, in the app and by email, that a backup failed."""
+    from markupsafe import escape
+    when = (_parse_timestamp(due_at) or datetime.now(timezone.utc)).astimezone(LAB_TZ)
+    label = f"The scheduled backup for {when:%b %d, %Y %I:%M %p}" if kind == "scheduled" else "A backup"
+    _notify_admins(f"{label} failed: {error} Open Backup & Recovery to try again.", link="/admin/backup")
+    app_url = APP_URL or "http://localhost:5000"
+    for email, name in _admin_emails():
+        html = (f"<p>Hi {escape(name)},</p><p>{label} of DentaLink <strong>failed</strong>.</p>"
+                f"<p style=\"color:#B91C1C\">{escape(error)}</p>"
+                f"<p>No data was lost, but there is no new backup. Open "
+                f"<a href=\"{app_url}/admin/backup\">Backup &amp; Recovery</a> to back up now; "
+                f"the next scheduled backup will also run as planned.</p><p>DentaLink LIS</p>")
+        try:
+            _send_plain_email(email, name, "DentaLink backup failed", html)
+        except Exception:
+            app.logger.exception("Unable to email the backup failure to %s", email)
+
+
+def run_due_backup(now=None):
+    """Make the scheduled backup if one is due and not done yet. Called every minute.
+
+    Catch-up: only the most recent scheduled time is checked, so after downtime the missed
+    backup runs once as soon as the server is back (not once per missed day). A time before
+    the schedule was last saved doesn't count, so saving a schedule doesn't start one.
+    Each time is claimed with a unique row first, so two app processes never both run it.
+    Returns the run row it made, or None.
+    """
+    now = now or datetime.now(timezone.utc)
+    settings = _backup_settings()
+    slot = _backup_slot(settings, now, 0)
+    if slot is None:
+        return None
+    saved_at = _parse_timestamp(settings.get("updated_at"))
+    if saved_at and slot < saved_at:
+        return None
+    # A run left "running" by a server that stopped mid-backup is marked failed, so it shows.
+    stale = (now - timedelta(minutes=BACKUP_STALE_MINUTES)).isoformat()
+    (supabase_admin.table("backup_runs")
+     .update({"status": "failed", "finished_at": _now_iso(), "error": "The server stopped before the backup finished."})
+     .eq("status", "running").lt("started_at", stale).execute())
+    due = slot.astimezone(timezone.utc).isoformat()
+    if supabase_admin.table("backup_runs").select("id").eq("kind", "scheduled").eq("due_at", due).execute().data:
+        return None
+    try:
+        run = supabase_admin.table("backup_runs").insert({"kind": "scheduled", "due_at": due, "status": "running"}).execute().data[0]
+    except Exception:
+        return None   # another process claimed this time first
+    try:
+        return _save_backup("scheduled", _build_backup_zip(), due_at=due, run_id=run["id"])
+    except Exception as error:
+        app.logger.exception("Scheduled backup failed")
+        message = str(error) if isinstance(error, ValueError) else "Something went wrong while creating or saving the backup."
+        (supabase_admin.table("backup_runs").update({"status": "failed", "finished_at": _now_iso(), "error": message})
+         .eq("id", run["id"]).execute())
+        _alert_backup_failed("scheduled", due, message)
+        return None
+
+
+def _backup_scheduler():
+    """Background loop: check for a due backup every minute, for the life of the process."""
+    import time
+    time.sleep(20)   # let the app finish starting
+    while True:
+        try:
+            run_due_backup()
+        except Exception:
+            app.logger.exception("Backup scheduler check failed")
+        time.sleep(60)
+
+
+def start_backup_scheduler():
+    if os.getenv("DISABLE_BACKUP_SCHEDULER") == "1" or getattr(start_backup_scheduler, "started", False):
+        return
+    start_backup_scheduler.started = True
+    threading.Thread(target=_backup_scheduler, name="backup-scheduler", daemon=True).start()
+
+
 @app.route("/admin/backup/download", methods=["POST"])
 def admin_backup_download():
+    """Make a backup now: saved to the backup list and downloaded to this computer."""
+    import io
     user_id = session.get("user_id")
     if not user_id:
         return redirect(url_for("login"))
-
     try:
         if not _approved_admin_profile(user_id):
             return "Access denied.", 403
         if not _valid_csrf_token():
             return "Invalid backup request. Reload the page and try again.", 400
-
-        backup_file = tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024)
-        created_at = datetime.utcnow().isoformat() + "Z"
-        storage_manifest = []
-        with zipfile.ZipFile(
-            backup_file,
-            mode="w",
-            compression=zipfile.ZIP_DEFLATED,
-            compresslevel=1,
-        ) as archive:
-            for table_name in BACKUP_TABLES:
-                rows = _backup_table_rows(table_name)
-                archive.writestr(
-                    f"database/{table_name}.json",
-                    json.dumps(rows, ensure_ascii=False, default=str),
-                )
-
-            for bucket_name in BACKUP_STORAGE_BUCKETS:
-                bucket = supabase_admin.storage.from_(bucket_name)
-                for object_path, metadata in _storage_objects(bucket):
-                    if not _safe_archive_path(object_path):
-                        raise ValueError(f"Unsafe storage object path in {bucket_name}")
-                    archive_path = f"storage/{bucket_name}/{object_path}"
-                    archive.writestr(archive_path, bucket.download(object_path))
-                    object_metadata = metadata.get("metadata") or {}
-                    storage_manifest.append({
-                        "bucket": bucket_name,
-                        "path": object_path,
-                        "content_type": object_metadata.get("mimetype")
-                        or object_metadata.get("contentType")
-                        or "application/octet-stream",
-                    })
-
-            manifest = {
-                "format": "dentalink-app-backup",
-                "version": 1,
-                "created_at": created_at,
-                "database_tables": list(BACKUP_TABLES),
-                "storage_objects": storage_manifest,
-                "configuration": {
-                    "values": {
-                        "APP_URL": APP_URL,
-                        "SUPABASE_URL": SUPABASE_URL,
-                    },
-                    "redacted": [
-                        "FLASK_SECRET_KEY",
-                        "SUPABASE_PUBLISHABLE_KEY",
-                        "SUPABASE_SERVICE_ROLE_KEY",
-                        "BREVO_SMTP_PASS",
-                    ],
-                },
-                "encrypted": False,
-                "limitations": [
-                    "This archive does not include database schema or Supabase Auth accounts.",
-                    "Restore merges records into the existing schema and does not delete newer records.",
-                ],
-            }
-            archive.writestr(
-                "manifest.json",
-                json.dumps(manifest, ensure_ascii=False, indent=2),
-            )
-
-        backup_file.seek(0)
-        filename = f"dentalink-backup-{datetime.utcnow():%Y%m%d-%H%M%S}.zip"
-        response = send_file(
-            backup_file,
-            mimetype="application/zip",
-            as_attachment=True,
-            download_name=filename,
-        )
-        response.headers["Cache-Control"] = "no-store"
-        return response
+        data = _build_backup_zip()
     except Exception:
         app.logger.exception("Unable to create an admin backup")
         return "Backup failed. Check the server logs for details.", 500
+    try:
+        _save_backup("manual", data, user_id=user_id)
+    except Exception:
+        # The download still goes ahead; the saved list just won't have this copy.
+        app.logger.exception("Unable to save a copy of the manual backup")
+    response = send_file(io.BytesIO(data), mimetype="application/zip", as_attachment=True,
+                         download_name=f"dentalink-backup-{datetime.now(LAB_TZ):%Y%m%d-%H%M%S}.zip")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/admin/backup/schedule", methods=["POST"])
+@role_required("admin")
+def admin_backup_schedule():
+    import re
+    freq = request.form.get("frequency")
+    time_of_day = (request.form.get("time_of_day") or "").strip()
+    try:
+        weekday = int(request.form.get("weekday", 6))
+        month_day = int(request.form.get("month_day", 1))
+        keep = int(request.form.get("keep_count", 7))
+    except ValueError:
+        weekday, month_day, keep = -1, 0, 0
+    if (freq not in BACKUP_FREQUENCIES or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", time_of_day)
+            or not 0 <= weekday <= 6 or not 1 <= month_day <= 28 or not 1 <= keep <= 30):
+        flash("Check the schedule: choose how often, a time, and a day where needed.", "backup-input")
+        return redirect(url_for("admin_backup"))
+    supabase_admin.table("backup_settings").upsert({
+        "id": 1, "frequency": freq, "time_of_day": time_of_day, "weekday": weekday, "month_day": month_day,
+        "keep_count": keep, "updated_at": _now_iso(), "updated_by": g.profile["id"],
+    }).execute()
+    _prune_backups()   # a smaller "keep" takes effect right away
+    nxt = _backup_slot({"frequency": freq, "time_of_day": time_of_day, "weekday": weekday, "month_day": month_day},
+                       datetime.now(timezone.utc), 1)
+    flash("Automatic backups are turned off." if not nxt else
+          f"Automatic backups saved. The next one is on {nxt:%a, %b %d, %Y at %I:%M %p}.", "backup-saved")
+    return redirect(url_for("admin_backup"))
+
+
+@app.route("/admin/backup/files/<run_id>")
+@role_required("admin")
+def admin_backup_file(run_id):
+    """Download a saved backup through a short-lived signed link to the private bucket."""
+    rows = supabase_admin.table("backup_runs").select("file_path").eq("id", run_id).execute().data or []
+    if not rows or not rows[0].get("file_path"):
+        flash("That backup is no longer stored.", "backup-input")
+        return redirect(url_for("admin_backup"))
+    path = rows[0]["file_path"]
+    signed = supabase_admin.storage.from_(BACKUP_BUCKET).create_signed_url(path, 120)
+    url = (signed.get("signedURL") or signed.get("signedUrl")) if isinstance(signed, dict) else signed
+    return redirect(f"{url}{'&' if '?' in url else '?'}download={quote(path.rsplit('/', 1)[-1])}")
+
+
+def _schedule_label(settings):
+    """e.g. "Every Sunday at 11:00 PM"; "Off" when automatic backups are off."""
+    freq = settings.get("frequency")
+    if freq not in ("daily", "weekly", "monthly"):
+        return "Off"
+    t = datetime.strptime(settings.get("time_of_day") or "12:00", "%H:%M").strftime("%I:%M %p").lstrip("0")
+    if freq == "daily":
+        return f"Every day at {t}"
+    if freq == "weekly":
+        return f"Every {WEEKDAY_NAMES[int(settings.get('weekday', 6))]} at {t}"
+    d = int(settings.get("month_day", 1))
+    suffix = "th" if 11 <= d <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(d % 10, "th")
+    return f"Every month on the {d}{suffix} at {t}"
+
+
+def _backup_page_context():
+    """Schedule, next and last backups, and the saved list, for the Backup page."""
+    try:
+        settings = _backup_settings()
+        runs = (supabase_admin.table("backup_runs").select("*").order("started_at", desc=True)
+                .limit(40).execute().data or [])
+    except Exception:
+        app.logger.warning("backup tables unavailable; run the scheduled backups migration")
+        return {"backup_ready": False}
+    for r in runs:
+        r["started_local"] = (_parse_timestamp(r.get("started_at")) or datetime.now(timezone.utc)).astimezone(LAB_TZ)
+        r["due_local"] = _parse_timestamp(r["due_at"]).astimezone(LAB_TZ) if r.get("due_at") else None
+        size = r.get("size_bytes") or 0
+        r["size_label"] = (f"{size / 1048576:.1f} MB" if size >= 1048576 else f"{max(size // 1024, 1)} KB") if size else ""
+    scheduled = [r for r in runs if r["kind"] == "scheduled"]
+    return {
+        "backup_ready": True,
+        "settings": settings,
+        "schedule_label": _schedule_label(settings),
+        "next_backup": _backup_slot(settings, datetime.now(timezone.utc), 1),
+        "last_scheduled": scheduled[0] if scheduled else None,
+        "saved_backups": [r for r in runs if r["status"] == "succeeded" and r.get("file_path")],
+        "recent_failures": [r for r in runs if r["status"] == "failed"][:3],
+        "weekday_names": WEEKDAY_NAMES,
+    }
 
 
 @app.route("/admin/backup/restore", methods=["POST"])
@@ -877,12 +1143,16 @@ def admin_backup_restore():
                 raise ValueError("Backup archive is corrupt or contains duplicate files.")
             manifest = json.loads(archive.read("manifest.json"))
             manifest_tables = manifest.get("database_tables") if isinstance(manifest, dict) else None
-            legacy_tables = [table for table in BACKUP_TABLES if table != "login_history"]
+            # Older backups hold fewer tables than today's list; any known subset with the core
+            # tables is accepted.
             if (
                 not isinstance(manifest, dict)
                 or manifest.get("format") != "dentalink-app-backup"
                 or manifest.get("version") != 1
-                or manifest_tables not in (list(BACKUP_TABLES), legacy_tables)
+                or not isinstance(manifest_tables, list)
+                or len(set(manifest_tables)) != len(manifest_tables)
+                or not set(manifest_tables) <= set(BACKUP_TABLES)
+                or not set(BACKUP_CORE_TABLES) <= set(manifest_tables)
             ):
                 raise ValueError("Unsupported or incomplete DentaLink backup.")
 
@@ -895,8 +1165,6 @@ def admin_backup_restore():
                 if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
                     raise ValueError(f"Invalid data in {archive_path}.")
                 database_rows[table_name] = rows
-            if "login_history" not in database_rows:
-                database_rows["login_history"] = []
 
             storage_objects = manifest.get("storage_objects")
             if not isinstance(storage_objects, list):
@@ -934,8 +1202,8 @@ def admin_backup_restore():
             if set(names) != allowed_paths:
                 raise ValueError("Backup contains unexpected files.")
 
-            for table_name in BACKUP_TABLES:
-                rows = database_rows[table_name]
+            for table_name in BACKUP_TABLES:   # dependency order, whatever order the backup lists
+                rows = database_rows.get(table_name, [])
                 for start in range(0, len(rows), 500):
                     supabase_admin.table(table_name).upsert(rows[start:start + 500]).execute()
 
@@ -6536,6 +6804,10 @@ def admin_analytics():
         d = (d - timedelta(days=1)).replace(day=1)
     return render_template("admin_analytics.html", profile=g.profile, a=data, month=f"{month:%Y-%m}",
                            month_options=options, quiet_days=QUIET_CLINIC_DAYS, fmt_day=_fmt_day)
+
+
+# Scheduled backups: checks every minute in the background (see run_due_backup).
+start_backup_scheduler()
 
 
 # =========================
