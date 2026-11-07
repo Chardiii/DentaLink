@@ -58,7 +58,9 @@ Dentists, technicians, and administrators are specializations of a general Denta
 
 ## 6. Entity-relationship diagram
 
-![Entity-Relationship Diagram](diagrams/erd.jpg)
+The ERD shows the 19 tables of the Supabase database and their one-to-many relationships, including the zirconia disc tracking and scheduled backup tables.
+
+![Entity-Relationship Diagram](diagrams/erd.svg)
 
 *Figure 3. Entity-Relationship Diagram (ERD)*
 
@@ -110,9 +112,11 @@ cancelled      : case cancelled by the laboratory
 | `case_status_history` | Every stage change, with time and user |
 | `case_dispatches`, `case_dispatch_events` | QR dispatch labels and every scan |
 | `case_issue_reports` | Delivery issues reported by clinics |
-| `inventory`, `inventory_logs` | Stock items and stock changes |
+| `inventory`, `inventory_logs` | Stock items, material usage rules, and stock changes |
+| `zirconia_discs`, `zirconia_disc_usage` | Individual opened zirconia discs and the units milled from each disc per case |
 | `material_requests` | Technicians' material requests |
 | `job_order_history` | Imported paper job orders |
 | `forecast_runs` | Stored forecast results |
 | `notifications` | In-app notifications |
 | `login_history` | Sign-in activity |
+| `backup_settings`, `backup_runs` | Scheduled backup settings and the record of each backup run |
