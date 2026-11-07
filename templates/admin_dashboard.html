@@ -548,14 +548,18 @@
                                 </div>
                             </div>
                             
-                            <form class="reassign-form" method="POST" action="{{ url_for('admin_reassign_case', case_id=c.id) }}">
-                                <select name="technician_id" class="select-dark" style="flex: 1;" required>
-                                    <option value="" disabled>Reassign Tech...</option>
+                            {# Reassign: a confirmation (bottom of the page) names both technicians first. #}
+                            <form class="reassign-form" method="POST" action="{{ url_for('admin_reassign_case', case_id=c.id) }}"
+                                  data-case-number="{{ c.case_number }}" data-current-tech="{{ c.technician_id or '' }}"
+                                  data-stage="{{ (c.status or '') | replace('_', ' ') | capitalize }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <select name="technician_id" class="select-dark" style="flex: 1;" required aria-label="Technician for case {{ c.case_number }}">
+                                    <option value="" disabled{% if not c.technician_id %} selected{% endif %}>Choose technician…</option>
                                     {% for tech in technicians %}
-                                        <option value="{{ tech.id }}" {% if c.technician_id == tech.id %}selected{% endif %}>{{ tech.first_name }}</option>
+                                        <option value="{{ tech.id }}" data-name="{{ tech.display_name or tech.first_name }}" {% if c.technician_id == tech.id %}selected{% endif %}>{{ tech.first_name }}{% if c.technician_id == tech.id %} (current){% else %} · {{ tech.active_workload }} active{% endif %}</option>
                                     {% endfor %}
                                 </select>
-                                <button type="submit" class="btn btn-outline-cyan" style="padding: 5px 10px; font-size: 11px;">Move</button>
+                                <button type="submit" class="btn btn-outline-cyan" style="padding: 5px 10px; font-size: 11px;" title="Give this case to the selected technician">Reassign</button>
                             </form>
                             {{ rush_toggle(c) }}
                         </div>
@@ -1159,6 +1163,101 @@
             if (event.target === document.getElementById('settingsModal')) { closeSettingsModal(); }
         }
 
+    </script>
+
+    <!-- REASSIGN CONFIRMATION: names both technicians before the case changes benches -->
+    <style>
+        .ra-overlay { position: fixed; inset: 0; z-index: 2100; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, .5); }
+        .ra-overlay.open { display: flex; }
+        .ra-card { width: 100%; max-width: 440px; background: #FFFFFF; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 48px rgba(15, 23, 42, .25); font-family: inherit; }
+        .ra-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+        .ra-icon { flex: 0 0 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #E0F2FE; color: #0284C7; }
+        .ra-card h2 { margin: 2px 0 4px; font-size: 17px; color: #0F172A; }
+        .ra-card p { margin: 0; font-size: 13.5px; line-height: 1.5; color: #475569; }
+        .ra-swap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 0 0 14px; padding: 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; }
+        .ra-swap div { display: grid; gap: 2px; min-width: 0; }
+        .ra-swap small { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #64748B; }
+        .ra-swap strong { font-size: 14px; color: #0F172A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ra-swap .arrow { color: #0284C7; font-size: 18px; }
+        .ra-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+        .ra-actions button { padding: 9px 16px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; }
+        .ra-actions .ok { background: #0284C7; border-color: #0284C7; color: #FFFFFF; }
+        .ra-actions .ok:hover { background: #0369A1; }
+        .ra-actions button:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+    </style>
+    <div class="ra-overlay" id="reassignDialog" role="alertdialog" aria-modal="true" aria-labelledby="raTitle" aria-describedby="raText">
+        <div class="ra-card">
+            <div class="ra-head">
+                <div class="ra-icon" aria-hidden="true">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                </div>
+                <div>
+                    <h2 id="raTitle"></h2>
+                    <p id="raText"></p>
+                </div>
+            </div>
+            <div class="ra-swap" aria-hidden="true">
+                <div><small>From</small><strong id="raFrom"></strong></div>
+                <span class="arrow">→</span>
+                <div><small>To</small><strong id="raTo"></strong></div>
+            </div>
+            <p id="raNote"></p>
+            <div class="ra-actions">
+                <button type="button" id="raCancel">Cancel</button>
+                <button type="button" class="ok" id="raConfirm">Reassign</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        const dialog = document.getElementById('reassignDialog');
+        let pending = null;   // { action, techId }
+        let confirmed = false;
+        const close = () => { dialog.classList.remove('open'); pending = null; };
+
+        document.addEventListener('submit', (e) => {
+            const form = e.target.closest('.reassign-form');
+            if (!form || confirmed) return;
+            e.preventDefault();
+            const select = form.querySelector('select[name="technician_id"]');
+            const chosen = select.selectedOptions[0];
+            if (!chosen || !chosen.value) return;
+            const current = form.dataset.currentTech;
+            const currentOpt = current ? select.querySelector(`option[value="${CSS.escape(current)}"]`) : null;
+            const fromName = currentOpt ? currentOpt.dataset.name : 'No technician yet';
+            const toName = chosen.dataset.name;
+            document.getElementById('raTitle').textContent = chosen.value === current
+                ? `#${form.dataset.caseNumber} is already ${toName}'s` : `Reassign #${form.dataset.caseNumber}?`;
+            document.getElementById('raText').textContent = chosen.value === current
+                ? 'Choose a different technician in the dropdown to reassign this case.'
+                : `The case stays at its current stage (${form.dataset.stage}) and moves to ${toName}'s bench.`;
+            document.getElementById('raFrom').textContent = fromName;
+            document.getElementById('raTo').textContent = toName;
+            document.getElementById('raNote').textContent = chosen.value === current ? ''
+                : `${toName} will be notified${currentOpt ? `, and ${fromName} will be told it's no longer on their bench` : ''}.`;
+            const ok = document.getElementById('raConfirm');
+            ok.hidden = chosen.value === current;
+            document.getElementById('raCancel').textContent = chosen.value === current ? 'OK' : 'Cancel';
+            pending = { action: form.getAttribute('action'), techId: chosen.value };
+            dialog.classList.add('open');
+            (ok.hidden ? document.getElementById('raCancel') : ok).focus();
+        });
+
+        document.getElementById('raConfirm').addEventListener('click', () => {
+            if (!pending) return;
+            // Live updates may have redrawn the card; find its form again by the case's URL.
+            const form = document.querySelector(`form.reassign-form[action="${CSS.escape(pending.action)}"]`);
+            if (!form) { close(); return; }
+            form.querySelector('select[name="technician_id"]').value = pending.techId;
+            confirmed = true;
+            dialog.querySelectorAll('.ra-actions button').forEach((b) => { b.disabled = true; });
+            document.getElementById('raConfirm').textContent = 'Reassigning…';
+            form.submit();
+        });
+        document.getElementById('raCancel').addEventListener('click', close);
+        dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dialog.classList.contains('open')) { e.stopPropagation(); close(); } }, true);
+    })();
     </script>
     {% include 'partials/action_notice.html' %}
     <script>

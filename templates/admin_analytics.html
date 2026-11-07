@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --border-color: #E2E8F0;
+            --text-main: #1E293B;
+            --text-strong: #0F172A;
+            --text-muted: #64748B;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --series-1: #0284C7;          /* validated: >= 3:1 on the white card */
+            --grid: #E8EDF3;
+            --axis: #CBD5E1;
+            --good: #047857;
+            --bad: #B91C1C;
+            --sidebar-width: 260px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; background-color: var(--bg-main); color: var(--text-main);
+            background-image: radial-gradient(circle at 10% 10%, rgba(2, 132, 199, 0.06) 0%, transparent 45%), radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5;
+        }
+        .dashboard-container { margin-left: var(--sidebar-width); padding: 38px 42px 48px; max-width: 1320px; }
+        .page-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+        .eyebrow { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; color: var(--accent-cyan); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+        .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: #0EA5E9; }
+        h1 { margin: 0; color: var(--text-strong); font-size: clamp(27px, 3vw, 34px); letter-spacing: -.04em; }
+        .lead { max-width: 720px; margin: 9px 0 0; color: var(--text-muted); font-size: 14px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border-radius: 10px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; }
+        .btn-primary { background: var(--accent-cyan); color: #FFFFFF; }
+        .btn-primary:hover { background: var(--accent-cyan-hover); }
+        .btn-ghost { background: #FFFFFF; border-color: var(--border-color); color: var(--text-main); }
+        .btn-ghost:hover { border-color: #94A3B8; }
+        .btn:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+
+        /* One filter row above everything it scopes */
+        .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
+        .filters label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+        .filters select { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 9px; font: inherit; font-size: 13.5px; color: var(--text-strong); background: #FFFFFF; }
+        .filters .note { font-size: 12.5px; color: var(--text-muted); }
+
+        /* Stat tiles */
+        .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .figure { background: #FFFFFF; border: 1px solid rgba(203, 213, 225, .9); border-radius: 14px; padding: 16px 18px; box-shadow: 0 6px 20px rgba(15, 23, 42, .04); }
+        .figure .label { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+        .figure .value { margin-top: 4px; font-size: 30px; font-weight: 700; color: var(--text-strong); letter-spacing: -.02em; line-height: 1.1; }
+        .figure .delta { margin-top: 6px; font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+        .delta.up { color: var(--good); }
+        .delta.down { color: var(--bad); }
+
+        .card { background: #FFFFFF; border: 1px solid rgba(203, 213, 225, .9); border-radius: 14px; box-shadow: 0 6px 20px rgba(15, 23, 42, .04); padding: 20px 22px; margin-bottom: 18px; min-width: 0; }
+        .card-head { margin-bottom: 10px; }
+        .card h2 { margin: 0; font-size: 16px; color: var(--text-strong); letter-spacing: -.01em; }
+        .card-sub { margin: 3px 0 0; color: var(--text-muted); font-size: 13px; }
+        .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+        .two-col .card { margin-bottom: 18px; }
+
+        .chart-box { position: relative; }
+        .chart-box svg { display: block; width: 100%; height: 240px; overflow: visible; }
+        .chart-box svg.short { height: 200px; }
+        .chart-box text { font-size: 11px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .chart-box text.value { fill: var(--text-strong); font-weight: 700; }
+        .chart-box text.cat { fill: var(--text-main); font-variant-numeric: normal; }
+        .chart-box [tabindex]:focus { outline: none; }
+        .chart-box [tabindex]:focus-visible { outline: 2px solid var(--accent-cyan); }
+        .tooltip { position: absolute; z-index: 5; transform: translate(-50%, -100%); padding: 7px 10px; border-radius: 8px; background: #0F172A; color: #E2E8F0; font-size: 12px; white-space: nowrap; pointer-events: none; box-shadow: 0 8px 20px rgba(15, 23, 42, .2); }
+        .tooltip strong { display: block; color: #FFFFFF; font-size: 13.5px; }
+        .empty-chart { padding: 34px 16px; text-align: center; color: var(--text-muted); font-size: 13px; border: 1px dashed var(--border-color); border-radius: 10px; }
+
+        details.table-view { margin-top: 8px; }
+        details.table-view summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--accent-cyan); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+        th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        td { padding: 9px 10px; border-bottom: 1px solid #EEF2F6; vertical-align: top; }
+        tr:last-child td { border-bottom: 0; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .rank { color: var(--text-muted); font-weight: 700; width: 36px; }
+        .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+        .none { color: var(--text-muted); font-size: 13px; padding: 10px 0 0; margin: 0; }
+
+        @media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 1024px) { .dashboard-container { margin-left: 0; padding: 22px; } }
+    </style>
+</head>
+<body>
+    {% set active_admin_page = 'analytics' %}
+    {% include 'partials/admin_sidebar.html' %}
+    {% macro delta(now, before, label) -%}
+        {%- set d = now - before -%}
+        <div class="delta {{ 'up' if d > 0 else ('down' if d < 0 else '') }}">
+            {%- if d > 0 %}<span aria-hidden="true">▲</span> {{ d }} more{% elif d < 0 %}<span aria-hidden="true">▼</span> {{ -d }} fewer{% else %}No change{% endif %} than {{ label }}
+        </div>
+    {%- endmacro %}
+
+    <main class="dashboard-container">
+        <div class="page-heading">
+            <div>
+                <span class="eyebrow"><span class="eyebrow-dot"></span>Analytics</span>
+                <h1>Clinics &amp; job orders</h1>
+                <p class="lead">Who is ordering, how much, and how the lab is delivering. Counts DentaLink job orders only; imported paper job orders aren't included yet.</p>
+            </div>
+            <a class="btn btn-ghost" href="{{ url_for('reports') }}">Printable reports →</a>
+        </div>
+
+        <form class="filters" method="GET" action="{{ url_for('admin_analytics') }}">
+            <label for="month">Month</label>
+            <select id="month" name="month" onchange="this.form.submit()">
+                {% for value, text in month_options %}<option value="{{ value }}"{{ ' selected' if value == month }}>{{ text }}</option>{% endfor %}
+            </select>
+            <noscript><button class="btn btn-primary" type="submit">Show</button></noscript>
+            <span class="note">Trends show the 12 months up to {{ a.month_label }}.</span>
+        </form>
+
+        <section class="figures" aria-label="{{ a.month_label }} at a glance">
+            <div class="figure">
+                <div class="label">Job orders</div>
+                <div class="value">{{ a.now.orders }}</div>
+                {{ delta(a.now.orders, a.before.orders, a.prev_label) }}
+            </div>
+            <div class="figure">
+                <div class="label">Active clinics</div>
+                <div class="value">{{ a.now.active_clinics }}</div>
+                {{ delta(a.now.active_clinics, a.before.active_clinics, a.prev_label) }}
+            </div>
+            <div class="figure">
+                <div class="label">New partner clinics</div>
+                <div class="value">{{ a.now.new_clinics }}</div>
+                <div class="delta">{{ a.before.new_clinics }} in {{ a.prev_label }}</div>
+            </div>
+            <div class="figure">
+                <div class="label">On-time delivery</div>
+                <div class="value">{{ '%d%%' % a.now.on_time if a.now.on_time is not none else '—' }}</div>
+                <div class="delta">{{ a.now.delivered }} case{{ 's' if a.now.delivered != 1 }} delivered</div>
+            </div>
+        </section>
+
+        <section class="card" aria-labelledby="ordersTitle">
+            <div class="card-head">
+                <h2 id="ordersTitle">Job orders per month</h2>
+                <p class="card-sub">Job orders sent to the lab each month.</p>
+            </div>
+            <div class="chart-box"><svg id="ordersChart" role="img" aria-labelledby="ordersTitle"></svg><div class="tooltip" hidden></div></div>
+            <details class="table-view"><summary>Show as a table</summary>
+                <div class="table-wrap"><table><thead><tr><th>Month</th><th class="num">Job orders</th><th class="num">Units</th><th class="num">Active clinics</th></tr></thead>
+                <tbody>{% for t in a.trend %}<tr><td>{{ t.label }}</td><td class="num">{{ t.orders }}</td><td class="num">{{ t.units }}</td><td class="num">{{ t.active_clinics }}</td></tr>{% endfor %}</tbody></table></div>
+            </details>
+        </section>
+
+        <div class="two-col">
+            <section class="card" aria-labelledby="topTitle">
+                <div class="card-head">
+                    <h2 id="topTitle">Top clinics in {{ a.month_label }}</h2>
+                    <p class="card-sub">Ranked by job orders{% if a.ranking | length > 10 %}; the top 10 are shown{% endif %}.</p>
+                </div>
+                {% if a.ranking %}
+                    <div class="chart-box"><svg id="topChart" role="img" aria-labelledby="topTitle"></svg><div class="tooltip" hidden></div></div>
+                {% else %}
+                    <div class="empty-chart">No job orders in {{ a.month_label }}.</div>
+                {% endif %}
+            </section>
+            <section class="card" aria-labelledby="mixTitle">
+                <div class="card-head">
+                    <h2 id="mixTitle">What was ordered</h2>
+                    <p class="card-sub">Job orders in {{ a.month_label }} by prosthesis type.</p>
+                </div>
+                {% if a.mix %}
+                    <div class="chart-box"><svg id="mixChart" role="img" aria-labelledby="mixTitle"></svg><div class="tooltip" hidden></div></div>
+                    <details class="table-view"><summary>Show as a table</summary>
+                        <div class="table-wrap"><table><thead><tr><th>Prosthesis type</th><th class="num">Job orders</th></tr></thead>
+                        <tbody>{% for label, n in a.mix %}<tr><td>{{ label }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</tbody></table></div>
+                    </details>
+                {% else %}
+                    <div class="empty-chart">No job orders in {{ a.month_label }}.</div>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="card" aria-labelledby="rankTitle">
+            <div class="card-head">
+                <h2 id="rankTitle">Clinic ranking, {{ a.month_label }}</h2>
+                <p class="card-sub">Every clinic that ordered this month. Change compares with {{ a.prev_label }}.</p>
+            </div>
+            {% if a.ranking %}
+                <div class="table-wrap"><table>
+                    <thead><tr><th class="rank">#</th><th>Clinic</th><th class="num">Job orders</th><th class="num">Units</th><th class="num">Share</th><th class="num">Change</th><th>Last order</th><th class="num">On-time</th><th class="num">Remakes</th></tr></thead>
+                    <tbody>
+                        {% for r in a.ranking %}
+                            <tr>
+                                <td class="rank">{{ loop.index }}</td>
+                                <td><strong>{{ r.label }}</strong>{% if r.dentists > 1 %}<div class="card-sub" style="margin: 0;">{{ r.dentists }} dentists</div>{% endif %}</td>
+                                <td class="num"><strong>{{ r.orders }}</strong></td>
+                                <td class="num">{{ r.units }}</td>
+                                <td class="num">{{ r.share }}%</td>
+                                <td class="num">{% if r.change > 0 %}<span class="delta up" style="justify-content: flex-end; margin: 0;">▲ {{ r.change }}</span>{% elif r.change < 0 %}<span class="delta down" style="justify-content: flex-end; margin: 0;">▼ {{ -r.change }}</span>{% else %}<span class="card-sub">—</span>{% endif %}</td>
+                                <td>{{ fmt_day(r.last_order) }}</td>
+                                <td class="num">{{ '%d%%' % r.on_time if r.on_time is not none else '—' }}</td>
+                                <td class="num">{{ r.remakes or '—' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table></div>
+            {% else %}
+                <p class="none">No clinic ordered in {{ a.month_label }}.</p>
+            {% endif %}
+        </section>
+
+        <div class="two-col">
+            <section class="card" aria-labelledby="newTitle">
+                <div class="card-head">
+                    <h2 id="newTitle">New partner clinics per month</h2>
+                    <p class="card-sub">Clinics whose first dentist account was approved that month.</p>
+                </div>
+                <div class="chart-box"><svg id="newChart" class="short" role="img" aria-labelledby="newTitle"></svg><div class="tooltip" hidden></div></div>
+                <details class="table-view"><summary>Show as a table</summary>
+                    <div class="table-wrap"><table><thead><tr><th>Month</th><th class="num">New clinics</th></tr></thead>
+                    <tbody>{% for t in a.trend %}<tr><td>{{ t.label }}</td><td class="num">{{ t.new_clinics }}</td></tr>{% endfor %}</tbody></table></div>
+                </details>
+            </section>
+            <section class="card" aria-labelledby="newListTitle">
+                <div class="card-head">
+                    <h2 id="newListTitle">Joined in {{ a.month_label }}</h2>
+                    <p class="card-sub">A clinic that hasn't ordered yet may be worth a follow-up call.</p>
+                </div>
+                {% if a.new_partners %}
+                    <div class="table-wrap"><table>
+                        <thead><tr><th>Clinic</th><th>Dentist</th><th>Joined</th><th>First order</th><th class="num">Orders</th></tr></thead>
+                        <tbody>
+                            {% for p in a.new_partners %}
+                                <tr>
+                                    <td><strong>{{ p.label }}</strong><div class="card-sub" style="margin: 0;">Lic. {{ p.licenses }}</div></td>
+                                    <td>{{ p.dentists }}</td>
+                                    <td>{{ fmt_day(p.joined) }}</td>
+                                    <td>{% if p.first_order %}{{ fmt_day(p.first_order) }}{% else %}<span class="tag">No orders yet</span>{% endif %}</td>
+                                    <td class="num">{{ p.orders }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table></div>
+                {% else %}
+                    <p class="none">No new partner clinics in {{ a.month_label }}.</p>
+                {% endif %}
+            </section>
+        </div>
+
+        <div class="two-col">
+            <section class="card" aria-labelledby="ontimeTitle">
+                <div class="card-head">
+                    <h2 id="ontimeTitle">On-time delivery</h2>
+                    <p class="card-sub">Share of cases delivered by their due date, by month delivered.</p>
+                </div>
+                <div class="chart-box"><svg id="ontimeChart" class="short" role="img" aria-labelledby="ontimeTitle"></svg><div class="tooltip" hidden></div></div>
+                <details class="table-view"><summary>Show as a table</summary>
+                    <div class="table-wrap"><table><thead><tr><th>Month</th><th class="num">Delivered</th><th class="num">On-time</th></tr></thead>
+                    <tbody>{% for t in a.trend %}<tr><td>{{ t.label }}</td><td class="num">{{ t.delivered }}</td><td class="num">{{ '%d%%' % t.on_time if t.on_time is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
+                </details>
+            </section>
+            <section class="card" aria-labelledby="remakeTitle">
+                <div class="card-head">
+                    <h2 id="remakeTitle">Remake rate</h2>
+                    <p class="card-sub">Remakes accepted per case delivered, by month.</p>
+                </div>
+                <div class="chart-box"><svg id="remakeChart" class="short" role="img" aria-labelledby="remakeTitle"></svg><div class="tooltip" hidden></div></div>
+                <details class="table-view"><summary>Show as a table</summary>
+                    <div class="table-wrap"><table><thead><tr><th>Month</th><th class="num">Remakes</th><th class="num">Delivered</th><th class="num">Rate</th></tr></thead>
+                    <tbody>{% for t in a.trend %}<tr><td>{{ t.label }}</td><td class="num">{{ t.remakes }}</td><td class="num">{{ t.delivered }}</td><td class="num">{{ '%d%%' % t.remake_rate if t.remake_rate is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
+                </details>
+            </section>
+        </div>
+
+        <section class="card" aria-labelledby="quietTitle">
+            <div class="card-head">
+                <h2 id="quietTitle">Clinics gone quiet</h2>
+                <p class="card-sub">Clinics that have ordered before but not in the last {{ quiet_days }} days (as of {{ fmt_day(a.ref_day) }}). These partners may be ordering elsewhere.</p>
+            </div>
+            {% if a.quiet %}
+                <div class="table-wrap"><table>
+                    <thead><tr><th>Clinic</th><th>Last order</th><th class="num">Days since</th><th class="num">Orders so far</th></tr></thead>
+                    <tbody>{% for q in a.quiet %}<tr><td><strong>{{ q.label }}</strong></td><td>{{ fmt_day(q.last_order) }}</td><td class="num">{{ q.days }}</td><td class="num">{{ q.orders }}</td></tr>{% endfor %}</tbody>
+                </table></div>
+            {% else %}
+                <p class="none">Every clinic that has ordered before ordered within the last {{ quiet_days }} days.</p>
+            {% endif %}
+        </section>
+    </main>
+
+    <script type="application/json" id="analyticsData">{{ {'trend': a.trend, 'top': a.ranking[:10] | map(attribute='label') | list, 'top_orders': a.ranking[:10] | map(attribute='orders') | list, 'mix': a.mix} | tojson }}</script>
+    <script>
+    (function () {
+        const data = JSON.parse(document.getElementById('analyticsData').textContent);
+        const NS = 'http://www.w3.org/2000/svg';
+        const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+        const txt = (attrs, s) => { const t = el('text', attrs); t.textContent = s; return t; };
+        // A round tick step (1, 2 or 5 x 10^k) giving about 4 gridlines.
+        function niceStep(v) {
+            const raw = Math.max(v, 1) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+            return Math.max(1, [1, 2, 5, 10].map((f) => f * mag).find((s) => s >= raw));
+        }
+        // Tooltip: value first (strong), then the label. Text set with textContent only.
+        function tipFor(svg) {
+            const tip = svg.parentElement.querySelector('.tooltip');
+            return {
+                show(x, y, value, label, W) {
+                    tip.replaceChildren(Object.assign(document.createElement('strong'), { textContent: value }), document.createTextNode(label));
+                    const scale = svg.getBoundingClientRect().width / W;
+                    tip.style.left = `${x * scale}px`; tip.style.top = `${(y - 8) * scale}px`; tip.hidden = false;
+                },
+                hide() { tip.hidden = true; },
+            };
+        }
+        function hover(node, show, hide) {
+            node.addEventListener('pointerenter', show); node.addEventListener('focus', show);
+            node.addEventListener('pointerleave', hide); node.addEventListener('blur', hide);
+        }
+        // Rounded data-end bar path: 4px corners at the value end, square at the baseline.
+        function colPath(x0, x1, top, base) {
+            const r = Math.min(4, base - top, (x1 - x0) / 2);
+            return `M${x0},${base} V${top + r} Q${x0},${top} ${x0 + r},${top} H${x1 - r} Q${x1},${top} ${x1},${top + r} V${base} Z`;
+        }
+        function rowPath(left, right, y0, y1) {
+            const r = Math.min(4, right - left, (y1 - y0) / 2);
+            return `M${left},${y0} H${right - r} Q${right},${y0} ${right},${y0 + r} V${y1 - r} Q${right},${y1} ${right - r},${y1} H${left} Z`;
+        }
+
+        // Columns over months (one series, so no legend; the last month's value is labeled).
+        function columns(id, points, unit) {
+            const svg = document.getElementById(id); if (!svg) return;
+            const W = svg.clientWidth || 700, H = svg.clientHeight || 240, pad = { l: 34, r: 8, t: 18, b: 24 };
+            const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b, base = pad.t + ih;
+            const step = niceStep(Math.max(...points.map((p) => p.value), 1)), ticks = Math.ceil(Math.max(...points.map((p) => p.value), 1) / step), max = step * ticks;
+            const y = (v) => base - (v / max) * ih, slot = iw / points.length, bw = Math.min(24, slot * 0.6);
+            svg.replaceChildren(); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+            for (let i = 0; i <= ticks; i++) {
+                svg.append(el('line', { x1: pad.l, x2: W - pad.r, y1: y(step * i), y2: y(step * i), stroke: i ? 'var(--grid)' : 'var(--axis)', 'stroke-width': 1 }));
+                svg.append(txt({ x: pad.l - 6, y: y(step * i) + 3.5, 'text-anchor': 'end' }, String(step * i)));
+            }
+            const tip = tipFor(svg);
+            points.forEach((p, i) => {
+                const cx = pad.l + slot * i + slot / 2;
+                if (p.value > 0) svg.append(el('path', { d: colPath(cx - bw / 2, cx + bw / 2, y(p.value), base), fill: 'var(--series-1)' }));
+                if (i % (slot < 34 ? 2 : 1) === 0 || i === points.length - 1) svg.append(txt({ x: cx, y: H - 6, 'text-anchor': 'middle' }, p.short));
+                if (i === points.length - 1) svg.append(txt({ x: cx, y: y(p.value) - 6, 'text-anchor': 'middle', class: 'value' }, String(p.value)));
+                const hit = el('rect', { x: pad.l + slot * i, y: pad.t, width: slot, height: ih, fill: 'transparent', tabindex: 0, 'aria-label': `${p.label}: ${p.value} ${unit}` });
+                hover(hit, () => tip.show(cx, y(p.value), `${p.value} ${unit}`, p.label, W), tip.hide);
+                svg.append(hit);
+            });
+        }
+
+        // Ranked horizontal bars, largest first, one hue; value at the bar tip.
+        function bars(id, items, unit) {
+            const svg = document.getElementById(id); if (!svg || !items.length) return;
+            const W = svg.clientWidth || 500, rowH = 30, pad = { l: Math.min(190, W * 0.42), r: 36, t: 4, b: 4 };
+            const H = pad.t + pad.b + rowH * items.length;
+            svg.style.height = `${H}px`;
+            const max = Math.max(...items.map((it) => it.value), 1), iw = W - pad.l - pad.r, bh = Math.min(18, rowH - 8);
+            svg.replaceChildren(); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+            svg.append(el('line', { x1: pad.l, x2: pad.l, y1: pad.t, y2: H - pad.b, stroke: 'var(--axis)', 'stroke-width': 1 }));
+            const tip = tipFor(svg);
+            items.forEach((it, i) => {
+                const y0 = pad.t + rowH * i + (rowH - bh) / 2, right = pad.l + (it.value / max) * iw;
+                let name = it.label;
+                const label = txt({ x: pad.l - 8, y: y0 + bh / 2 + 4, 'text-anchor': 'end', class: 'cat' }, name);
+                svg.append(label);
+                while (label.getComputedTextLength && label.getComputedTextLength() > pad.l - 14 && name.length > 4) {
+                    name = name.slice(0, -2); label.textContent = name + '…';
+                }
+                svg.append(el('path', { d: rowPath(pad.l, Math.max(right, pad.l + 2), y0, y0 + bh), fill: 'var(--series-1)' }));
+                svg.append(txt({ x: right + 6, y: y0 + bh / 2 + 4, class: 'value' }, String(it.value)));
+                const hit = el('rect', { x: 0, y: pad.t + rowH * i, width: W, height: rowH, fill: 'transparent', tabindex: 0, 'aria-label': `${it.label}: ${it.value} ${unit}` });
+                hover(hit, () => tip.show(Math.min(right, W - 80), y0, `${it.value} ${unit}`, it.label, W), tip.hide);
+                svg.append(hit);
+            });
+        }
+
+        // A percentage over months, 0-100% axis; months with no deliveries leave a gap.
+        function line(id, points, what) {
+            const svg = document.getElementById(id); if (!svg) return;
+            const W = svg.clientWidth || 500, H = svg.clientHeight || 200, pad = { l: 38, r: 12, t: 14, b: 24 };
+            const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b, base = pad.t + ih;
+            const x = (i) => pad.l + (points.length > 1 ? (iw * i) / (points.length - 1) : iw / 2), y = (v) => base - (v / 100) * ih;
+            svg.replaceChildren(); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+            [0, 25, 50, 75, 100].forEach((v) => {
+                svg.append(el('line', { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), stroke: v ? 'var(--grid)' : 'var(--axis)', 'stroke-width': 1 }));
+                svg.append(txt({ x: pad.l - 6, y: y(v) + 3.5, 'text-anchor': 'end' }, `${v}%`));
+            });
+            let d = '';
+            points.forEach((p, i) => { if (p.value === null) { d += ' '; return; } d += (d === '' || d.endsWith(' ') ? 'M' : 'L') + `${x(i)},${y(p.value)}`; });
+            svg.append(el('path', { d: d.trim().replace(/\s+/g, ' '), fill: 'none', stroke: 'var(--series-1)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+            points.forEach((p, i) => {
+                const lonely = p.value !== null && (points[i - 1] || {}).value == null && (points[i + 1] || {}).value == null;
+                if (lonely) svg.append(el('circle', { cx: x(i), cy: y(p.value), r: 4, fill: 'var(--series-1)', stroke: '#FFFFFF', 'stroke-width': 2 }));
+                if (i % (iw / points.length < 34 ? 2 : 1) === 0 || i === points.length - 1) svg.append(txt({ x: x(i), y: H - 6, 'text-anchor': 'middle' }, p.short));
+            });
+            const last = [...points].reverse().find((p) => p.value !== null);
+            if (last) {
+                const i = points.indexOf(last);
+                svg.append(el('circle', { cx: x(i), cy: y(last.value), r: 4, fill: 'var(--series-1)', stroke: '#FFFFFF', 'stroke-width': 2 }));
+                svg.append(txt({ x: x(i), y: y(last.value) - 9, 'text-anchor': 'middle', class: 'value' }, `${last.value}%`));
+            } else {
+                svg.append(txt({ x: pad.l + iw / 2, y: pad.t + ih / 2, 'text-anchor': 'middle' }, 'No deliveries in these months yet'));
+            }
+            // Crosshair: a hairline that snaps to the nearest month, with every value in the tooltip.
+            const tip = tipFor(svg);
+            const cross = el('line', { y1: pad.t, y2: base, stroke: 'var(--axis)', 'stroke-width': 1, visibility: 'hidden' });
+            svg.append(cross);
+            points.forEach((p, i) => {
+                const w = points.length > 1 ? iw / (points.length - 1) : iw;
+                const hit = el('rect', { x: x(i) - w / 2, y: pad.t, width: w, height: ih, fill: 'transparent', tabindex: 0,
+                                         'aria-label': `${p.label}: ${p.value === null ? 'no deliveries' : p.value + '%'}` });
+                hover(hit, () => {
+                    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+                    tip.show(x(i), p.value === null ? pad.t + 20 : y(p.value), p.value === null ? 'No deliveries' : `${p.value}% ${what}`, p.detail, W);
+                }, () => { cross.setAttribute('visibility', 'hidden'); tip.hide(); });
+                svg.append(hit);
+            });
+        }
+
+        function draw() {
+            const t = data.trend.map((m) => ({ ...m, short: m.label.split(' ')[0] }));
+            columns('ordersChart', t.map((m) => ({ value: m.orders, label: m.label, short: m.short })), 'job orders');
+            columns('newChart', t.map((m) => ({ value: m.new_clinics, label: m.label, short: m.short })), 'new clinics');
+            bars('topChart', data.top.map((label, i) => ({ label, value: data.top_orders[i] })), 'job orders');
+            bars('mixChart', data.mix.map(([label, value]) => ({ label, value })), 'job orders');
+            line('ontimeChart', t.map((m) => ({ value: m.on_time, label: m.label, short: m.short,
+                detail: `${m.label} · ${m.delivered} delivered` })), 'on time');
+            line('remakeChart', t.map((m) => ({ value: m.remake_rate, label: m.label, short: m.short,
+                detail: `${m.label} · ${m.remakes} remake${m.remakes === 1 ? '' : 's'} / ${m.delivered} delivered` })), 'remade');
+        }
+        let timer;
+        window.addEventListener('resize', () => { clearTimeout(timer); timer = setTimeout(draw, 150); });
+        draw();
+    })();
+    </script>
+</body>
+</html>
