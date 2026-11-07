@@ -66,9 +66,9 @@ The ERD shows the 19 tables of the Supabase database and their one-to-many relat
 
 ## 7. System architecture
 
-Users reach DentaLink through a web browser. Railway hosts the Flask application, which handles requests, checks each user's role, and communicates with Supabase for the database, authentication, and file storage, and with Brevo for email.
+Users reach DentaLink through a web browser. Railway hosts the Flask application behind the Gunicorn server. The application handles requests, checks each user's role, runs the forecasting engine and the backup scheduler, and generates QR dispatch labels and Excel reports. It communicates with Supabase for the database, authentication, and file storage (including backups), and with Brevo for account and backup-failure emails.
 
-![System Communication and Interaction](diagrams/system-architecture.jpg)
+![System Communication and Interaction](diagrams/system-architecture.svg)
 
 *Figure 4. System Communication and Interaction*
 
