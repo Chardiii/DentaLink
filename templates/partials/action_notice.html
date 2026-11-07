@@ -28,6 +28,9 @@
     "joborders-input": ("stale", "Check the file"),
     "joborder-deleted": ("dismissed", "Job order removed"),
     "material-blocked": ("stale", "Case not moved"),
+    "approve-input": ("stale", "Clinic name needed"),
+    "reassign-done": ("fulfilled", "Technician changed"),
+    "reassign-stale": ("stale", "Technician not changed"),
 } %}
 {% with notices = get_flashed_messages(with_categories=true, category_filter=notice_kinds.keys()|list) %}
 {% if notices %}
