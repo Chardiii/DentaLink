@@ -247,6 +247,19 @@
                     <span class="info-label">Mobile Contact</span>
                     <span class="info-value">{{ user.phone or 'N/A' }}</span>
                 </div>
+                {% if user.role == 'dentist' %}
+                    <div class="info-block" style="grid-column: span 2;">
+                        <span class="info-label">Dental Clinic</span>
+                        {% if user.status == 'pending' %}
+                            <input type="text" name="clinic_name" form="approveForm" value="{{ user.clinic_name or '' }}" maxlength="120" required
+                                   placeholder="e.g. SmileCare Dental Clinic" aria-label="Dental clinic name"
+                                   style="width: 100%; margin-top: 4px; padding: 9px 11px; border: 1px solid var(--border-color, #E2E8F0); border-radius: 8px; font: inherit; font-size: 14px;">
+                            <span style="display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-muted);">Required. Check the spelling: clinic reports and analytics group dentists by this name.</span>
+                        {% else %}
+                            <span class="info-value">{{ user.clinic_name or 'Not set' }}</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
                 <div class="info-block" style="grid-column: span 2;">
                     <span class="info-label">Email Address Verification Status</span>
                     <span class="info-value">
@@ -265,7 +278,7 @@
                     <h4 style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Review Decision</h4>
                     <div class="actions-container">
                         <!-- APPROVE BUTTON (Disabled if email is unverified) -->
-                        <form method="POST" action="{{ url_for('approve_user', user_id=user.id) }}" style="flex: 1; display: flex;">
+                        <form method="POST" action="{{ url_for('approve_user', user_id=user.id) }}" id="approveForm" style="flex: 1; display: flex;">
                             <button type="submit" class="btn btn-green" style="width: 100%;" {% if not email_verified %}disabled title="Cannot approve until user verifies email"{% endif %}>
                                 Approve Account
                             </button>
@@ -300,5 +313,6 @@
         © 2026 Mrkzter Dental Laboratory • All Rights Reserved
     </div>
 
+    {% include 'partials/action_notice.html' %}
 </body>
 </html>

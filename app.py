@@ -1189,30 +1189,51 @@ def admin_reassign_case(case_id):
             return "No technician selected.", 400
 
         # Fetch case and new tech info for logging/notification
-        case_res = supabase_admin.table("dental_cases").select("case_number, status").eq("id", case_id).execute()
+        case_res = supabase_admin.table("dental_cases").select("case_number, status, technician_id").eq("id", case_id).execute()
         if not case_res.data:
             return "Case not found.", 404
         if case_res.data[0].get("status") not in REASSIGNABLE_STATUSES:
-            return "Only cases still in production can be reassigned.", 409
+            flash(f"Case {case_res.data[0]['case_number']} has left production, so its technician can't be changed.", "reassign-stale")
+            return redirect(url_for("admin_dashboard"))
         case_number = case_res.data[0]["case_number"]
+        old_tech_id = case_res.data[0].get("technician_id")
+        if old_tech_id == new_tech_id:
+            flash(f"Case {case_number} is already assigned to that technician. Nothing was changed.", "reassign-stale")
+            return redirect(url_for("admin_dashboard"))
 
-        tech_res = supabase_admin.table("profiles").select("display_name, role, status").eq("id", new_tech_id).execute()
+        tech_res = supabase_admin.table("profiles").select("display_name, first_name, role, status").eq("id", new_tech_id).execute()
         if not tech_res.data or tech_res.data[0].get("role") != "technician" or tech_res.data[0].get("status") != "approved":
             return "Choose an approved technician.", 400
-        tech_name = tech_res.data[0]["display_name"] or "New Technician"
+        tech_name = _display_name(tech_res.data[0], "the new technician")
+        old_name = None
+        if old_tech_id:
+            old = supabase_admin.table("profiles").select("display_name, first_name").eq("id", old_tech_id).execute().data or []
+            old_name = _display_name(old[0] if old else None, "the previous technician")
 
         # UPDATE ONLY THE TECHNICIAN_ID (Status is intentionally preserved)
-        supabase_admin.table("dental_cases").update({
+        updated = supabase_admin.table("dental_cases").update({
             "technician_id": new_tech_id
-        }).eq("id", case_id).in_("status", list(REASSIGNABLE_STATUSES)).execute()
+        }).eq("id", case_id).in_("status", list(REASSIGNABLE_STATUSES)).execute().data or []
+        if not updated:
+            flash(f"Case {case_number} left production while you were choosing, so nothing was changed.", "reassign-stale")
+            return redirect(url_for("admin_dashboard"))
 
-        # Notify the newly assigned technician
+        log_case_status_change(case_id, "Technician changed", user_id,
+                               f"Reassigned from {old_name} to {tech_name}" if old_name else f"Assigned to {tech_name}")
+        # Tell both technicians: the case moves to one bench and leaves the other.
         create_notification(
             user_id=new_tech_id,
             message=f"Case Reassigned: You have been assigned to take over Case {case_number}.",
             link="/technician"
         )
+        if old_tech_id:
+            create_notification(
+                user_id=old_tech_id,
+                message=f"Case {case_number} was reassigned to {tech_name}. It's no longer on your bench.",
+                link="/technician"
+            )
 
+        flash(f"Case {case_number} now belongs to {tech_name}" + (f" (was {old_name})." if old_name else "."), "reassign-done")
         return redirect(url_for("admin_dashboard"))
 
     except Exception as e:
@@ -1382,7 +1403,7 @@ def approve_user(user_id):
         if not admin_profiles or admin_profiles[0]["role"] != "admin" or admin_profiles[0]["status"] != "approved":
             return "Access denied.", 403
 
-        user_response = supabase_admin.table("profiles").select("id, role, status, display_name, first_name").eq("id", user_id).execute()
+        user_response = supabase_admin.table("profiles").select("id, role, status, display_name, first_name, clinic_name").eq("id", user_id).execute()
         users = user_response.data or []
         if not users:
             return "User not found.", 404
@@ -1391,8 +1412,17 @@ def approve_user(user_id):
         if user["role"] == "admin":
             return "Admin accounts cannot be approved here.", 403
 
+        # Dentists need a clinic name (clinic reports group by it); the admin can correct it here.
+        changes = {"status": "approved", "approved_at": _now_iso(), "approved_by": admin_id}
+        if user["role"] == "dentist":
+            clinic = " ".join((request.form.get("clinic_name") or user.get("clinic_name") or "").split())[:120]
+            if not clinic:
+                flash("Enter the dentist's clinic name before approving the account.", "approve-input")
+                return redirect(url_for("review_user", user_id=user_id))
+            changes["clinic_name"] = clinic
+
         # Update status in database
-        supabase_admin.table("profiles").update({"status": "approved"}).eq("id", user_id).execute()
+        supabase_admin.table("profiles").update(changes).eq("id", user_id).execute()
 
         # Fire email asynchronously in background thread so Gunicorn doesn't timeout
         try:
@@ -1920,6 +1950,13 @@ def register():
         if role not in ["dentist", "technician"]:
             flash("Invalid role selected.", "error")
             return render_template("register.html")
+
+        # Clinic reports group dentists by clinic, so a dentist must name theirs.
+        if role == "dentist":
+            clinic_name = " ".join((clinic_name or "").split())[:120]
+            if not clinic_name:
+                flash("Please enter your dental clinic's name.", "error")
+                return render_template("register.html")
 
         # =========================
         # REQUIRE TERMS ACCEPTANCE
@@ -5661,6 +5698,22 @@ def _material_family(name):
     return (name or "Not specified").replace("_", " ").split(" (")[0].strip().capitalize()
 
 
+def _clinic_key(name):
+    """Grouping key for a clinic name: case, spacing and stray punctuation don't matter, so
+    "SmileCare  Dental Clinic." and "smilecare dental clinic" are the same clinic."""
+    import re
+    text = re.sub(r"[.,;:'’\"]+", "", (name or "").casefold())
+    return " ".join(text.replace("&", " and ").split())
+
+
+def _clinic_of(dentist, dentist_id):
+    """(key, label) for a dentist's clinic; a dentist without a clinic name stands alone."""
+    name = " ".join(((dentist or {}).get("clinic_name") or "").split())
+    if name:
+        return _clinic_key(name), name
+    return f"dentist:{dentist_id}", f"{_display_name(dentist, 'Unknown dentist')} (no clinic name)"
+
+
 def _report_cases(dentist_id=None, technician_id=None):
     """Sent (non-draft) cases with their teeth and names, plus the derived days reports use."""
     def query():
@@ -5698,7 +5751,7 @@ def _report_cases(dentist_id=None, technician_id=None):
         c["late_days"] = max(0, (c["delivered"] - c["due"]).days) if c["delivered"] and c["due"] else None
         dentist = people.get(c.get("dentist_id"))
         c["dentist_name"] = _display_name(dentist, "—")
-        c["clinic"] = (dentist or {}).get("clinic_name") or "Independent practice"
+        c["clinic_key"], c["clinic"] = _clinic_of(dentist, c.get("dentist_id"))
         c["technician_name"] = _display_name(people.get(c.get("technician_id")), "Unassigned")
         c["status_label"] = REPORT_STATUS_LABELS.get(c.get("status"), (c.get("status") or "").replace("_", " ").capitalize())
         c["type_label"] = (c.get("case_type") or "—").replace("_", " ").title()
@@ -5781,10 +5834,12 @@ def _report_job_orders(period, **_):
         month_rows.append([_fmt_month(m), len(month), sum(e["units"] for e in month),
                            sum(1 for e in month if e["source"] == "DentaLink"), sum(1 for e in month if e["source"] == "Paper"),
                            sum(1 for e in month if e["remake"])])
-    by_type, by_material, by_clinic = {}, {}, {}
+    by_type, by_material, by_clinic, clinic_label = {}, {}, {}, {}
     for e in active:
         by_type[e["type"]] = by_type.get(e["type"], 0) + 1
-        by_clinic[e["clinic"]] = by_clinic.get(e["clinic"], 0) + 1
+        key = _clinic_key(e["clinic"]) or e["clinic"]   # one row per clinic, however it was typed
+        label = clinic_label.setdefault(key, e["clinic"])
+        by_clinic[label] = by_clinic.get(label, 0) + 1
         for fam, n in e["materials"].items():
             by_material[fam] = by_material.get(fam, 0) + n
 
@@ -6341,6 +6396,146 @@ def print_job_order(case_id):
     except Exception:
         app.logger.exception("Unable to print job order")
         return "Unable to load this job order. Check the server logs for details.", 500
+
+
+# =========================
+# ADMIN: ANALYTICS (on-screen charts; DentaLink cases only, paper job orders not counted)
+# =========================
+QUIET_CLINIC_DAYS = 60
+
+
+def _analytics(month):
+    """Everything the Analytics page shows for `month` (a first-of-month date): 12-month trends
+    ending there, the month's KPIs against the month before, the clinic ranking, new partner
+    clinics and clinics that have gone quiet. A clinic is the dentists sharing a clinic name
+    (see _clinic_key); it joins when its first dentist account is approved."""
+    today = datetime.now(LAB_TZ).date()
+    months = [month]
+    for _ in range(11):
+        months.insert(0, (months[0] - timedelta(days=1)).replace(day=1))
+    prev = months[-2]
+    month_end = _next_month(month)
+    ref_day = min(today, month_end - timedelta(days=1))   # "now" for this month
+
+    cases = [c for c in _report_cases() if c.get("status") != "cancelled" and c["received"]]
+    by_id = {c["id"]: c for c in cases}
+    reports = _report_issue_reports()
+    remakes = [r for r in reports if r.get("status") == "remake_accepted" and r.get("case_id") in by_id]
+
+    dentists = (supabase_admin.table("profiles")
+                .select("id, display_name, first_name, last_name, clinic_name, professional_id, approved_at, created_at")
+                .eq("role", "dentist").eq("status", "approved").execute().data or [])
+    clinics = {}
+    for d in dentists:
+        key, label = _clinic_of(d, d["id"])
+        joined = _lab_day(d.get("approved_at") or d.get("created_at"))
+        cl = clinics.setdefault(key, {"key": key, "label": label, "dentists": [], "joined": joined})
+        cl["dentists"].append(d)
+        if joined and (cl["joined"] is None or joined < cl["joined"]):
+            cl["joined"] = joined
+    for c in cases:   # a clinic whose dentist is no longer approved still has its orders
+        clinics.setdefault(c["clinic_key"], {"key": c["clinic_key"], "label": c["clinic"], "dentists": [], "joined": None})
+
+    def in_month(day, m):
+        return day is not None and m <= day < _next_month(m)
+
+    def on_time(delivered):
+        timed = [c for c in delivered if c["late_days"] is not None]
+        return round(100 * sum(1 for c in timed if c["late_days"] == 0) / len(timed)) if timed else None
+
+    trend = []
+    for m in months:
+        received = [c for c in cases if in_month(c["received"], m)]
+        delivered = [c for c in cases if in_month(c["delivered"], m)]
+        remade = sum(1 for r in remakes if in_month(_lab_day(r.get("created_at")), m))
+        trend.append({
+            "month": f"{m:%Y-%m}", "label": f"{MONTH_NAMES[m.month - 1][:3]} {m.year}",
+            "orders": len(received), "units": sum(c["units"] for c in received),
+            "active_clinics": len({c["clinic_key"] for c in received}),
+            "new_clinics": sum(1 for cl in clinics.values() if in_month(cl["joined"], m)),
+            "delivered": len(delivered), "on_time": on_time(delivered),
+            "remakes": remade, "remake_rate": round(100 * remade / len(delivered)) if delivered else None,
+        })
+    now, before = trend[-1], trend[-2]
+
+    month_cases = [c for c in cases if in_month(c["received"], month)]
+    prev_counts = {}
+    for c in cases:
+        if in_month(c["received"], prev):
+            prev_counts[c["clinic_key"]] = prev_counts.get(c["clinic_key"], 0) + 1
+    ranking = []
+    for key in {c["clinic_key"] for c in month_cases}:
+        mine = [c for c in month_cases if c["clinic_key"] == key]
+        delivered = [c for c in cases if c["clinic_key"] == key and in_month(c["delivered"], month)]
+        last = max(c["received"] for c in cases if c["clinic_key"] == key and c["received"] < month_end)
+        ranking.append({
+            "label": clinics[key]["label"], "orders": len(mine), "units": sum(c["units"] for c in mine),
+            "share": round(100 * len(mine) / len(month_cases)) if month_cases else 0,
+            "change": len(mine) - prev_counts.get(key, 0), "last_order": last,
+            "dentists": len(clinics[key]["dentists"]) or 1, "on_time": on_time(delivered),
+            "remakes": sum(1 for r in remakes if in_month(_lab_day(r.get("created_at")), month)
+                           and by_id[r["case_id"]]["clinic_key"] == key),
+        })
+    ranking.sort(key=lambda r: (-r["orders"], -r["units"], r["label"].lower()))
+
+    new_partners = []
+    for cl in clinics.values():
+        if in_month(cl["joined"], month):
+            mine = sorted((c for c in cases if c["clinic_key"] == cl["key"]), key=lambda c: c["received"])
+            new_partners.append({
+                "label": cl["label"], "joined": cl["joined"],
+                "dentists": ", ".join(_display_name(d, "Dentist") for d in cl["dentists"]),
+                "licenses": ", ".join(d.get("professional_id") or "—" for d in cl["dentists"]),
+                "first_order": mine[0]["received"] if mine else None, "orders": len(mine),
+            })
+    new_partners.sort(key=lambda p: p["joined"])
+
+    quiet = []
+    for key in {c["clinic_key"] for c in cases}:
+        past = [c for c in cases if c["clinic_key"] == key and c["received"] <= ref_day]
+        if not past:
+            continue
+        last = max(c["received"] for c in past)
+        idle = (ref_day - last).days
+        if idle >= QUIET_CLINIC_DAYS:
+            quiet.append({"label": clinics[key]["label"], "last_order": last, "days": idle, "orders": len(past)})
+    quiet.sort(key=lambda q: -q["days"])
+
+    mix = {}
+    for c in month_cases:
+        mix[c["type_label"]] = mix.get(c["type_label"], 0) + 1
+    return {
+        "trend": trend, "now": now, "before": before,
+        "ranking": ranking, "new_partners": new_partners, "quiet": quiet,
+        "mix": sorted(mix.items(), key=lambda kv: (-kv[1], kv[0])),
+        "month_label": f"{MONTH_NAMES[month.month - 1]} {month.year}",
+        "prev_label": f"{MONTH_NAMES[prev.month - 1]} {prev.year}",
+        "ref_day": ref_day,
+    }
+
+
+@app.route("/admin/analytics")
+@role_required("admin")
+def admin_analytics():
+    today = datetime.now(LAB_TZ).date()
+    try:
+        y, m = (int(x) for x in request.args.get("month", "").split("-"))
+        month = today.replace(year=y, month=m, day=1)
+        if month > today:
+            raise ValueError
+    except (ValueError, TypeError):
+        month = today.replace(day=1)
+    try:
+        data = _analytics(month)
+    except Exception:
+        app.logger.exception("Unable to build analytics")
+        return "Unable to load analytics. Check the server logs for details.", 500
+    options, d = [], today.replace(day=1)
+    for _ in range(24):
+        options.append((f"{d:%Y-%m}", f"{MONTH_NAMES[d.month - 1]} {d.year}"))
+        d = (d - timedelta(days=1)).replace(day=1)
+    return render_template("admin_analytics.html", profile=g.profile, a=data, month=f"{month:%Y-%m}",
+                           month_options=options, quiet_days=QUIET_CLINIC_DAYS, fmt_day=_fmt_day)
 
 
 # =========================
