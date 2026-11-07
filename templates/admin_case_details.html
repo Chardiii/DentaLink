@@ -126,6 +126,7 @@
 <body>
     {% from 'partials/case_files.html' import file_grid, file_viewer %}
     {% from 'partials/tooth_chart.html' import tooth_chart as draw_tooth_chart %}
+    {% from 'partials/previous_job_order.html' import prev_jo_button, prev_jo_dialog %}
     {% set active_admin_page = 'job_orders' if case.status in ['delivered', 'completed'] else 'dashboard' %}
     {% include "partials/admin_sidebar.html" %}
     {% set status = case.status %}
@@ -158,7 +159,10 @@
                     </div>
                 </div>
                 {% set tone = 'ok' if status in ['delivered', 'completed'] else ('warn' if status in ['pending_admin_review', 'needs_revision', 'submitted'] else 'info') %}
-                <span class="chip status {{ tone }}">{{ status_labels.get(status, status | replace('_', ' ') | capitalize) }}</span>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <a class="btn btn-ghost btn-sm" href="{{ url_for('print_job_order', case_id=case.id) }}" target="_blank" rel="noopener">Print job order</a>
+                    <span class="chip status {{ tone }}">{{ status_labels.get(status, status | replace('_', ' ') | capitalize) }}</span>
+                </div>
             </div>
 
             <dl class="facts">
@@ -170,7 +174,7 @@
 
             {% if parent or remakes %}
                 <div class="links">
-                    {% if parent %}<span class="link-row">Remake of <a href="{{ url_for('admin_case_details', case_id=parent.id) }}">#{{ parent.case_number }}</a>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>{% endif %}
+                    {% if parent %}<span class="link-row">Remake of <a href="{{ url_for('admin_case_details', case_id=parent.id) }}">#{{ parent.case_number }}</a>{% if case.remake_reason %} · {{ case.remake_reason }}{% endif %}</span>{{ prev_jo_button(parent.id, 'View original job order #' ~ parent.case_number) }}{% endif %}
                     {% for rm in remakes %}<span class="link-row">Remake <a href="{{ url_for('admin_case_details', case_id=rm.id) }}">#{{ rm.case_number }}</a> · {{ status_labels.get(rm.status, rm.status) }} · due {{ rm.due_date }}</span>{% endfor %}
                 </div>
             {% endif %}
@@ -318,6 +322,7 @@
     </main>
 
     {{ file_viewer() }}
+    {{ prev_jo_dialog() }}
     {% include 'partials/action_notice.html' %}
     <script>
         document.querySelectorAll('time[datetime]').forEach((el) => {

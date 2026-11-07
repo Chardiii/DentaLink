@@ -1,0 +1,177 @@
+{# "View original job order" for remakes, shared by the dentist, technician and admin pages.
+   prev_jo_button(original_id, label, cls) wherever the button should appear (original_id is
+   the remake's remake_of); prev_jo_dialog() once near the end of <body>. The dialog loads
+   app.previous_job_order() and can step back through a chain of remakes. #}
+{% macro prev_jo_button(original_id, label="View original job order", cls="pjo-btn") %}
+<button type="button" class="{{ cls }}" data-prev-jo="{{ url_for('previous_job_order', case_id=original_id) }}">
+    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    {{ label }}
+</button>
+{% endmacro %}
+
+{% macro prev_jo_dialog() %}
+<style>
+    .pjo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 11px; border-radius: 8px; border: 1px solid #FDE68A; background: #FFFBEB; color: #92400E; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; text-decoration: none; }
+    .pjo-btn:hover { background: #FEF3C7; border-color: #F59E0B; }
+    .pjo-btn:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+
+    .pjo-overlay { position: fixed; inset: 0; z-index: 290; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, .55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    .pjo-overlay.open { display: flex; }
+    .pjo-dialog {
+        --border-color: #E2E8F0; --bg-soft: #F8FAFC; --text-strong: #0F172A; --text-main: #1E293B; --text-muted: #64748B; --accent-cyan: #0284C7;
+        width: 100%; max-width: 860px; max-height: 90vh; display: flex; flex-direction: column; background: #FFFFFF; color: var(--text-main); border-radius: 16px; box-shadow: 0 24px 48px rgba(15, 23, 42, .25); overflow: hidden; font-size: 14px; line-height: 1.5; text-align: left;
+    }
+    .pjo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border-color); background: #FFFBEB; }
+    .pjo-bar-left { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #92400E; font-weight: 600; }
+    .pjo-icon-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 12px; font-weight: 600; color: var(--text-main); cursor: pointer; }
+    .pjo-icon-btn:hover { border-color: #94A3B8; }
+    .pjo-close { font-size: 20px; line-height: 1; padding: 2px 10px; }
+    .pjo-body { padding: 20px 22px 24px; overflow-y: auto; display: grid; gap: 18px; }
+    .pjo-loading { padding: 40px; text-align: center; color: var(--text-muted); }
+
+    .pjo-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+    .pjo-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #B45309; }
+    .pjo-title { margin: 2px 0 6px; font-size: 22px; color: var(--text-strong); }
+    .pjo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pjo-chip { padding: 2px 10px; border-radius: 999px; border: 1px solid #BAE6FD; background: #F0F9FF; color: var(--accent-cyan); font-size: 12px; font-weight: 700; }
+    .pjo-chip.ok { color: #047857; background: #ECFDF5; border-color: #A7F3D0; }
+    .pjo-chip.remake { color: #92400E; background: #FEF3C7; border-color: #FDE68A; }
+    .pjo-remade { display: grid; gap: 4px; font-size: 12.5px; color: var(--text-muted); text-align: right; }
+    .pjo-remade strong { color: var(--text-strong); }
+
+    .pjo-why { border: 1px solid #FDE68A; background: #FFFBEB; border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+    .pjo-why h3, .pjo-section h3 { margin: 0; font-size: 14px; color: var(--text-strong); }
+    .pjo-report { display: grid; gap: 4px; }
+    .pjo-report + .pjo-report { border-top: 1px dashed #FDE68A; padding-top: 10px; }
+    .pjo-report-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .pjo-quote { margin: 0; font-style: italic; color: #78350F; }
+    .pjo-decision { font-size: 13px; color: #78350F; }
+    .pjo-muted { color: var(--text-muted); font-size: 12.5px; font-weight: 400; }
+    .pjo-late { color: #B45309; font-size: 12px; font-weight: 700; }
+
+    .pjo-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 12px 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+    .pjo-facts dt { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+    .pjo-facts dd { margin: 2px 0 0; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+    .pjo-section { display: grid; gap: 10px; }
+    .pjo-instructions { padding: 10px 14px; border-left: 3px solid var(--accent-cyan); background: #F0F9FF; border-radius: 0 10px 10px 0; white-space: pre-wrap; }
+    .pjo-instructions.empty { color: var(--text-muted); font-style: italic; border-left-color: #CBD5E1; background: var(--bg-soft); }
+    .pjo-mix { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pjo-mix span { padding: 4px 10px; border-radius: 8px; background: var(--bg-soft); border: 1px solid var(--border-color); font-size: 12.5px; }
+    .pjo-table-wrap { overflow-x: auto; }
+    .pjo-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .pjo-table th { text-align: left; padding: 7px 10px; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+    .pjo-table td { padding: 8px 10px; border-bottom: 1px solid #EEF2F6; }
+    .pjo-tooth { color: var(--accent-cyan); }
+    .pjo-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 240px; overflow-y: auto; }
+    .pjo-timeline li { display: grid; padding-left: 12px; border-left: 2px solid #BAE6FD; }
+    .pjo-timeline strong { font-size: 13px; color: var(--text-strong); }
+    .pjo-note { margin-top: 2px; font-size: 12px; color: #475569; background: var(--bg-soft); border-radius: 6px; padding: 3px 8px; }
+    .pjo-chain { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; background: #FEF3C7; color: #92400E; font-size: 13px; }
+
+    /* Classes used by the shared file grid, scoped so dashboards' own .btn styles don't leak in. */
+    .pjo-dialog .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 11px; border-radius: 8px; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; box-shadow: none; }
+    .pjo-dialog .btn-primary { background: var(--accent-cyan); color: #FFFFFF; }
+    .pjo-dialog .btn-ghost { background: #FFFFFF; border-color: var(--border-color); color: var(--text-main); }
+    .pjo-dialog .note-box { padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: 9px; font-size: 12.5px; color: var(--text-muted); }
+
+    @media (max-width: 700px) { .pjo-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pjo-remade { text-align: left; } }
+</style>
+
+<div class="pjo-overlay" id="pjoOverlay" aria-hidden="true">
+    <div class="pjo-dialog" role="dialog" aria-modal="true" aria-labelledby="pjoTitle">
+        <div class="pjo-bar">
+            <div class="pjo-bar-left">
+                <button type="button" class="pjo-icon-btn" id="pjoBack" hidden>← Back</button>
+                <span>Read-only · the earlier job order this remake replaced</span>
+            </div>
+            <button type="button" class="pjo-icon-btn pjo-close" id="pjoClose" aria-label="Close">×</button>
+        </div>
+        <div class="pjo-body" id="pjoBody"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const overlay = document.getElementById('pjoOverlay');
+    const body = document.getElementById('pjoBody');
+    const backBtn = document.getElementById('pjoBack');
+    let stack = [];      // URLs viewed, so Back can step down a chain of remakes
+    let opener = null;
+
+    function formatTimes(root) {
+        root.querySelectorAll('time[datetime]').forEach((el) => {
+            const raw = el.getAttribute('datetime');
+            if (!raw) return;
+            const dateOnly = el.hasAttribute('data-date') || raw.length <= 10;
+            const d = new Date(dateOnly ? raw.slice(0, 10) + 'T00:00:00' : raw);
+            if (isNaN(d)) return;
+            el.textContent = dateOnly
+                ? d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+                : d.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+        });
+    }
+
+    async function load(url) {
+        body.innerHTML = '<div class="pjo-loading">Loading the original job order…</div>';
+        backBtn.hidden = stack.length < 2;
+        try {
+            const res = await fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
+            if (res.redirected) throw new Error('Your session has ended. Reload the page and sign in again.');
+            const html = await res.text();
+            if (!res.ok) throw new Error(html);
+            body.innerHTML = html;
+            formatTimes(body);
+            body.scrollTop = 0;
+        } catch (e) {
+            const msg = document.createElement('div');
+            msg.className = 'pjo-loading';
+            msg.textContent = (e && e.message && e.message.length < 200) ? e.message : "The original job order couldn't be loaded. Try again.";
+            body.replaceChildren(msg);
+        }
+    }
+
+    function open(url, trigger) {
+        opener = trigger || null;
+        stack = [url];
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        load(url);
+        document.getElementById('pjoClose').focus();
+    }
+
+    function close() {
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
+        body.replaceChildren();
+        stack = [];
+        document.body.style.overflow = '';
+        if (opener) opener.focus();
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-prev-jo]');
+        if (btn) {
+            e.preventDefault();
+            if (overlay.contains(btn)) { stack.push(btn.dataset.prevJo); load(btn.dataset.prevJo); }
+            else open(btn.dataset.prevJo, btn);
+            return;
+        }
+        // Pages without the shared file viewer (the dashboards): open photos and scans in a new tab.
+        const view = e.target.closest('.pjo-body [data-view-kind]');
+        if (view && !document.getElementById('viewer')) window.open(view.dataset.viewUrl, '_blank', 'noopener');
+    });
+    backBtn.addEventListener('click', () => { stack.pop(); load(stack[stack.length - 1]); });
+    document.getElementById('pjoClose').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    // Capture phase, so an open photo/3D viewer on top gets Escape first and this dialog stays open.
+    window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !overlay.classList.contains('open')) return;
+        const viewer = document.getElementById('viewer');
+        if (viewer && viewer.classList.contains('open')) return;
+        e.stopPropagation();
+        close();
+    }, true);
+})();
+</script>
+{% endmacro %}
