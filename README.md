@@ -43,17 +43,20 @@ Mrkzter Dental Laboratory in Marikina City handled case communication through Me
 
 | Module | Description |
 |---|---|
-| Case and client order management | Dentists submit job orders online; the administrator assigns cases to technicians and can flag rush cases. |
+| Case and client order management | Dentists submit job orders online with an odontogram, STL scans, and photos; the administrator assigns or reassigns technicians and can flag rush cases. |
 | Digital case-file management | Scans, photos, and design files are attached to each case (Supabase Storage). |
 | Departmental workflow tracking | Technicians move cases through the bench stages, from CAD design and milling to finishing and quality check, with a full status history. |
 | Quality-control review | The administrator approves or rejects each finished case before dispatch. |
 | QR-enabled dispatch | Each case gets a printable dispatch slip with a QR label. Scanning it records the courier handover and the clinic's receipt. |
 | Delivery issues and remakes | Clinics report problems with delivered cases; remakes are linked to the original case. |
-| Inventory management | Stock levels, inventory logs, and technician material requests. |
+| Inventory management | Stock levels, audit log, restock requests, and usage rules that pre-fill the materials technicians log at milling, packing, and finishing. |
+| Zirconia disc tracking | Each opened disc is tracked by the ID written on its box, with the units milled from it, to measure real yield per disc. |
 | ML-based inventory forecasting | Forecasts the next 4 weeks of demand for each zirconia disc shade and for e.max, with stock projections, stockout risk, and order recommendations. |
 | Job order history | Imports the laboratory's past paper job orders for search and forecasting. |
 | Dashboards and notifications | Role-based dashboards and live notifications for administrators, technicians, and dentists. |
-| Administration | User approval, login history, and database backup and restore. |
+| Analytics | Job orders per month, top clinics, prosthesis mix, new and inactive clinics, and on-time and remake rate trends. |
+| Reports and printing | Role-specific reports (monthly, quarterly, annual, or all time) downloadable as Excel, and printable job order slips. |
+| Administration | User approval with clinic name confirmation, login history, and backup and restore with scheduled automatic backups. |
 
 ### Forecasting approach
 
@@ -66,6 +69,7 @@ The forecasting engine (`ml_models/`) builds weekly demand series from job order
 | Back end | Python 3, Flask 3.1, Jinja2 templates |
 | Database, authentication, file storage | Supabase (PostgreSQL, Auth, Storage) |
 | Machine learning | scikit-learn, pandas, NumPy |
+| Reports | openpyxl (Excel) |
 | Email | Brevo SMTP |
 | Hosting | Railway (Gunicorn) |
 
