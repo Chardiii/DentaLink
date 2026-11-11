@@ -133,13 +133,21 @@
         textarea { min-height: 86px; resize: vertical; }
         select:focus, textarea:focus { outline: none; border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(2, 132, 199, .15); }
 
-        @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        /* Grid children default to their content's width; let them shrink to the screen. */
+        .layout > *, .stack > * { min-width: 0; }
+        @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 700px) {
+            .header-left { min-width: 0; }
+            .btn-label { display: none; }
+            .app-header .btn { padding: 8px 10px; }
             .app-header { padding: 10px 16px; }
             .header-left p { display: none; }
             .container { padding: 18px 16px 40px; }
             .stages { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 10px; }
         }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>
@@ -182,13 +190,13 @@
             </div>
         </div>
         <div style="display: flex; gap: 8px;">
-            <a class="btn btn-ghost" href="{{ url_for('print_job_order', case_id=case.id) }}" target="_blank" rel="noopener">
+            <a class="btn btn-ghost" href="{{ url_for('print_job_order', case_id=case.id) }}" target="_blank" rel="noopener" aria-label="Print job order" title="Print job order">
                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                Print job order
+                <span class="btn-label">Print job order</span>
             </a>
-            <a class="btn btn-ghost" href="{{ url_for('dentist_dashboard') }}">
+            <a class="btn btn-ghost" href="{{ url_for('dentist_dashboard') }}" aria-label="Back to my cases" title="Back to my cases">
                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                Back to my cases
+                <span class="btn-label">Back to my cases</span>
             </a>
         </div>
     </header>

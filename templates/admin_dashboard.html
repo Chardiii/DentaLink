@@ -76,7 +76,7 @@
         .logo-box { border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
         .sidebar-titles h1 { margin: 0; font-size: 16px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 6px; }
-        .version-badge { background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 9px; padding: 2px 5px; border-radius: 12px; border: 1px solid rgba(2, 132, 199, 0.25); }
+        .version-badge { background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 11px; padding: 2px 5px; border-radius: 12px; border: 1px solid rgba(2, 132, 199, 0.25); }
         .sidebar-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
 
         .sidebar-nav {
@@ -90,7 +90,7 @@
         .nav-pill:hover { color: #0F172A; background: #F8FAFC; border-color: var(--border-color); }
         .nav-pill.active { background-color: rgba(2, 132, 199, 0.08); color: var(--accent-cyan); border-color: rgba(2, 132, 199, 0.25); }
         
-        .pill-badge { background-color: var(--accent-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+        .pill-badge { background-color: var(--accent-red); color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
         .pill-badge.yellow { background-color: var(--accent-yellow); color: #FFFFFF; }
 
         .sidebar-footer {
@@ -109,7 +109,7 @@
         .avatar { width: 32px; height: 32px; background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(16, 185, 129, 0.15)); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; flex-shrink: 0; }
         .user-info { overflow: hidden; }
         .user-info p { margin: 0; font-size: 12px; font-weight: 600; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .user-info span { font-size: 10px; color: var(--accent-cyan); }
+        .user-info span { font-size: 11px; color: var(--accent-cyan); }
         
         .btn-icon { padding: 6px; border-radius: 6px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
         .btn-icon:hover { color: var(--accent-red); border-color: var(--accent-red); background: rgba(239, 68, 68, 0.05); }
@@ -127,7 +127,7 @@
         .notif-wrapper { position: relative; }
         .notif-bell { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.02); }
         .notif-bell:hover, .notif-bell.active { color: #0F172A; border-color: var(--accent-cyan); background: rgba(2, 132, 199, 0.05); }
-        .notif-badge { background: var(--accent-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: bold; }
+        .notif-badge { background: var(--accent-red); color: white; font-size: 11px; padding: 1px 6px; border-radius: 10px; font-weight: bold; }
         .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
         .notif-dropdown.show { display: flex; }
         .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: #0F172A; display: flex; justify-content: space-between; background: var(--panel-header); }
@@ -137,7 +137,7 @@
         .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .notif-item-dd:hover { background: #F8FAFC; }
         .notif-content-dd { flex: 1; font-size: 12px; color: #334155; line-height: 1.4; }
-        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-time-dd { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }
         .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
         .notif-close:hover { color: var(--accent-red); }
 
@@ -151,7 +151,7 @@
         /* Metrics Strip */
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -249,7 +249,7 @@
 
         .cases-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
             gap: 16px;
         }
 
@@ -306,9 +306,9 @@
         .meta-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; font-weight: 600; }
         .meta-val { color: #0F172A; font-weight: 600; }
         .tooth-badge-list { display: flex; gap: 4px; flex-wrap: wrap; }
-        .tooth-pill { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 10px; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(2, 132, 199, 0.25); font-weight: 700; }
+        .tooth-pill { background: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 11px; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(2, 132, 199, 0.25); font-weight: 700; }
 
-        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
         .k-card.is-rush { border-left: 3px solid #EF4444; }
         .rush-form { margin: 0; }
         .rush-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 6px; border: 1px dashed #FCA5A5; background: transparent; color: #B91C1C; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
@@ -342,7 +342,7 @@
         .tag { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); border: 1px solid rgba(2, 132, 199, 0.25); }
         .select-dark { background-color: #FFFFFF; border: 1px solid var(--border-color); color: var(--text-main); padding: 6px 8px; border-radius: 6px; font-size: 11px; outline: none; font-family: inherit; }
 
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 14px; }
         .item-card { background-color: #F8FAFC; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; transition: border-color 0.2s; }
         .item-card:hover { border-color: rgba(2, 132, 199, 0.4); }
         .item-card h4 { margin: 0 0 6px 0; color: var(--accent-cyan); font-size: 14px; }
@@ -384,7 +384,10 @@
             .dashboard-container { margin-left: 0; padding: 20px; }
         }
         .case-tags { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .remake-chip { padding: 2px 7px; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .remake-chip { padding: 2px 7px; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>
@@ -726,7 +729,7 @@
                             <p><strong>Contact:</strong> {{ user.phone or 'N/A' }}</p>
                             {% if user.role == 'technician' %}
                                 <div style="margin-top: 8px;">
-                                    <span class="tag" style="background: rgba(2,132,199,0.08); font-size: 10px;">
+                                    <span class="tag" style="background: rgba(2,132,199,0.08); font-size: 11px;">
                                         Bench Units: 
                                         {% for tech in technicians %}{% if tech.id == user.id %}{{ tech.active_workload }}{% endif %}{% endfor %}
                                     </span>
@@ -1176,7 +1179,7 @@
         .ra-card p { margin: 0; font-size: 13.5px; line-height: 1.5; color: #475569; }
         .ra-swap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 0 0 14px; padding: 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; }
         .ra-swap div { display: grid; gap: 2px; min-width: 0; }
-        .ra-swap small { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #64748B; }
+        .ra-swap small { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #64748B; }
         .ra-swap strong { font-size: 14px; color: #0F172A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ra-swap .arrow { color: #0284C7; font-size: 18px; }
         .ra-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

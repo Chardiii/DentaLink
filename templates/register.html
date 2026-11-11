@@ -133,7 +133,7 @@
             display: block;
             margin-bottom: 8px;
             font-weight: 700;
-            font-size: 11px;
+            font-size: 12px;
             color: #475569;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -578,6 +578,9 @@
                 padding: 30px 20px;
             }
         }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>

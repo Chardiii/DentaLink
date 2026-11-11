@@ -23,7 +23,7 @@
         .tab.active { background: #E0F2FE; border-color: #BAE6FD; color: var(--accent); }
         .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; padding: 12px 14px; background: #FFFFFF; border: 1px solid var(--border); border-radius: 12px; }
         .field { display: grid; gap: 4px; }
-        .field label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+        .field label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
         .field select, .field input { min-width: 150px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; color: var(--strong); background: #FFFFFF; }
         .filters .spacer { flex: 1; }
         .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
@@ -48,7 +48,7 @@
         table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
         thead { display: table-header-group; }   /* repeat column headings on every printed page */
         tfoot { display: table-row-group; }
-        th { text-align: left; padding: 7px 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--strong); vertical-align: bottom; }
+        th { text-align: left; padding: 7px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--strong); vertical-align: bottom; }
         td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
         tr { page-break-inside: avoid; break-inside: avoid; }
         .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -79,6 +79,9 @@
             h2 { break-after: avoid; }
         }
         @media (max-width: 700px) { .sheet { padding: 20px 16px; } .sheet-head { flex-direction: column; } .meta { text-align: left; } }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>

@@ -97,7 +97,7 @@
         .when-main { color: #0F172A; font-weight: 600; }
         .sub { display: block; color: var(--text-muted); font-size: 12px; }
         .who-name { color: #0F172A; font-weight: 600; }
-        .role { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; background: #E0F2FE; color: #0369A1; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px; }
+        .role { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; background: #E0F2FE; color: #0369A1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px; }
         .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
         .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
         .pill.success { border-color: var(--ok-line); background: var(--ok-bg); color: var(--ok); }
@@ -105,7 +105,7 @@
         .pill.blocked { border-color: var(--warn-line); background: var(--warn-bg); color: var(--warn); }
         .pill.logout { border-color: var(--neutral-line); background: var(--neutral-bg); color: var(--neutral); }
         .mono { font-family: Consolas, 'SFMono-Regular', Menlo, monospace; font-size: 12px; }
-        .muted { color: #94A3B8; }
+        .muted { color: #64748B; }
         .device { cursor: help; text-decoration: underline dotted #CBD5E1; text-underline-offset: 3px; }
 
         .empty { padding: 56px 20px; text-align: center; }
@@ -137,6 +137,9 @@
             .when { white-space: normal; }
         }
         @media (prefers-reduced-motion: reduce) { .chip { transition: none; } .chip:hover { transform: none; } }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>

@@ -86,6 +86,9 @@
 
         @media (max-width: 1024px) { .dashboard-container { margin-left: 0; padding: 24px; } }
         @media (max-width: 760px) { .dashboard-container { padding: 20px 16px; } .report { grid-template-columns: 1fr; } }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>

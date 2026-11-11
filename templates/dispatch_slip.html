@@ -85,6 +85,9 @@
         .label-foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 6.5pt; color: var(--text-muted); border-top: 0.2mm solid var(--border-color); padding-top: 1.5mm; }
         .mono { font-family: Consolas, 'SFMono-Regular', Menlo, monospace; }
 
+        /* Phones (screen only): let the preview shrink a little instead of scrolling sideways. */
+        @media screen and (max-width: 420px) { .label { max-width: calc(100vw - 16px); box-sizing: border-box; } }
+
         @page { size: 100mm 150mm; margin: 0; }
         @media print {
             body { background: #FFFFFF; }
