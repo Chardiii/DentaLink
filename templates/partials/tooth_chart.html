@@ -6,14 +6,16 @@
     .chart-wrap { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 14px; }
     .tooth-chart { width: 100%; height: auto; display: block; }
     .tooth-chart circle { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1.2; }
-    .tooth-chart text { font-size: 9.5px; font-weight: 700; fill: #94A3B8; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
+    .tooth-chart text { font-size: 11px; font-weight: 700; fill: #64748B; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
     .tooth-chart g.marked circle { fill: var(--accent-cyan); stroke: #0369A1; }
     .tooth-chart g.marked text { fill: #FFFFFF; }
-    .tooth-chart .arch-label { font-size: 10px; font-weight: 800; fill: #94A3B8; letter-spacing: .08em; }
+    .tooth-chart .arch-label { font-size: 11px; font-weight: 800; fill: #64748B; letter-spacing: .08em; }
     .chart-key { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
     .chart-key span { display: inline-flex; align-items: center; gap: 8px; }
     .chart-key i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1.2px solid #CBD5E1; background: #F8FAFC; }
     .chart-key i.on { background: var(--accent-cyan); border-color: #0369A1; }
+    /* Phones: chart on top, key below. */
+    @media (max-width: 600px) { .chart-wrap { grid-template-columns: minmax(0, 1fr); } .chart-wrap > * { min-width: 0; } }
 </style>
     <div class="chart-wrap">
         <svg class="tooth-chart" viewBox="0 0 360 300" role="img" aria-label="Tooth chart: {{ teeth | map(attribute='tooth_number') | join(', ') or 'no teeth marked' }}">

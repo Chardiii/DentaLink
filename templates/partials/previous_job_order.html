@@ -50,7 +50,7 @@
     .pjo-late { color: #B45309; font-size: 12px; font-weight: 700; }
 
     .pjo-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 12px 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
-    .pjo-facts dt { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+    .pjo-facts dt { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
     .pjo-facts dd { margin: 2px 0 0; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
     .pjo-section { display: grid; gap: 10px; }
     .pjo-instructions { padding: 10px 14px; border-left: 3px solid var(--accent-cyan); background: #F0F9FF; border-radius: 0 10px 10px 0; white-space: pre-wrap; }
@@ -59,7 +59,7 @@
     .pjo-mix span { padding: 4px 10px; border-radius: 8px; background: var(--bg-soft); border: 1px solid var(--border-color); font-size: 12.5px; }
     .pjo-table-wrap { overflow-x: auto; }
     .pjo-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .pjo-table th { text-align: left; padding: 7px 10px; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+    .pjo-table th { text-align: left; padding: 7px 10px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
     .pjo-table td { padding: 8px 10px; border-bottom: 1px solid #EEF2F6; }
     .pjo-tooth { color: var(--accent-cyan); }
     .pjo-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 240px; overflow-y: auto; }
@@ -74,7 +74,12 @@
     .pjo-dialog .btn-ghost { background: #FFFFFF; border-color: var(--border-color); color: var(--text-main); }
     .pjo-dialog .note-box { padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: 9px; font-size: 12.5px; color: var(--text-muted); }
 
-    @media (max-width: 700px) { .pjo-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pjo-remade { text-align: left; } }
+    @media (max-width: 700px) {
+        .pjo-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pjo-remade { text-align: left; }
+        .pjo-overlay { padding: 8px; }
+        .pjo-dialog { max-height: calc(100vh - 16px); }
+        .pjo-body { padding: 16px; }
+    }
 </style>
 
 <div class="pjo-overlay" id="pjoOverlay" aria-hidden="true">

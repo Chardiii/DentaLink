@@ -58,7 +58,7 @@
         .logo-box { border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
         .header-titles h1 { margin: 0; font-size: 17px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 8px; }
-        .version-badge { background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(2, 132, 199, 0.25); }
+        .version-badge { background-color: rgba(2, 132, 199, 0.1); color: var(--accent-cyan); font-size: 11px; padding: 2px 6px; border-radius: 12px; border: 1px solid rgba(2, 132, 199, 0.25); }
         .header-titles p { margin: 0; font-size: 11px; color: var(--text-muted); }
 
         .header-right { display: flex; align-items: center; gap: 16px; }
@@ -69,7 +69,7 @@
         .notif-wrapper { position: relative; }
         .notif-bell { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 7px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
         .notif-bell:hover, .notif-bell.active { color: #0F172A; border-color: var(--accent-cyan); background: rgba(2, 132, 199, 0.05); }
-        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid #FFFFFF; }
+        .notif-badge { position: absolute; top: -5px; right: -5px; background: var(--accent-red); color: white; font-size: 11px; padding: 2px 5px; border-radius: 10px; font-weight: bold; border: 2px solid #FFFFFF; }
         .notif-dropdown { position: absolute; top: 46px; right: 0; width: 340px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15); display: none; flex-direction: column; z-index: 200; overflow: hidden; }
         .notif-dropdown.show { display: flex; }
         .notif-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 600; color: #0F172A; display: flex; justify-content: space-between; background: var(--panel-header); }
@@ -79,7 +79,7 @@
         .notif-item-dd { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .notif-item-dd:hover { background: #F8FAFC; }
         .notif-content-dd { flex: 1; font-size: 12px; color: #334155; line-height: 1.4; }
-        .notif-time-dd { font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block; }
+        .notif-time-dd { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }
         .notif-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0; }
         .notif-close:hover { color: var(--accent-red); }
 
@@ -98,7 +98,7 @@
         /* Production Pulse Bar */
         .pulse-strip {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -258,7 +258,7 @@
         .pjo-card-btn { width: 100%; margin-top: 6px; }
 
         .pulse-tile.alert h3 { color: var(--accent-red); }
-        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .rush-chip { padding: 2px 7px; border-radius: 6px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
         .k-card.is-rush { border-left: 3px solid var(--accent-red); box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.12); }
         .k-card[hidden], .empty-column[hidden] { display: none; }
 
@@ -271,9 +271,10 @@
         .search-summary button { margin-left: 6px; border: 0; background: none; color: var(--accent-cyan); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
 
         @media (max-width: 720px) {
-            .app-header { padding: 10px 16px; }
-            .header-right { gap: 10px; }
-            .status-indicator, .version-badge, .header-titles p, .user-info { display: none; }
+            .app-header { padding: 10px 16px; gap: 10px; }
+            .header-left { min-width: 0; }
+            .header-right { gap: 8px; }
+            .status-indicator, .version-badge, .header-titles p, .user-info, .header-link span { display: none; }
             .notif-dropdown { width: min(340px, calc(100vw - 32px)); right: -60px; }
             .container { padding: 16px; }
             .pulse-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
@@ -287,7 +288,7 @@
         }
 
         /* Completed Grid */
-        .completed-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+        .completed-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
 
         /* JIT Material Logging Modal */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 1000; display: none; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.2s ease-out forwards; }
@@ -327,7 +328,10 @@
             box-shadow: 0 0 6px rgba(2, 132, 199, 0.4);
         }
         .case-tags { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .remake-chip { padding: 2px 7px; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .remake-chip { padding: 2px 7px; border-radius: 6px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
 <body>

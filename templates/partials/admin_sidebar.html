@@ -36,7 +36,7 @@
     .app-sidebar .logo-box { display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px; }
     .app-sidebar .logo-box img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
     .app-sidebar .sidebar-titles h1 { margin: 0; color: #0F172A; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-    .app-sidebar .version-badge { padding: 2px 5px; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; background: rgba(2, 132, 199, 0.1); color: #0284C7; font-size: 9px; }
+    .app-sidebar .version-badge { padding: 2px 5px; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; background: rgba(2, 132, 199, 0.1); color: #0284C7; font-size: 11px; }
     .app-sidebar .sidebar-titles p { margin: 0; color: var(--text-muted, #64748B); font-size: 11px; }
     .app-sidebar .sidebar-titles { min-width: 0; }
     .app-sidebar .sidebar-bell { margin-left: auto; }
@@ -64,7 +64,7 @@
     .app-sidebar .nav-pill:focus-visible { outline: 2px solid #0284C7; outline-offset: 1px; }
     .app-sidebar .nav-pill svg { flex: 0 0 16px; }
     .app-sidebar .nav-label { flex: 1; min-width: 0; }
-    .app-sidebar .nav-count { flex: 0 0 auto; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #EF4444; color: #FFFFFF; font-size: 10.5px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+    .app-sidebar .nav-count { flex: 0 0 auto; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #EF4444; color: #FFFFFF; font-size: 11px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
     .app-sidebar .nav-count.amber { background: #D97706; }
     .app-sidebar .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border-color, #E2E8F0); }
     .app-sidebar .status-indicator { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 20px; background: rgba(16, 185, 129, 0.1); color: #047857; font-size: 11px; font-weight: 600; }
@@ -74,7 +74,7 @@
     .app-sidebar .avatar { width: 32px; height: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #0284C7; border-radius: 50%; background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(16, 185, 129, 0.15)); color: #0284C7; font-size: 11px; font-weight: 700; }
     .app-sidebar .user-info { overflow: hidden; min-width: 0; }
     .app-sidebar .user-info p { overflow: hidden; margin: 0; color: #1E293B; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-    .app-sidebar .user-info span { color: #64748B; font-size: 10px; }
+    .app-sidebar .user-info span { color: #64748B; font-size: 11px; }
     .app-sidebar .sidebar-logout { margin: 0; flex: 0 0 auto; }
     .app-sidebar .btn-logout { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #64748B; cursor: pointer; }
     .app-sidebar .btn-logout:hover { border-color: #FECACA; background: #FEF2F2; color: #DC2626; }
@@ -86,6 +86,22 @@
     }
     @media (max-width: 600px) {
         .app-sidebar .sidebar-footer { grid-template-columns: 1fr; }
+    }
+    /* Phones: a compact top bar; the ☰ button opens the menu. */
+    .app-sidebar .sidebar-menu-btn { display: none; }
+    @media (max-width: 768px) {
+        .app-sidebar { position: sticky; top: 0; z-index: 200; max-height: 100vh; overflow-y: auto; padding: 10px 16px; gap: 12px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06); border-right: 0; border-bottom: 1px solid var(--border-color, #E2E8F0); }
+        .app-sidebar .sidebar-brand { padding-bottom: 0; border-bottom: 0; }
+        .app-sidebar.menu-open .sidebar-brand { padding-bottom: 12px; border-bottom: 1px solid var(--border-color, #E2E8F0); }
+        .app-sidebar .sidebar-bell { margin-left: auto; }
+        .app-sidebar .sidebar-menu-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 10px; border: 1px solid var(--border-color, #E2E8F0); border-radius: 9px; background: #FFFFFF; color: #334155; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .app-sidebar .sidebar-menu-btn:focus-visible { outline: 2px solid #0284C7; outline-offset: 1px; }
+        .app-sidebar.menu-open .sidebar-menu-btn { border-color: rgba(2, 132, 199, 0.4); background: rgba(2, 132, 199, 0.08); color: #0284C7; }
+        .app-sidebar .menu-icon-close, .app-sidebar.menu-open .menu-icon-open { display: none; }
+        .app-sidebar.menu-open .menu-icon-close { display: block; }
+        .app-sidebar:not(.menu-open) .sidebar-nav, .app-sidebar:not(.menu-open) .sidebar-footer { display: none; }
+        .app-sidebar .sidebar-nav { grid-template-columns: 1fr; }
+        .app-sidebar .nav-pill { padding: 11px 12px; }
     }
 </style>
 
@@ -112,8 +128,13 @@
                 {% set notif_placement = 'side' %}
                 {% include 'partials/notifications_bell.html' %}
             </div>
+            <button type="button" class="sidebar-menu-btn" aria-expanded="false" aria-controls="adminSidebarNav" aria-label="Open menu">
+                <svg class="menu-icon-open" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                <svg class="menu-icon-close" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M6 6l12 12M18 6L6 18"/></svg>
+                Menu
+            </button>
         </div>
-        <nav class="sidebar-nav">
+        <nav class="sidebar-nav" id="adminSidebarNav">
             {{ nav_link('dashboard', url_for('admin_dashboard'), 'Admin Command',
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>') }}
             {{ nav_link('incoming', url_for('admin_dashboard', open_modal='incoming'), 'Incoming Cases',
@@ -170,6 +191,21 @@
     (function () {
         if (window.__adminSidebarWired) return;
         window.__adminSidebarWired = true;
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.app-sidebar .sidebar-menu-btn');
+            if (!btn) return;
+            const bar = btn.closest('.app-sidebar');
+            const open = bar.classList.toggle('menu-open');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+        });
+        document.addEventListener('keydown', function (e) {
+            const bar = document.querySelector('.app-sidebar.menu-open');
+            if (e.key !== 'Escape' || !bar) return;
+            bar.classList.remove('menu-open');
+            const btn = bar.querySelector('.sidebar-menu-btn');
+            btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-label', 'Open menu'); btn.focus();
+        });
         const openers = { incoming: 'openIncomingModal', restock: 'openRestockModal', settings: 'openSettingsModal' };
         document.addEventListener('click', function (e) {
             const link = e.target.closest('.app-sidebar [data-open-modal]');
