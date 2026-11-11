@@ -214,25 +214,11 @@
 
         .form-row-checkbox {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
             font-size: 12.5px;
             margin-bottom: 20px;
             color: var(--text-muted);
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-        }
-
-        .checkbox-label input[type="checkbox"] {
-            accent-color: var(--accent-cyan);
-            width: 15px;
-            height: 15px;
-            cursor: pointer;
         }
 
         .login-btn {
@@ -443,9 +429,6 @@
                 </div>
 
                 <div class="form-row-checkbox">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="remember"> Keep me signed in
-                    </label>
                     <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
                 </div>
 
