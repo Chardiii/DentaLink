@@ -1817,22 +1817,6 @@ def dentist_dashboard():
         draft_cases = [c for c in dental_cases if c.get("status") == "draft"]
         ready_cases = [c for c in dental_cases if c.get("status") in ["ready_for_delivery", *DELIVERED_STATUSES]]
 
-        # Active label tokens so the clinic can confirm receipt without scanning
-        if transit_cases:
-            labels = (
-                supabase_admin
-                .table("case_dispatches")
-                .select("case_id, token")
-                .in_("case_id", [c["id"] for c in transit_cases])
-                .eq("status", "active")
-                .execute()
-                .data
-                or []
-            )
-            tokens_by_case = {label["case_id"]: label["token"] for label in labels}
-            for c in transit_cases:
-                c["dispatch_token"] = tokens_by_case.get(c["id"])
-
         # Delivery receipt and open issue for each delivered case
         if completed_cases:
             completed_ids = [c["id"] for c in completed_cases]
@@ -4659,65 +4643,109 @@ def admin_reissue_dispatch_label(case_id):
         return "Unable to reissue the label. Check the server logs for details.", 500
 
 
-@app.route("/d/<token>")
-@role_required("admin", "technician", "dentist")
-def scan_dispatch_label(token):
-    try:
-        label = _load_dispatch_label(token)
-        if not label:
-            return render_template("dispatch_scan.html", problem="unknown", profile=g.profile), 404
+# The box's QR label opens this page for anyone, signed in or not, so the public view must never
+# show more than a courier or receptionist needs: no patient name, phone numbers, instructions,
+# files or prices.
+PUBLIC_LABEL_DETAIL_DAYS = 30   # after delivery, the public page only says "Delivered on <date>"
 
-        case = _case_for_dispatch(label["case_id"])
-        if not case:
-            return render_template("dispatch_scan.html", problem="unknown", profile=g.profile), 404
+
+def _label_viewer():
+    """The signed-in, approved user scanning a label, or None for the public."""
+    if not session.get("user_id"):
+        return None
+    try:
+        profile = _current_profile()
+    except Exception:
+        return None
+    if profile and profile.get("status") == "approved" and profile.get("role") in ("admin", "technician", "dentist"):
+        return profile
+    return None
+
+
+def _no_store(body, status=200):
+    """Keep label pages out of caches and search engines, and don't leak the link in Referer."""
+    response = app.make_response((body, status))
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.route("/d/<token>")
+def scan_dispatch_label(token):
+    """The page behind a printed dispatch label.
+
+    Anyone can open it without signing in and sees the clinic, dentist, due date, case type
+    and shade. Signed-in lab staff and the case's own dentist see the full details, and an
+    admin can confirm the package was checked and hand it to the courier.
+    """
+    try:
+        viewer = _label_viewer()
+        role = viewer.get("role") if viewer else None
+        label = _load_dispatch_label(token)
+        case = _case_for_dispatch(label["case_id"]) if label else None
+        if not label or not case:
+            return _no_store(render_template("dispatch_scan.html", problem="unknown", profile=viewer), 404)
 
         if label["status"] != "active":
             _log_dispatch_event(case["id"], "denied", label["id"], notes="voided_label")
-            return render_template("dispatch_scan.html", problem="voided", case=case, profile=g.profile), 410
+            return _no_store(render_template("dispatch_scan.html", problem="voided", case=case, profile=viewer), 410)
 
-        if g.profile["role"] == "dentist" and case.get("dentist_id") != g.profile["id"]:
+        if role == "dentist" and case.get("dentist_id") != viewer["id"]:
             _log_dispatch_event(case["id"], "denied", label["id"], notes="wrong_clinic")
             _notify_admins(
-                f"Delivery check: {_display_name(g.profile, 'A clinic')} scanned the label for Case "
+                f"Delivery check: {_display_name(viewer, 'A clinic')} scanned the label for Case "
                 f"{case['case_number']}, which is addressed to another clinic. Check for a mixed-up package."
             )
-            return render_template("dispatch_scan.html", problem="wrong_clinic", case=case, profile=g.profile), 403
+            return _no_store(render_template("dispatch_scan.html", problem="wrong_clinic", case=case, profile=viewer), 403)
 
-        events = (
-            supabase_admin.table("case_dispatch_events")
-            .select("event_type, actor_id, courier_name, received_by, notes, created_at")
-            .eq("case_id", case["id"])
-            .in_("event_type", ["issued", "dispatched", "delivered"])
-            .order("created_at")
-            .execute()
-            .data
-            or []
-        )
-        actor_ids = list({e["actor_id"] for e in events if e.get("actor_id")})
-        actors = (
-            supabase_admin.table("profiles").select("id, display_name, first_name").in_("id", actor_ids).execute().data
-            or []
-        ) if actor_ids else []
-        actors_by_id = {a["id"]: _display_name(a) for a in actors}
-        for event in events:
-            event["actor_name"] = actors_by_id.get(event.get("actor_id"), "Unknown user")
+        full = role is not None   # lab staff, or this case's own dentist (other dentists stopped above)
+        delivered_at = _parse_timestamp(case.get("delivered_at"))
+        expired = (not full and delivered_at is not None
+                   and datetime.now(timezone.utc) - delivered_at > timedelta(days=PUBLIC_LABEL_DETAIL_DAYS))
+        shades = list(dict.fromkeys(t.get("shade") for t in case.get("teeth") or [] if t.get("shade")))
 
-        return render_template(
+        events = []
+        if full:
+            events = (
+                supabase_admin.table("case_dispatch_events")
+                .select("event_type, actor_id, courier_name, received_by, notes, created_at")
+                .eq("case_id", case["id"])
+                .in_("event_type", ["issued", "dispatched", "delivered"])
+                .order("created_at")
+                .execute()
+                .data
+                or []
+            )
+            actor_ids = list({e["actor_id"] for e in events if e.get("actor_id")})
+            actors = (
+                supabase_admin.table("profiles").select("id, display_name, first_name").in_("id", actor_ids).execute().data
+                or []
+            ) if actor_ids else []
+            actors_by_id = {a["id"]: _display_name(a) for a in actors}
+            for event in events:
+                event["actor_name"] = actors_by_id.get(event.get("actor_id"), "Unknown user")
+
+        return _no_store(render_template(
             "dispatch_scan.html",
             case=case,
             label=label,
             events=events,
-            profile=g.profile,
+            profile=viewer,
+            public=not full,
+            expired=expired,
+            shades=shades,
             patient_initials=_patient_initials(case.get("patient_name")),
-        )
+        ))
     except Exception:
         app.logger.exception("Unable to load dispatch scan page")
-        return "Unable to load this delivery label. Check the server logs for details.", 500
+        return "Unable to load this delivery label. Try again in a moment.", 500
 
 
 @app.route("/d/<token>/dispatch", methods=["POST"])
-@role_required("admin", "technician")
+@role_required("admin")
 def dispatch_case(token):
+    """Admin scanned the box, checked it matches the label, and hands it to the courier."""
     try:
         label = _load_dispatch_label(token)
         if not label or label["status"] != "active":
@@ -4726,6 +4754,9 @@ def dispatch_case(token):
         courier_name = request.form.get("courier_name", "").strip()[:120]
         if not courier_name:
             flash("Enter the courier's name before handing over the case.", "error")
+            return redirect(url_for("scan_dispatch_label", token=token))
+        if request.form.get("package_checked") != "yes":
+            flash("Tick the box to confirm you checked the package against this label.", "error")
             return redirect(url_for("scan_dispatch_label", token=token))
 
         case = _set_case_status(
@@ -4742,10 +4773,10 @@ def dispatch_case(token):
         log_case_status_change(case["id"], "Dispatched (in transit)", g.profile["id"], f"Handed to courier {courier_name} by {staff_name}")
         create_notification(
             user_id=case["dentist_id"],
-            message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. Scan the QR label on the box when it arrives to confirm receipt.",
+            message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. When the box arrives, open the case in DentaLink and tap Confirm receipt.",
             link=f"/dentist/cases/{case['id']}",
         )
-        _notify_admins(f"Dispatched: Case {case['case_number']} was handed to {courier_name} by {staff_name}.")
+        _notify_admins(f"Dispatched: Case {case['case_number']} was checked and handed to {courier_name} by {staff_name}.")
         flash(f"Handed to {courier_name}. The clinic has been notified.", "success")
         return redirect(url_for("scan_dispatch_label", token=token))
     except Exception:
@@ -4753,56 +4784,85 @@ def dispatch_case(token):
         return "Unable to record the handoff. Check the server logs for details.", 500
 
 
-@app.route("/d/<token>/receive", methods=["POST"])
-@role_required("dentist")
-def receive_case(token):
-    try:
-        label = _load_dispatch_label(token)
-        if not label or label["status"] != "active":
-            return redirect(url_for("scan_dispatch_label", token=token))
+def _mark_case_delivered(case_id, received_by, by_lab=False):
+    """Record delivery of a case that's ready for dispatch or in transit; the current user is the
+    actor. Returns the case, or None if it was already delivered or isn't out for delivery."""
+    before = supabase_admin.table("dental_cases").select("status").eq("id", case_id).execute().data or []
+    was_scanned_out = bool(before) and before[0].get("status") == "in_transit"
+    case = _set_case_status(case_id, DISPATCH_STATUSES, {"status": "delivered", "delivered_at": _now_iso()})
+    if not case:
+        return None
 
-        cases = (
-            supabase_admin.table("dental_cases")
-            .select("id, dentist_id, status")
-            .eq("id", label["case_id"])
-            .execute()
-            .data
-            or []
-        )
-        if not cases or cases[0].get("dentist_id") != g.profile["id"]:
-            return redirect(url_for("scan_dispatch_label", token=token))
-        was_scanned_out = cases[0].get("status") == "in_transit"
+    label = _active_dispatch_label(case_id)
+    notes = []
+    if by_lab:
+        notes.append(f"Marked delivered by the lab ({_display_name(g.profile, 'Admin')})")
+    if not was_scanned_out:
+        notes.append("Received without a dispatch scan at the lab")
+    _log_dispatch_event(case_id, "delivered", label["id"] if label else None,
+                        received_by=received_by, notes="; ".join(notes) or None)
+    log_case_status_change(case_id, "Delivered", g.profile["id"],
+                           f"Received by {received_by}" + (" (recorded by the lab)" if by_lab else ""))
 
-        received_by = request.form.get("received_by", "").strip()[:120] or _display_name(g.profile, "Clinic")
-        case = _set_case_status(
-            label["case_id"],
-            DISPATCH_STATUSES,
-            {"status": "delivered", "delivered_at": _now_iso()},
-        )
-        if not case:
-            flash("This case was already confirmed as delivered.", "error")
-            return redirect(url_for("scan_dispatch_label", token=token))
-
-        skipped_note = None if was_scanned_out else "Received without a dispatch scan at the lab"
-        _log_dispatch_event(case["id"], "delivered", label["id"], received_by=received_by, notes=skipped_note)
-        log_case_status_change(case["id"], "Delivered", g.profile["id"], f"Received by {received_by}")
-
-        clinic = g.profile.get("clinic_name") or _display_name(g.profile, "the clinic")
+    dentist = {}
+    if case.get("dentist_id"):
+        rows = (supabase_admin.table("profiles").select("display_name, first_name, clinic_name")
+                .eq("id", case["dentist_id"]).execute().data or [])
+        dentist = rows[0] if rows else {}
+    clinic = dentist.get("clinic_name") or _display_name(dentist, "the clinic")
+    if not by_lab:
         message = f"Delivered: Case {case['case_number']} was received by {received_by} at {clinic}."
-        if skipped_note:
+        if not was_scanned_out:
             message += " It was never scanned out at the lab."
         _notify_admins(message)
-        if case.get("technician_id"):
-            create_notification(
-                user_id=case["technician_id"],
-                message=f"Delivered: Case {case['case_number']} reached {clinic}.",
-                link="/technician",
-            )
-        flash("Receipt confirmed. The lab has been notified.", "success")
-        return redirect(url_for("scan_dispatch_label", token=token))
+    elif case.get("dentist_id"):
+        create_notification(
+            user_id=case["dentist_id"],
+            message=f"Delivered: the lab recorded Case {case['case_number']} as received by {received_by}. If that's not right, contact the lab.",
+            link=f"/dentist/cases/{case_id}",
+        )
+    if case.get("technician_id"):
+        create_notification(user_id=case["technician_id"],
+                            message=f"Delivered: Case {case['case_number']} reached {clinic}.", link="/technician")
+    return case
+
+
+@app.route("/dentist/cases/<case_id>/confirm-receipt", methods=["POST"])
+@role_required("dentist")
+def dentist_confirm_receipt(case_id):
+    """The clinic confirms the box arrived, from the case page (the QR label is information only)."""
+    try:
+        rows = supabase_admin.table("dental_cases").select("id, dentist_id").eq("id", case_id).execute().data or []
+        if not rows or rows[0].get("dentist_id") != g.profile["id"]:
+            return "Case not found.", 404
+        received_by = request.form.get("received_by", "").strip()[:120] or _display_name(g.profile, "Clinic")
+        if _mark_case_delivered(case_id, received_by):
+            flash("Receipt confirmed. The lab has been notified.", "success")
+        else:
+            flash("This case was already confirmed as delivered, or it hasn't left the lab yet.", "error")
+        return redirect(url_for("dentist_case_summary", case_id=case_id))
     except Exception:
         app.logger.exception("Unable to confirm receipt")
         return "Unable to confirm receipt. Check the server logs for details.", 500
+
+
+@app.route("/admin/cases/<case_id>/mark-delivered", methods=["POST"])
+@role_required("admin")
+def admin_mark_delivered(case_id):
+    """The lab records delivery, e.g. when the courier confirms drop-off and the clinic hasn't."""
+    next_path = request.form.get("next", "")
+    back = next_path if _safe_next_path(next_path) else url_for("admin_dashboard")
+    try:
+        received_by = request.form.get("received_by", "").strip()[:120] or "Clinic (confirmed by courier)"
+        case = _mark_case_delivered(case_id, received_by, by_lab=True)
+        if case:
+            flash(f"Case {case['case_number']} marked as delivered. The clinic has been notified.", "success")
+        else:
+            flash("That case was already delivered, or it isn't out for delivery.", "error")
+        return redirect(back)
+    except Exception:
+        app.logger.exception("Unable to mark case delivered")
+        return "Unable to mark the case delivered. Check the server logs for details.", 500
 
 # =========================
 # ADMIN: ASSIGN CASE TO TECH

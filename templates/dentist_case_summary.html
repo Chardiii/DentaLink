@@ -146,6 +146,11 @@
             .stages { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 10px; }
         }
 
+        .receipt-form { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .receipt-form label { font-size: 12px; font-weight: 700; color: var(--text-strong); }
+        .receipt-form input[type=text] { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; font: inherit; }
+        .receipt-form .btn { width: 100%; padding: 11px 14px; }
+
         /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
         @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
@@ -178,7 +183,7 @@
         "finishing_and_quality_check": ("Finishing", "Staining, glazing and polishing, then the lab's quality check."),
         "pending_admin_review": ("Final quality check", "The lab is inspecting the finished work before it ships."),
         "ready_for_dispatch": ("Packed and labelled", "It leaves the lab with the next courier pickup."),
-        "in_transit": ("On its way to you", "When the box arrives, scan the QR label with your DentaLink account to confirm receipt."),
+        "in_transit": ("On its way to you", "When the box arrives, check it and tap Confirm receipt below."),
     } %}
 
     <header class="app-header">
@@ -323,9 +328,18 @@
                         <li class="{{ 'done' if receipt.delivered or receipt.tracked or status == 'completed' }}"><div><strong>Received at your clinic</strong><span>{% if receipt.delivered %}{{ receipt.delivered.received_by or receipt.delivered.actor_name }} · <time datetime="{{ receipt.delivered.created_at }}">{{ receipt.delivered.created_at[:16]|replace('T', ' ') }}</time>{% elif receipt.tracked %}<time datetime="{{ case.delivered_at }}">{{ case.delivered_at[:16]|replace('T', ' ') }}</time>{% elif status == 'completed' %}Delivered; date not recorded{% else %}Not yet received{% endif %}</span></div></li>
                     </ol>
                     {% if receipt.delivered %}
-                        <div class="proof"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" style="flex:0 0 16px;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg><span>Proof of delivery: receipt was confirmed by scanning the case's QR label with your clinic's DentaLink account.{% if receipt.delivered.notes %} {{ receipt.delivered.notes }}.{% endif %}</span></div>
+                        <div class="proof"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" style="flex:0 0 16px;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg><span>Proof of delivery: {% if receipt.delivered.notes and 'by the lab' in receipt.delivered.notes %}recorded by the lab in DentaLink{% else %}confirmed by your clinic in DentaLink{% endif %}.{% if receipt.delivered.notes %} {{ receipt.delivered.notes }}.{% endif %}</span></div>
                     {% elif status == 'completed' %}
                         <p class="hint">This case was completed before QR delivery tracking, so no receipt was recorded.</p>
+                    {% endif %}
+                    {% if status in ['ready_for_dispatch', 'in_transit'] %}
+                        <form method="POST" action="{{ url_for('dentist_confirm_receipt', case_id=case.id) }}" class="receipt-form" onsubmit="return confirm('Confirm that #{{ case.case_number }} arrived at your clinic? The lab will be notified.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            {% if status == 'ready_for_dispatch' %}<p class="hint">The lab hasn't handed this to a courier yet. If the box is already with you, you can still confirm.</p>{% endif %}
+                            <label for="received_by">Received by</label>
+                            <input type="text" id="received_by" name="received_by" maxlength="120" autocomplete="name" placeholder="{{ profile.display_name or 'Your name' }}">
+                            <button type="submit" class="btn btn-primary">Confirm receipt</button>
+                        </form>
                     {% endif %}
                 </section>
                 {% endif %}
