@@ -263,26 +263,19 @@ def admin_dashboard():
         # ==========================================
         # 1. VERIFY ADMIN ACCESS
         # ==========================================
-        response = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
-        profiles = response.data or []
-        if not profiles:
+        profile = _current_profile()
+        if not profile:
             session.clear()
             return "Profile not found.", 404
-
-        profile = profiles[0]
 
         if profile.get("role") != "admin" or profile.get("status") != "approved":
             return "Access denied.", 403
 
         # ==========================================
-        # 2. UPDATE ACTIVE SESSION HEARTBEAT
+        # 2. ACTIVE SESSION HEARTBEAT
         # ==========================================
+        # update_user_activity() (before every request) records last_seen once a minute.
         from datetime import datetime, timedelta
-        now_iso = datetime.utcnow().isoformat()
-        try:
-            supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
-        except Exception:
-            pass
 
         # ==========================================
         # 3. DIRECTORY USERS & ONLINE METRIC
@@ -294,15 +287,12 @@ def admin_dashboard():
         approved_users = [u for u in all_users if u.get("status") == "approved"]
         rejected_users = [u for u in all_users if u.get("status") == "rejected"]
 
-        five_mins_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
-        online_res = (
-            supabase_admin
-            .table("profiles")
-            .select("id", count="exact")
-            .gte("last_seen", five_mins_ago)
-            .execute()
+        # Online = seen in the last 5 minutes; counted from the profiles already loaded above.
+        five_mins_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+        online_count = sum(
+            1 for u in all_users
+            if (_parse_timestamp(u.get("last_seen")) or datetime.min.replace(tzinfo=timezone.utc)) >= five_mins_ago
         )
-        online_count = online_res.count or 0
 
         # Quick lookup map for user profiles (id -> profile)
         users_map = {u["id"]: u for u in all_users}
@@ -361,31 +351,26 @@ def admin_dashboard():
         unassigned_cases = unassigned_res.data or []
         unassigned_ids = [c["id"] for c in unassigned_cases]
 
-        # Bulk fetch teeth & signed file attachments for unassigned cases
-        if unassigned_ids:
-            unassigned_teeth_res = supabase_admin.table("case_teeth").select("*").in_("case_id", unassigned_ids).execute()
-            teeth_by_case = {}
-            for t in (unassigned_teeth_res.data or []):
+        # Active workflow cases (section 8 uses them too); loaded here so one teeth query
+        # covers both the unassigned and the active cases.
+        active_cases_query = supabase_admin.table("dental_cases").select("*")
+        for closed_status in CLOSED_STATUSES:
+            active_cases_query = active_cases_query.neq("status", closed_status)
+        active_cases = active_cases_query.order("created_at", desc=True).execute().data or []
+        active_case_ids = [c["id"] for c in active_cases]
+
+        teeth_by_case = {}
+        if unassigned_ids or active_case_ids:
+            teeth_rows = (supabase_admin.table("case_teeth").select("*")
+                          .in_("case_id", unassigned_ids + active_case_ids).execute().data or [])
+            for t in teeth_rows:
                 teeth_by_case.setdefault(t["case_id"], []).append(t)
-            for c in unassigned_cases:
-                c["teeth"] = teeth_by_case.get(c["id"], [])
 
-            files_res = supabase_admin.table("case_files").select("*").in_("case_id", unassigned_ids).execute()
-            files_by_case = {}
-            for f in (files_res.data or []):
-                try:
-                    signed_url_res = supabase_admin.storage.from_("dental-case-files").create_signed_url(f["file_path"], 3600)
-                    f["download_url"] = signed_url_res.get("signedURL") or signed_url_res.get("signed_url")
-                except Exception:
-                    f["download_url"] = "#"
-                files_by_case.setdefault(f["case_id"], []).append(f)
-
-            for c in unassigned_cases:
-                c["files"] = files_by_case.get(c["id"], [])
-        else:
-            for c in unassigned_cases:
-                c["teeth"] = []
-                c["files"] = []
+        # The incoming list shows each case's summary only; its scans and photos open on the
+        # case page, so they aren't loaded (or signed) here.
+        for c in unassigned_cases:
+            c["teeth"] = teeth_by_case.get(c["id"], [])
+            c["files"] = []
 
         # ==========================================
         # 7. APPROVED TECHNICIANS & WORKLOADS
@@ -398,46 +383,20 @@ def admin_dashboard():
             "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
         ]
 
-        if tech_ids:
-            workload_cases_res = (
-                supabase_admin
-                .table("dental_cases")
-                .select("technician_id")
-                .in_("technician_id", tech_ids)
-                .in_("status", active_statuses)
-                .execute()
-            )
-            workload_counts = {}
-            for w in (workload_cases_res.data or []):
-                t_id = w.get("technician_id")
-                workload_counts[t_id] = workload_counts.get(t_id, 0) + 1
-
-            for t in technicians:
-                t["active_workload"] = workload_counts.get(t["id"], 0)
-        else:
-            for t in technicians:
-                t["active_workload"] = 0
+        # Every active status is also an open workflow status, so the active cases loaded
+        # above already hold each technician's workload.
+        workload_counts = {}
+        for c in active_cases:
+            if c.get("technician_id") in tech_ids and c.get("status") in active_statuses:
+                workload_counts[c["technician_id"]] = workload_counts.get(c["technician_id"], 0) + 1
+        for t in technicians:
+            t["active_workload"] = workload_counts.get(t["id"], 0)
 
         # ==========================================
         # 8. ACTIVE WORKFLOW CASES WITH TEETH & CLINIC
         # ==========================================
-        active_cases_query = supabase_admin.table("dental_cases").select("*")
-        for closed_status in CLOSED_STATUSES:
-            active_cases_query = active_cases_query.neq("status", closed_status)
-        active_cases = active_cases_query.order("created_at", desc=True).execute().data or []
-        active_case_ids = [c["id"] for c in active_cases]
-
-        # Bulk fetch teeth for active cases
-        if active_case_ids:
-            active_teeth_res = supabase_admin.table("case_teeth").select("*").in_("case_id", active_case_ids).execute()
-            active_teeth_by_case = {}
-            for t in (active_teeth_res.data or []):
-                active_teeth_by_case.setdefault(t["case_id"], []).append(t)
-        else:
-            active_teeth_by_case = {}
-
         for case in active_cases:
-            case["teeth"] = active_teeth_by_case.get(case["id"], [])
+            case["teeth"] = teeth_by_case.get(case["id"], [])
 
             dentist_id = case.get("dentist_id")
             dentist_profile = users_map.get(dentist_id, {})
@@ -478,18 +437,10 @@ def admin_dashboard():
                 c["courier_name"] = couriers_by_case.get(c["id"])
 
         # ==========================================
-        # 9. RECENT NOTIFICATIONS
+        # 9. RECENT NOTIFICATIONS (shared with the bell)
         # ==========================================
-        notif_response = (
-            supabase_admin
-            .table("notifications")
-            .select("*")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(5)
-            .execute()
-        )
-        notifications = notif_response.data or []
+        notifications = notification_feed()["items"][:5]
+        _prime_sidebar_counts(incoming=len(unassigned_cases), restock=len(restock_requests))
 
         return render_template(
             "admin_dashboard.html",
@@ -555,6 +506,25 @@ def _valid_csrf_token():
     return bool(token and submitted and secrets.compare_digest(token, submitted))
 
 
+def _current_profile():
+    """The signed-in user's profile row, read from the database at most once per request.
+
+    Every database call costs a round trip (~200 ms from the Philippines to the Sydney
+    project), and a page used to read the same profile up to three times: the one-device
+    check, role_required and the view itself. They now share this copy.
+    """
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    cached = g.get("_current_profile_entry")
+    if cached and cached[0] == user_id:
+        return cached[1]
+    rows = supabase_admin.table("profiles").select("*").eq("id", user_id).execute().data or []
+    profile = rows[0] if rows else None
+    g._current_profile_entry = (user_id, profile)
+    return profile
+
+
 @app.before_request
 def enforce_single_device_sessions():
     """Sign out an admin browser whose sign-in was replaced by a newer one on another device."""
@@ -565,13 +535,11 @@ def enforce_single_device_sessions():
     if role and role not in SINGLE_SESSION_ROLES:
         return None  # dentists and technicians may use several devices
     try:
-        rows = (supabase_admin.table("profiles").select("role, active_session_id")
-                .eq("id", user_id).execute().data or [])
+        profile = _current_profile()
     except Exception:
-        return None  # e.g. before migration 20261101020000: never lock anyone out over this
-    if not rows:
+        return None  # never lock anyone out over a failed check
+    if not profile:
         return None
-    profile = rows[0]
     session["role"] = profile.get("role")
     active = profile.get("active_session_id")
     if profile.get("role") not in SINGLE_SESSION_ROLES or not active or active == session.get("login_session_id"):
@@ -590,7 +558,14 @@ def enforce_single_device_sessions():
 
 
 def admin_sidebar_counts():
-    """Badge counts for the admin sidebar; called only by pages that render it."""
+    """Badge counts for the admin sidebar; called only by pages that render it.
+
+    Pages that already loaded the incoming cases and restock requests hand their counts
+    over with _prime_sidebar_counts(), which saves two database calls.
+    """
+    cached = g.get("_sidebar_counts")
+    if cached is not None:
+        return cached
     counts = {"incoming": 0, "restock": 0, "issues": 0}
     try:
         counts["incoming"] = _count("dental_cases", status="submitted")
@@ -598,7 +573,13 @@ def admin_sidebar_counts():
         counts["issues"] = _open_issue_count()
     except Exception:
         app.logger.exception("Unable to load sidebar counts")
+    g._sidebar_counts = counts
     return counts
+
+
+def _prime_sidebar_counts(incoming, restock):
+    """Reuse counts a page already has: `incoming` submitted cases, `restock` pending requests."""
+    g._sidebar_counts = {"incoming": incoming, "restock": restock, "issues": _open_issue_count()}
 
 
 @app.context_processor
@@ -635,20 +616,13 @@ def role_required(*roles):
                 next_path = request.full_path if request.query_string else request.path
                 return redirect(url_for("login", next=next_path if request.method == "GET" else None))
 
-            profiles = (
-                supabase_admin.table("profiles")
-                .select("id, display_name, first_name, last_name, clinic_name, role, status")
-                .eq("id", user_id)
-                .execute()
-                .data
-                or []
-            )
-            if not profiles or profiles[0].get("status") != "approved" or profiles[0].get("role") not in roles:
+            profile = _current_profile()
+            if not profile or profile.get("status") != "approved" or profile.get("role") not in roles:
                 return "Access denied.", 403
             if request.method == "POST" and not _valid_csrf_token():
                 return "This form has expired. Reload the page and try again.", 400
 
-            g.profile = profiles[0]
+            g.profile = profile
             return view(*args, **kwargs)
         return wrapped
     return decorator
@@ -1520,20 +1494,11 @@ def admin_inventory_logs():
 
     try:
         # 1. Verify admin
-        profile_res = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
-        profiles = profile_res.data or []
-        if not profiles or profiles[0].get("role") != "admin" or profiles[0].get("status") != "approved":
+        profile = _current_profile()
+        if not profile or profile.get("role") != "admin" or profile.get("status") != "approved":
             return "Access denied.", 403
 
-        profile = profiles[0]
-
-        # 2. Update session heartbeat
-        from datetime import datetime
-        now_iso = datetime.utcnow().isoformat()
-        try:
-            supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
-        except Exception:
-            pass
+        # 2. Session heartbeat: update_user_activity() records last_seen once a minute.
 
         # 3. Date filters & fetch logs
         start_date = request.args.get("start_date")
@@ -1555,16 +1520,7 @@ def admin_inventory_logs():
         logs = logs_res.data or []
 
         # 4. Fetch notifications for header
-        notif_res = (
-            supabase_admin
-            .table("notifications")
-            .select("*")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(5)
-            .execute()
-        )
-        notifications = notif_res.data or []
+        notifications = notification_feed()["items"][:5]  # shared with the bell
 
         # 5. Fetch Restock Requests for sidebar badge & modal
         restock_res = (
@@ -1577,18 +1533,24 @@ def admin_inventory_logs():
         )
         restock_requests = restock_res.data or []
 
-        # 6. Fetch Unassigned Cases for sidebar badge & modal
-        unassigned_res = (
+        # 6–8. One case query covers the unassigned cases (sidebar badge & modal), each
+        # technician's active workload, and the milling / finishing counts for the chime.
+        active_statuses = [
+            "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
+            "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
+        ]
+        open_cases = (
             supabase_admin
             .table("dental_cases")
             .select("*")
-            .eq("status", "submitted")
+            .in_("status", ["submitted"] + active_statuses)
             .order("created_at", desc=True)
             .execute()
+            .data
+            or []
         )
-        unassigned_cases = unassigned_res.data or []
+        unassigned_cases = [c for c in open_cases if c.get("status") == "submitted"]
 
-        # 7. Fetch Technicians & compute active workloads in bulk
         techs_res = (
             supabase_admin
             .table("profiles")
@@ -1600,49 +1562,16 @@ def admin_inventory_logs():
         technicians = techs_res.data or []
         tech_ids = [t["id"] for t in technicians]
 
-        active_statuses = [
-            "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
-            "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
-        ]
+        workload_counts = {}
+        for c in open_cases:
+            if c.get("technician_id") in tech_ids and c.get("status") in active_statuses:
+                workload_counts[c["technician_id"]] = workload_counts.get(c["technician_id"], 0) + 1
+        for tech in technicians:
+            tech["active_workload"] = workload_counts.get(tech["id"], 0)
 
-        if tech_ids:
-            workload_cases_res = (
-                supabase_admin
-                .table("dental_cases")
-                .select("technician_id")
-                .in_("technician_id", tech_ids)
-                .in_("status", active_statuses)
-                .execute()
-            )
-            workload_counts = {}
-            for w in (workload_cases_res.data or []):
-                t_id = w.get("technician_id")
-                workload_counts[t_id] = workload_counts.get(t_id, 0) + 1
-
-            for tech in technicians:
-                tech["active_workload"] = workload_counts.get(tech["id"], 0)
-        else:
-            for tech in technicians:
-                tech["active_workload"] = 0
-
-        # 8. Fetch milling & finishing stages for audio chime triggers
-        milling_res = (
-            supabase_admin
-            .table("dental_cases")
-            .select("id")
-            .eq("status", "milling_or_printing")
-            .execute()
-        )
-        milling_cases = milling_res.data or []
-
-        qc_res = (
-            supabase_admin
-            .table("dental_cases")
-            .select("id")
-            .eq("status", "finishing_and_quality_check")
-            .execute()
-        )
-        qc_cases = qc_res.data or []
+        milling_cases = [{"id": c["id"]} for c in open_cases if c.get("status") == "milling_or_printing"]
+        qc_cases = [{"id": c["id"]} for c in open_cases if c.get("status") == "finishing_and_quality_check"]
+        _prime_sidebar_counts(incoming=len(unassigned_cases), restock=len(restock_requests))
 
         return render_template(
             "admin_inventory_logs.html",
@@ -1816,13 +1745,8 @@ def dentist_dashboard():
             profile["last_name"] = ""
 
         # =========================
-        # 3. UPDATE USER HEARTBEAT
+        # 3. USER HEARTBEAT: update_user_activity() records last_seen once a minute.
         # =========================
-        now_iso = datetime.utcnow().isoformat()
-        try:
-            supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
-        except Exception:
-            pass
 
         # =========================
         # 4. GET DENTIST CASES (SAFE QUERY)
@@ -1956,16 +1880,7 @@ def dentist_dashboard():
         # =========================
         # 7. GET RECENT NOTIFICATIONS
         # =========================
-        notif_response = (
-            supabase_admin
-            .table("notifications")
-            .select("*")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(5)
-            .execute()
-        )
-        notifications = notif_response.data or []
+        notifications = notification_feed()["items"][:5]  # shared with the bell
 
         # =========================
         # 8. RENDER VIEW
@@ -2936,14 +2851,8 @@ def technician_dashboard():
             profile["last_name"] = ""
 
         # ==========================================
-        # 2. UPDATE ACTIVE SESSION HEARTBEAT
+        # 2. SESSION HEARTBEAT: update_user_activity() records last_seen once a minute.
         # ==========================================
-        from datetime import datetime
-        now_iso = datetime.utcnow().isoformat()
-        try:
-            supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
-        except Exception:
-            pass
 
         # ==========================================
         # 3. GET CASES ASSIGNED TO THIS TECHNICIAN
@@ -3027,16 +2936,7 @@ def technician_dashboard():
         # ==========================================
         # 7. NOTIFICATIONS
         # ==========================================
-        notif_response = (
-            supabase_admin
-            .table("notifications")
-            .select("*")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(5)
-            .execute()
-        )
-        notifications = notif_response.data or []
+        notifications = notification_feed()["items"][:5]  # shared with the bell
 
         # ==========================================
         # 8. RENDER VIEW
@@ -3391,9 +3291,33 @@ def _materials_used(case_number):
     return logs
 
 
+def _signed_case_file_urls(paths, expires_in=3600):
+    """Signed URLs for case files, {path: url}: one storage request for all of them.
+
+    Falls back to one request per file if the batch call fails (e.g. a file is missing,
+    which the batch call can't report per file)."""
+    paths = [p for p in dict.fromkeys(paths) if p]
+    if not paths:
+        return {}
+    bucket = supabase_admin.storage.from_(CASE_FILES_BUCKET)
+    try:
+        return {item.get("path"): item.get("signedURL") for item in bucket.create_signed_urls(paths, expires_in)
+                if item.get("path") and item.get("signedURL")}
+    except Exception:
+        urls = {}
+        for path in paths:
+            try:
+                signed = bucket.create_signed_url(path, expires_in)
+                urls[path] = signed.get("signedURL") or signed.get("signedUrl") if isinstance(signed, dict) else signed
+            except Exception:
+                app.logger.exception("Unable to sign case file %s", path)
+        return urls
+
+
 def _case_file_links(files):
     """Add view_url (opens in the browser) and download_url (saves the file) to case file rows,
     plus kind: "stl", "image", "pdf" or "other" for choosing a viewer."""
+    urls = _signed_case_file_urls([f.get("file_path") for f in files])
     for f in files:
         name = (f.get("file_name") or "").lower()
         mime = (f.get("mime_type") or "").lower()
@@ -3405,12 +3329,7 @@ def _case_file_links(files):
             f["kind"] = "pdf"
         else:
             f["kind"] = "other"
-        try:
-            signed = supabase_admin.storage.from_(CASE_FILES_BUCKET).create_signed_url(f["file_path"], 3600)
-            url = signed.get("signedURL") or signed.get("signedUrl") if isinstance(signed, dict) else signed
-        except Exception:
-            app.logger.exception("Unable to sign case file %s", f.get("file_path"))
-            url = None
+        url = urls.get(f.get("file_path"))
         f["view_url"] = url
         # Supabase sends the file as an attachment when the URL carries ?download=<name>.
         f["download_url"] = f"{url}{'&' if '?' in url else '?'}download={quote(f.get('file_name') or 'file')}" if url else None
@@ -3736,11 +3655,17 @@ def _issue_reports_for(case_ids):
 
 
 def _open_issue_count():
-    """Number of delivery issue reports awaiting review (0 if the table isn't migrated yet)."""
+    """Number of delivery issue reports awaiting review (0 if the table isn't migrated yet).
+
+    Counted once per request: the dashboard and the sidebar both show it."""
+    if g.get("_open_issue_count") is not None:
+        return g._open_issue_count
     try:
-        return supabase_admin.table("case_issue_reports").select("id", count="exact").eq("status", "open").limit(1).execute().count or 0
+        count = supabase_admin.table("case_issue_reports").select("id", count="exact").eq("status", "open").limit(1).execute().count or 0
     except Exception:
         return 0
+    g._open_issue_count = count
+    return count
 
 
 def _next_case_number():
@@ -4250,9 +4175,24 @@ def live_status():
     Pages poll this every few seconds and refresh their sections only when the
     fingerprint changes. Case rows have an auto-updated `updated_at`; inventory and
     requests are tracked through their logs and counts.
+
+    The database function live_stamp() (migration 20261112000000) builds the fingerprint in
+    one call; without it, the separate queries below are used.
     """
     try:
         user_id, role = g.profile["id"], g.profile["role"]
+        try:
+            result = supabase_admin.rpc("live_stamp", {"p_user": user_id, "p_role": role}).execute().data
+        except Exception:
+            result = None
+        if isinstance(result, dict) and "stamp" in result:
+            response = app.response_class(
+                json.dumps({"stamp": result["stamp"], "latest": result.get("latest")}),
+                mimetype="application/json",
+            )
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
         scope = {"technician": {"technician_id": user_id}, "dentist": {"dentist_id": user_id}}.get(role, {})
         parts = [
             _latest("notifications", "created_at", user_id=user_id),
@@ -4305,11 +4245,17 @@ NOTIFICATION_FEED_SIZE = 10
 
 
 def notification_feed():
-    """The signed-in user's bell: unread count and the newest notifications (for partials/notifications_bell.html)."""
+    """The signed-in user's bell: unread count and the newest notifications (for partials/notifications_bell.html).
+
+    Loaded once per request; dashboards reuse the items for their alert chime."""
     user_id = session.get("user_id")
     feed = {"unread": 0, "items": []}
     if not user_id:
         return feed
+    cached = g.get("_notification_feed")
+    if cached and cached[0] == user_id:
+        return cached[1]
+    g._notification_feed = (user_id, feed)
     try:
         feed["unread"] = (supabase_admin.table("notifications").select("id", count="exact")
                           .eq("user_id", user_id).eq("is_read", False).limit(1).execute().count or 0)
@@ -4934,20 +4880,11 @@ def admin_inventory():
 
     try:
         # 1. Verify admin access & get profile info
-        profile_res = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
-        profiles = profile_res.data or []
-        if not profiles or profiles[0].get("role") != "admin" or profiles[0].get("status") != "approved":
+        profile = _current_profile()
+        if not profile or profile.get("role") != "admin" or profile.get("status") != "approved":
             return "Access denied.", 403
 
-        profile = profiles[0]
-
-        # 2. Update session heartbeat
-        from datetime import datetime
-        now_iso = datetime.utcnow().isoformat()
-        try:
-            supabase_admin.table("profiles").update({"last_seen": now_iso}).eq("id", user_id).execute()
-        except Exception:
-            pass
+        # 2. Session heartbeat: update_user_activity() records last_seen once a minute.
 
         # 3. Fetch inventory items
         inv_res = supabase_admin.table("inventory").select("*").order("item_name").execute()
@@ -4972,17 +4909,8 @@ def admin_inventory():
         pred_map = {p['item_id']: p for p in predictions}
         # ==========================================
 
-        # 4. Fetch notifications for layout consistency
-        notif_res = (
-            supabase_admin
-            .table("notifications")
-            .select("*")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(5)
-            .execute()
-        )
-        notifications = notif_res.data or []
+        # 4. Notifications for the alert chime (shared with the bell)
+        notifications = notification_feed()["items"][:5]
 
         # 5. Fetch Restock Requests (from material_requests) for sidebar badge & modal
         restock_res = (
@@ -4995,18 +4923,24 @@ def admin_inventory():
         )
         restock_requests = restock_res.data or []
 
-        # 6. Fetch Unassigned Cases for sidebar badge & modal
-        unassigned_res = (
+        # 6–8. One case query covers the unassigned cases (sidebar badge & modal), each
+        # technician's active workload, and the milling / finishing counts for the chime.
+        active_statuses = [
+            "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
+            "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
+        ]
+        open_cases = (
             supabase_admin
             .table("dental_cases")
             .select("*")
-            .eq("status", "submitted")
+            .in_("status", ["submitted"] + active_statuses)
             .order("created_at", desc=True)
             .execute()
+            .data
+            or []
         )
-        unassigned_cases = unassigned_res.data or []
+        unassigned_cases = [c for c in open_cases if c.get("status") == "submitted"]
 
-        # 7. Fetch Technicians & compute active workloads in bulk
         techs_res = (
             supabase_admin
             .table("profiles")
@@ -5018,49 +4952,16 @@ def admin_inventory():
         technicians = techs_res.data or []
         tech_ids = [t["id"] for t in technicians]
 
-        active_statuses = [
-            "assigned", "in_progress", "cad_designing", "wax_up_or_try_in",
-            "milling_or_printing", "packing_and_curing", "finishing_and_quality_check", "needs_revision"
-        ]
+        workload_counts = {}
+        for c in open_cases:
+            if c.get("technician_id") in tech_ids and c.get("status") in active_statuses:
+                workload_counts[c["technician_id"]] = workload_counts.get(c["technician_id"], 0) + 1
+        for tech in technicians:
+            tech["active_workload"] = workload_counts.get(tech["id"], 0)
 
-        if tech_ids:
-            workload_cases_res = (
-                supabase_admin
-                .table("dental_cases")
-                .select("technician_id")
-                .in_("technician_id", tech_ids)
-                .in_("status", active_statuses)
-                .execute()
-            )
-            workload_counts = {}
-            for w in (workload_cases_res.data or []):
-                t_id = w.get("technician_id")
-                workload_counts[t_id] = workload_counts.get(t_id, 0) + 1
-
-            for tech in technicians:
-                tech["active_workload"] = workload_counts.get(tech["id"], 0)
-        else:
-            for tech in technicians:
-                tech["active_workload"] = 0
-
-        # 8. Fetch Milling & Finishing stages for audio chime triggers
-        milling_res = (
-            supabase_admin
-            .table("dental_cases")
-            .select("id")
-            .eq("status", "milling_or_printing")
-            .execute()
-        )
-        milling_cases = milling_res.data or []
-
-        qc_res = (
-            supabase_admin
-            .table("dental_cases")
-            .select("id")
-            .eq("status", "finishing_and_quality_check")
-            .execute()
-        )
-        qc_cases = qc_res.data or []
+        milling_cases = [{"id": c["id"]} for c in open_cases if c.get("status") == "milling_or_printing"]
+        qc_cases = [{"id": c["id"]} for c in open_cases if c.get("status") == "finishing_and_quality_check"]
+        _prime_sidebar_counts(incoming=len(unassigned_cases), restock=len(restock_requests))
 
         return render_template(
             "admin_inventory.html",
