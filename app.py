@@ -269,7 +269,7 @@ def admin_dashboard():
             return "Profile not found.", 404
 
         if profile.get("role") != "admin" or profile.get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         # ==========================================
         # 2. ACTIVE SESSION HEARTBEAT
@@ -603,6 +603,35 @@ def _safe_next_path(path):
     )
 
 
+ROLE_HOME = {"admin": "admin_dashboard", "technician": "technician_dashboard", "dentist": "dentist_dashboard"}
+ROLE_LABEL = {"admin": "an admin", "technician": "a technician", "dentist": "a dentist"}
+
+
+def _access_denied(roles=None):
+    """403 page saying who is signed in and who the page is for.
+
+    The usual cause: several accounts signed in through tabs of one browser, which share one
+    sign-in cookie, so the last sign-in replaced the others."""
+    if request.path.startswith("/api/"):
+        return app.response_class(json.dumps({"error": "access_denied"}), status=403, mimetype="application/json")
+    if not roles:
+        first = request.path.strip("/").split("/", 1)[0]
+        roles = (first,) if first in ROLE_LABEL else ()
+    try:
+        profile = _current_profile()
+    except Exception:
+        profile = None
+    approved = bool(profile) and profile.get("status") == "approved" and profile.get("role") in ROLE_HOME
+    needed = " or ".join(ROLE_LABEL[r] for r in roles if r in ROLE_LABEL)
+    return render_template(
+        "access_denied.html",
+        profile=profile,
+        approved=approved,
+        needed=needed,
+        home_url=url_for(ROLE_HOME[profile["role"]]) if approved else None,
+    ), 403
+
+
 def role_required(*roles):
     """Require an approved account with one of `roles`; POSTs must carry a CSRF token.
 
@@ -618,7 +647,7 @@ def role_required(*roles):
 
             profile = _current_profile()
             if not profile or profile.get("status") != "approved" or profile.get("role") not in roles:
-                return "Access denied.", 403
+                return _access_denied(roles)
             if request.method == "POST" and not _valid_csrf_token():
                 return "This form has expired. Reload the page and try again.", 400
 
@@ -740,7 +769,7 @@ def admin_backup():
     try:
         profile = _approved_admin_profile(user_id)
         if not profile:
-            return "Access denied.", 403
+            return _access_denied()
         return render_template(
             "admin_backup.html",
             profile=profile,
@@ -992,7 +1021,7 @@ def admin_backup_download():
         return redirect(url_for("login"))
     try:
         if not _approved_admin_profile(user_id):
-            return "Access denied.", 403
+            return _access_denied()
         if not _valid_csrf_token():
             return "Invalid backup request. Reload the page and try again.", 400
         data = _build_backup_zip()
@@ -1102,7 +1131,7 @@ def admin_backup_restore():
 
     try:
         if not _approved_admin_profile(user_id):
-            return "Access denied.", 403
+            return _access_denied()
         if not _valid_csrf_token():
             return "Invalid backup request. Reload the page and try again.", 400
 
@@ -1218,7 +1247,7 @@ def admin_login_history():
     try:
         profile = _approved_admin_profile(user_id)
         if not profile:
-            return "Access denied.", 403
+            return _access_denied()
 
         try:
             page = max(1, int(request.args.get("page", "1")))
@@ -1312,7 +1341,7 @@ def update_case_status(case_id):
         # Verify Technician
         profile_res = supabase_admin.table("profiles").select("role, status, display_name").eq("id", user_id).execute()
         if not profile_res.data or profile_res.data[0]["role"] != "technician" or profile_res.data[0].get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
         if not _valid_csrf_token():
             return "This form has expired. Reload the page and try again.", 400
 
@@ -1424,7 +1453,7 @@ def admin_reassign_case(case_id):
         # Verify Admin
         profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
         if not profile_res.data or profile_res.data[0]["role"] != "admin" or profile_res.data[0]["status"] != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         new_tech_id = request.form.get("technician_id")
         if not new_tech_id:
@@ -1496,7 +1525,7 @@ def admin_inventory_logs():
         # 1. Verify admin
         profile = _current_profile()
         if not profile or profile.get("role") != "admin" or profile.get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         # 2. Session heartbeat: update_user_activity() records last_seen once a minute.
 
@@ -1598,7 +1627,7 @@ def approve_user(user_id):
         admin_response = supabase_admin.table("profiles").select("id, role, status").eq("id", admin_id).execute()
         admin_profiles = admin_response.data or []
         if not admin_profiles or admin_profiles[0]["role"] != "admin" or admin_profiles[0]["status"] != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         user_response = supabase_admin.table("profiles").select("id, role, status, display_name, first_name, clinic_name").eq("id", user_id).execute()
         users = user_response.data or []
@@ -1652,7 +1681,7 @@ def reject_user(user_id):
         admin_response = supabase_admin.table("profiles").select("id, role, status").eq("id", admin_id).execute()
         admin_profiles = admin_response.data or []
         if not admin_profiles or admin_profiles[0]["role"] != "admin" or admin_profiles[0]["status"] != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         user_response = supabase_admin.table("profiles").select("id, role, status, display_name, first_name").eq("id", user_id).execute()
         users = user_response.data or []
@@ -1727,7 +1756,7 @@ def dentist_dashboard():
 
         # Check Role
         if profile.get("role") != "dentist":
-            return "Access denied.", 403
+            return _access_denied()
 
         # Check Approval Status
         if profile.get("status") != "approved":
@@ -1910,7 +1939,7 @@ def create_dental_case():
         profile = profiles[0]
 
         if profile.get("role") != "dentist":
-            return "Access denied.", 403
+            return _access_denied()
 
         if profile.get("status") != "approved":
             return "Your account is not approved.", 403
@@ -2363,7 +2392,7 @@ def review_user(user_id):
         # CHECK ADMIN ROLE & STATUS
         # =========================
         if admin_profile["role"] != "admin":
-            return "Access denied.", 403
+            return _access_denied()
 
         if admin_profile["status"] != "approved":
             return "Administrator account is not approved.", 403
@@ -2628,7 +2657,7 @@ def reopen_user(user_id):
 
         if admin_profile["role"] != "admin":
 
-            return "Access denied.", 403
+            return _access_denied()
 
 
         if admin_profile["status"] != "approved":
@@ -2824,7 +2853,7 @@ def technician_dashboard():
         response = supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
         profiles = response.data or []
         if not profiles or profiles[0].get("role") != "technician" or profiles[0].get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         profile = profiles[0]
 
@@ -3426,7 +3455,7 @@ def edit_dental_case(case_id):
         # =========================
         profile_res = supabase_admin.table("profiles").select("role").eq("id", user_id).execute()
         if not profile_res.data or profile_res.data[0].get("role") != "dentist":
-            return "Access denied.", 403
+            return _access_denied()
 
         # =========================
         # FETCH EXISTING CASE
@@ -4296,7 +4325,7 @@ def return_case_to_dentist(case_id):
         # Verify Technician Role
         profile_res = supabase_admin.table("profiles").select("role, status").eq("id", user_id).execute()
         if not profile_res.data or profile_res.data[0].get("role") != "technician" or profile_res.data[0].get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         # Get the technician's revision notes from the form
         revision_notes = request.form.get("revision_notes", "").strip()
@@ -4919,7 +4948,7 @@ def admin_assign_case(case_id):
     try:
         admin_res = supabase_admin.table("profiles").select("role, status").eq("id", admin_id).execute()
         if not admin_res.data or admin_res.data[0]["role"] != "admin" or admin_res.data[0].get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         technician_id = request.form.get("technician_id")
         if not technician_id:
@@ -4982,7 +5011,7 @@ def admin_inventory():
         # 1. Verify admin access & get profile info
         profile = _current_profile()
         if not profile or profile.get("role") != "admin" or profile.get("status") != "approved":
-            return "Access denied.", 403
+            return _access_denied()
 
         # 2. Session heartbeat: update_user_activity() records last_seen once a minute.
 
