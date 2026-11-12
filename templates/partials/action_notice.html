@@ -31,6 +31,12 @@
     "approve-input": ("stale", "Clinic name needed"),
     "reassign-done": ("fulfilled", "Technician changed"),
     "reassign-stale": ("stale", "Technician not changed"),
+    "dispatch-done": ("fulfilled", "Handed to courier"),
+    "dispatch-stale": ("stale", "Not handed over"),
+    "delivered-done": ("fulfilled", "Marked as delivered"),
+    "delivered-stale": ("stale", "Not marked delivered"),
+    "receipt-done": ("fulfilled", "Receipt confirmed"),
+    "receipt-stale": ("stale", "Already confirmed"),
 } %}
 {% with notices = get_flashed_messages(with_categories=true, category_filter=notice_kinds.keys()|list) %}
 {% if notices %}
