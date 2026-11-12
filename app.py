@@ -4742,6 +4742,36 @@ def scan_dispatch_label(token):
         return "Unable to load this delivery label. Try again in a moment.", 500
 
 
+def _handover_form_problem():
+    """Why the courier handover form can't be accepted, or None if it can."""
+    if not request.form.get("courier_name", "").strip():
+        return "Enter the courier's name before handing over the case."
+    if request.form.get("package_checked") != "yes":
+        return "Tick the box to confirm you checked the package against the job order."
+    return None
+
+
+def _hand_to_courier(case_id, courier_name, via_web=False):
+    """Move a checked, packed case from Ready for dispatch to In transit; the current admin is the
+    actor. Returns the case, or None if it isn't ready for dispatch (e.g. already handed over)."""
+    case = _set_case_status(case_id, ["ready_for_dispatch"], {"status": "in_transit", "dispatched_at": _now_iso()})
+    if not case:
+        return None
+    staff_name = _display_name(g.profile)
+    label = _active_dispatch_label(case_id)
+    _log_dispatch_event(case_id, "dispatched", label["id"] if label else None, courier_name=courier_name,
+                        notes="Recorded on the web (label not scanned)" if via_web else None)
+    log_case_status_change(case_id, "Dispatched (in transit)", g.profile["id"],
+                           f"Handed to courier {courier_name} by {staff_name}" + (" (recorded on the web)" if via_web else ""))
+    create_notification(
+        user_id=case["dentist_id"],
+        message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. When the box arrives, open the case in DentaLink and tap Confirm receipt.",
+        link=f"/dentist/cases/{case_id}",
+    )
+    _notify_admins(f"Dispatched: Case {case['case_number']} was checked and handed to {courier_name} by {staff_name}.")
+    return case
+
+
 @app.route("/d/<token>/dispatch", methods=["POST"])
 @role_required("admin")
 def dispatch_case(token):
@@ -4750,45 +4780,52 @@ def dispatch_case(token):
         label = _load_dispatch_label(token)
         if not label or label["status"] != "active":
             return redirect(url_for("scan_dispatch_label", token=token))
-
+        problem = _handover_form_problem()
+        if problem:
+            flash(problem, "error")
+            return redirect(url_for("scan_dispatch_label", token=token))
         courier_name = request.form.get("courier_name", "").strip()[:120]
-        if not courier_name:
-            flash("Enter the courier's name before handing over the case.", "error")
-            return redirect(url_for("scan_dispatch_label", token=token))
-        if request.form.get("package_checked") != "yes":
-            flash("Tick the box to confirm you checked the package against this label.", "error")
-            return redirect(url_for("scan_dispatch_label", token=token))
-
-        case = _set_case_status(
-            label["case_id"],
-            ["ready_for_dispatch"],
-            {"status": "in_transit", "dispatched_at": _now_iso()},
-        )
-        if not case:
+        if _hand_to_courier(label["case_id"], courier_name):
+            flash(f"Handed to {courier_name}. The clinic has been notified.", "success")
+        else:
             flash("This case has already been handed to a courier.", "error")
-            return redirect(url_for("scan_dispatch_label", token=token))
-
-        staff_name = _display_name(g.profile)
-        _log_dispatch_event(case["id"], "dispatched", label["id"], courier_name=courier_name)
-        log_case_status_change(case["id"], "Dispatched (in transit)", g.profile["id"], f"Handed to courier {courier_name} by {staff_name}")
-        create_notification(
-            user_id=case["dentist_id"],
-            message=f"On its way: Case {case['case_number']} left the lab with {courier_name}. When the box arrives, open the case in DentaLink and tap Confirm receipt.",
-            link=f"/dentist/cases/{case['id']}",
-        )
-        _notify_admins(f"Dispatched: Case {case['case_number']} was checked and handed to {courier_name} by {staff_name}.")
-        flash(f"Handed to {courier_name}. The clinic has been notified.", "success")
         return redirect(url_for("scan_dispatch_label", token=token))
     except Exception:
         app.logger.exception("Unable to dispatch case")
         return "Unable to record the handoff. Check the server logs for details.", 500
 
 
+@app.route("/admin/cases/<case_id>/hand-over", methods=["POST"])
+@role_required("admin")
+def admin_hand_over(case_id):
+    """Hand a case to the courier from the dashboard, without scanning the label on a phone.
+    Same package check as the QR page; the chain of custody notes it was recorded on the web."""
+    next_path = request.form.get("next", "")
+    back = next_path if _safe_next_path(next_path) else url_for("admin_dashboard", stage="stage-dispatch")
+    try:
+        problem = _handover_form_problem()
+        if problem:
+            flash(problem, "dispatch-stale")
+            return redirect(back)
+        courier_name = request.form.get("courier_name", "").strip()[:120]
+        case = _hand_to_courier(case_id, courier_name, via_web=True)
+        if case:
+            flash(f"Case {case['case_number']} is with {courier_name} and now In transit. The clinic has been notified.", "dispatch-done")
+        else:
+            flash("That case was already handed to a courier, or it isn't ready for dispatch.", "dispatch-stale")
+        return redirect(back)
+    except Exception:
+        app.logger.exception("Unable to hand case to courier")
+        return "Unable to record the handoff. Check the server logs for details.", 500
+
+
 def _mark_case_delivered(case_id, received_by, by_lab=False):
     """Record delivery of a case that's ready for dispatch or in transit; the current user is the
-    actor. Returns the case, or None if it was already delivered or isn't out for delivery."""
+    actor. Returns the case, or None if it was already delivered or isn't out for delivery.
+    Without `received_by`, it says how the lab learned of it: via the courier, or collected at the lab."""
     before = supabase_admin.table("dental_cases").select("status").eq("id", case_id).execute().data or []
     was_scanned_out = bool(before) and before[0].get("status") == "in_transit"
+    received_by = received_by or ("Clinic (confirmed by courier)" if was_scanned_out else "Collected from the lab")
     case = _set_case_status(case_id, DISPATCH_STATUSES, {"status": "delivered", "delivered_at": _now_iso()})
     if not case:
         return None
@@ -4798,7 +4835,7 @@ def _mark_case_delivered(case_id, received_by, by_lab=False):
     if by_lab:
         notes.append(f"Marked delivered by the lab ({_display_name(g.profile, 'Admin')})")
     if not was_scanned_out:
-        notes.append("Received without a dispatch scan at the lab")
+        notes.append("Never handed to a courier" if by_lab else "Received without a dispatch scan at the lab")
     _log_dispatch_event(case_id, "delivered", label["id"] if label else None,
                         received_by=received_by, notes="; ".join(notes) or None)
     log_case_status_change(case_id, "Delivered", g.profile["id"],
@@ -4837,9 +4874,9 @@ def dentist_confirm_receipt(case_id):
             return "Case not found.", 404
         received_by = request.form.get("received_by", "").strip()[:120] or _display_name(g.profile, "Clinic")
         if _mark_case_delivered(case_id, received_by):
-            flash("Receipt confirmed. The lab has been notified.", "success")
+            flash("Thank you. The lab has been notified that the case arrived.", "receipt-done")
         else:
-            flash("This case was already confirmed as delivered, or it hasn't left the lab yet.", "error")
+            flash("This case was already confirmed as delivered.", "receipt-stale")
         return redirect(url_for("dentist_case_summary", case_id=case_id))
     except Exception:
         app.logger.exception("Unable to confirm receipt")
@@ -4851,14 +4888,17 @@ def dentist_confirm_receipt(case_id):
 def admin_mark_delivered(case_id):
     """The lab records delivery, e.g. when the courier confirms drop-off and the clinic hasn't."""
     next_path = request.form.get("next", "")
-    back = next_path if _safe_next_path(next_path) else url_for("admin_dashboard")
+    back = next_path if _safe_next_path(next_path) else url_for("admin_dashboard", stage="stage-dispatch")
+    from_label_page = back.startswith("/d/")   # the QR page shows plain messages, not the pop-up
     try:
-        received_by = request.form.get("received_by", "").strip()[:120] or "Clinic (confirmed by courier)"
+        received_by = request.form.get("received_by", "").strip()[:120]
         case = _mark_case_delivered(case_id, received_by, by_lab=True)
         if case:
-            flash(f"Case {case['case_number']} marked as delivered. The clinic has been notified.", "success")
+            flash(f"Case {case['case_number']} is marked as delivered. The clinic has been notified.",
+                  "success" if from_label_page else "delivered-done")
         else:
-            flash("That case was already delivered, or it isn't out for delivery.", "error")
+            flash("That case was already delivered, or it isn't out for delivery.",
+                  "error" if from_label_page else "delivered-stale")
         return redirect(back)
     except Exception:
         app.logger.exception("Unable to mark case delivered")

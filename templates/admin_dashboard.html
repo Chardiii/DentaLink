@@ -672,18 +672,21 @@
                                 {% else %}
                                     <div class="meta-row">
                                         <span class="meta-label">Next step:</span>
-                                        <span class="meta-val">Scan the label, check the package, hand to courier</span>
+                                        <span class="meta-val">Check the package, then hand it to the courier</span>
                                     </div>
                                 {% endif %}
                             </div>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn btn-outline-cyan" style="flex: 1; justify-content: center;">Print label</a>
-                                {% if c.status == 'in_transit' %}
-                                <form method="POST" action="{{ url_for('admin_mark_delivered', case_id=c.id) }}" style="margin: 0;" onsubmit="return confirm('Mark #{{ c.case_number }} as delivered? The clinic will be notified.');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                    <button type="submit" class="btn btn-outline" title="Use when the courier confirms drop-off and the clinic hasn't confirmed receipt">Mark delivered</button>
-                                </form>
+                            {% set dl_units = c.teeth | map(attribute='tooth_number') | join(', ') %}
+                            {% set dl_mix = [] %}
+                            {% for t in c.teeth %}{% set _ = dl_mix.append('#' ~ t.tooth_number ~ ' ' ~ ((t.material or 'material not set') | replace('_', ' ') | title) ~ (' · ' ~ t.shade if t.shade else '')) %}{% endfor %}
+                            {% set dl_data %}data-case-number="{{ c.case_number }}" data-patient="{{ c.patient_name or '—' }}" data-clinic="{{ c.profiles.clinic_name if c.profiles and c.profiles.clinic_name else 'Independent Practice' }}" data-units="{{ c.teeth | length }}" data-mix="{{ dl_mix | join('\n') }}" data-status="{{ c.status }}" data-courier="{{ c.courier_name or '' }}"{% endset %}
+                            <div class="dispatch-actions">
+                                {% if c.status == 'ready_for_dispatch' %}
+                                    <button type="button" class="btn btn-cyan" data-dispatch-action="handover" data-url="{{ url_for('admin_hand_over', case_id=c.id) }}" {{ dl_data }}>Hand to courier</button>
                                 {% endif %}
+                                <button type="button" class="btn {{ 'btn-cyan' if c.status == 'in_transit' else 'btn-outline' }}" data-dispatch-action="deliver" data-url="{{ url_for('admin_mark_delivered', case_id=c.id) }}" {{ dl_data }}
+                                        title="{{ 'When the courier confirms drop-off and the clinic hasn’t confirmed receipt' if c.status == 'in_transit' else 'When the clinic collects the case at the lab, or the lab delivers it itself' }}">Mark delivered</button>
+                                <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn btn-outline-cyan">Print label</a>
                                 <form method="POST" action="{{ url_for('admin_reissue_dispatch_label', case_id=c.id) }}" style="margin: 0;" onsubmit="return confirm('Replace this label? The old label will stop working.');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <button type="submit" class="btn btn-outline" title="Use when a label is lost or damaged">Reissue</button>
@@ -1266,6 +1269,161 @@
         document.getElementById('raCancel').addEventListener('click', close);
         dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dialog.classList.contains('open')) { e.stopPropagation(); close(); } }, true);
+    })();
+    </script>
+
+    <!-- DISPATCH FROM THE WEB: hand to courier / mark delivered without scanning the label on a phone -->
+    <style>
+        .dispatch-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .dispatch-actions > .btn, .dispatch-actions > form { flex: 1 1 auto; justify-content: center; }
+        .dispatch-actions form .btn { width: 100%; justify-content: center; }
+        .dd-card { max-width: 480px; max-height: calc(100vh - 32px); overflow-y: auto; }
+        .dd-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; padding: 12px; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; }
+        .dd-facts div { display: grid; gap: 2px; min-width: 0; }
+        .dd-facts dt { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #64748B; }
+        .dd-facts dd { margin: 0; font-size: 14px; font-weight: 700; color: #0F172A; overflow-wrap: anywhere; }
+        .dd-mix { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+        .dd-mix li { padding: 3px 9px; border-radius: 999px; background: #E0F2FE; color: #075985; font-size: 12px; font-weight: 700; }
+        .dd-checklist { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 3px; font-size: 13px; color: #334155; }
+        .dd-check { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #BAE6FD; border-radius: 10px; background: #F0F9FF; font-size: 13.5px; font-weight: 700; color: #0F172A; cursor: pointer; }
+        .dd-check input { width: 18px; height: 18px; flex: 0 0 18px; margin: 1px 0 0; accent-color: #0284C7; }
+        .dd-field { display: grid; gap: 5px; margin-bottom: 4px; }
+        .dd-field label { font-size: 12px; font-weight: 700; color: #334155; }
+        .dd-field input { width: 100%; padding: 10px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font: inherit; font-size: 14px; color: #0F172A; }
+        .dd-field input:focus { outline: none; border-color: #0284C7; box-shadow: 0 0 0 3px rgba(2, 132, 199, .15); }
+        .dd-note { margin: 10px 0 0 !important; font-size: 12.5px !important; color: #64748B !important; }
+        .dd-note.warn { color: #B45309 !important; }
+        .ra-icon.green { background: #D1FAE5; color: #047857; }
+        .ra-actions .ok.green { background: #059669; border-color: #059669; }
+        .ra-actions .ok.green:hover { background: #047857; }
+        .ra-actions button:disabled { opacity: .6; cursor: wait; }
+        @media (max-width: 480px) { .dd-facts { grid-template-columns: 1fr 1fr; } .ra-actions { flex-wrap: wrap; } .ra-actions button { flex: 1 1 auto; } }
+    </style>
+    <div class="ra-overlay" id="dispatchDialog" role="dialog" aria-modal="true" aria-labelledby="ddTitle" aria-describedby="ddText">
+        <form class="ra-card dd-card" id="ddForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="next" value="{{ url_for('admin_dashboard', stage='stage-dispatch') }}">
+            <div class="ra-head">
+                <div class="ra-icon" id="ddIcon" aria-hidden="true">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                </div>
+                <div>
+                    <h2 id="ddTitle"></h2>
+                    <p id="ddText"></p>
+                </div>
+            </div>
+            <dl class="dd-facts">
+                <div><dt>Clinic</dt><dd id="ddClinic"></dd></div>
+                <div><dt>Patient</dt><dd id="ddPatient"></dd></div>
+                <div><dt>Units</dt><dd id="ddUnits"></dd></div>
+            </dl>
+            <ul class="dd-mix" id="ddMix" aria-label="Teeth, material and shade"></ul>
+
+            <div id="ddHandover">
+                <ul class="dd-checklist">
+                    <li>The box is labelled with this case number and clinic.</li>
+                    <li>It holds every unit above, in the right material and shade.</li>
+                    <li>The restoration is protected and the box is sealed.</li>
+                </ul>
+                <label class="dd-check"><input type="checkbox" name="package_checked" value="yes" id="ddChecked"> I checked the package against this job order</label>
+                <div class="dd-field">
+                    <label for="ddCourier">Courier name</label>
+                    <input type="text" id="ddCourier" name="courier_name" maxlength="120" autocomplete="off" placeholder="e.g. Juan Dela Cruz (Lalamove)">
+                </div>
+            </div>
+
+            <div id="ddDeliver">
+                <div class="dd-field">
+                    <label for="ddReceivedBy">Received by (optional)</label>
+                    <input type="text" id="ddReceivedBy" name="received_by" maxlength="120" autocomplete="off">
+                </div>
+            </div>
+
+            <p class="dd-note" id="ddNote"></p>
+            <div class="ra-actions">
+                <button type="button" id="ddCancel">Cancel</button>
+                <button type="submit" class="ok" id="ddConfirm"></button>
+            </div>
+        </form>
+    </div>
+    <script>
+    (function () {
+        const dialog = document.getElementById('dispatchDialog');
+        const form = document.getElementById('ddForm');
+        const handover = document.getElementById('ddHandover');
+        const deliver = document.getElementById('ddDeliver');
+        const ok = document.getElementById('ddConfirm');
+        const icon = document.getElementById('ddIcon');
+        const note = document.getElementById('ddNote');
+        const show = (section, on) => {
+            section.hidden = !on;
+            // Hidden fields are disabled so they're neither required nor sent.
+            section.querySelectorAll('input').forEach((i) => { i.disabled = !on; });
+        };
+        const close = () => { dialog.classList.remove('open'); };
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-dispatch-action]');
+            if (!btn) return;
+            const d = btn.dataset;
+            const isHandover = d.dispatchAction === 'handover';
+            form.reset();
+            form.action = d.url;
+            document.getElementById('ddClinic').textContent = d.clinic;
+            document.getElementById('ddPatient').textContent = d.patient;
+            document.getElementById('ddUnits').textContent = d.units;
+            const mix = document.getElementById('ddMix');
+            mix.replaceChildren(...(d.mix ? d.mix.split('\n') : []).map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
+            show(handover, isHandover);
+            show(deliver, !isHandover);
+            document.getElementById('ddChecked').required = isHandover;
+            document.getElementById('ddCourier').required = isHandover;
+            icon.classList.toggle('green', !isHandover);
+            ok.classList.toggle('green', !isHandover);
+            note.classList.remove('warn');
+            if (isHandover) {
+                document.getElementById('ddTitle').textContent = `Hand #${d.caseNumber} to the courier?`;
+                document.getElementById('ddText').textContent = 'Check the package against this job order before it leaves the lab.';
+                ok.textContent = 'Package checked – hand to courier';
+                note.textContent = 'The case moves to In transit and the clinic is notified. The history notes this was recorded on the web, not by scanning the label.';
+            } else {
+                const inTransit = d.status === 'in_transit';
+                document.getElementById('ddTitle').textContent = `Mark #${d.caseNumber} as delivered?`;
+                document.getElementById('ddText').textContent = inTransit
+                    ? `With ${d.courier || 'the courier'}. Use this when the courier confirms drop-off and the clinic hasn't confirmed receipt.`
+                    : 'This case never left with a courier. Use this when the clinic collected it at the lab, or the lab delivered it itself.';
+                document.getElementById('ddReceivedBy').placeholder = inTransit ? 'e.g. Front desk, per courier' : 'e.g. Dr. Cruz, collected at the lab';
+                ok.textContent = 'Mark delivered';
+                note.textContent = inTransit
+                    ? 'The clinic is notified that the lab recorded the delivery, so they can tell you if it’s wrong.'
+                    : 'The history will note it was never handed to a courier. The clinic is notified.';
+                note.classList.toggle('warn', !inTransit);
+            }
+            ok.disabled = false;
+            document.getElementById('ddCancel').disabled = false;
+            dialog.classList.add('open');
+            (isHandover ? document.getElementById('ddChecked') : document.getElementById('ddReceivedBy')).focus();
+        });
+
+        form.addEventListener('submit', () => {
+            ok.disabled = true;
+            document.getElementById('ddCancel').disabled = true;
+            ok.textContent = 'Saving…';
+        });
+        document.getElementById('ddCancel').addEventListener('click', close);
+        dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dialog.classList.contains('open')) { e.stopPropagation(); close(); } }, true);
+
+        // After an action the server sends the admin back here with ?stage=stage-dispatch.
+        const params = new URLSearchParams(window.location.search);
+        const stage = params.get('stage');
+        if (stage && document.getElementById(stage)) {
+            document.querySelectorAll('.stage-section').forEach((s) => s.classList.toggle('active', s.id === stage));
+            document.querySelectorAll('.stage-tab-btn').forEach((b) => b.classList.toggle('active', (b.getAttribute('onclick') || '').includes("'" + stage + "'")));
+            params.delete('stage');
+            const url = new URL(window.location.href); url.search = params.toString();
+            window.history.replaceState({}, document.title, url);
+        }
     })();
     </script>
     {% include 'partials/action_notice.html' %}
