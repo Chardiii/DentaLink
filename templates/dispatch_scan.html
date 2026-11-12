@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
     <title>{% if case %}Case #{{ case.case_number }}{% else %}Delivery label{% endif %} | DentaLink LIS</title>
     <style>
         :root {
@@ -83,6 +85,10 @@
         .notice { border-left: 4px solid var(--accent-yellow); }
         .notice.danger { border-left-color: var(--accent-red); }
         .notice.done { border-left-color: var(--accent-green); }
+        .checklist { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; color: var(--text-main); }
+        .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+        .check input { width: 20px; height: 20px; margin: 1px 0 0; flex: 0 0 20px; accent-color: var(--accent-cyan); }
+        .privacy { font-size: 12px; color: var(--text-muted); margin: 0; text-align: center; }
 
         .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
         .timeline li { display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 14px; position: relative; }
@@ -104,16 +110,19 @@
 </head>
 <body>
     {% set role = profile.role if profile else None %}
-    {% set dashboard_url = url_for('admin_dashboard') if role == 'admin' else url_for('technician_dashboard') if role == 'technician' else url_for('dentist_dashboard') %}
+    {% set dashboard_url = url_for('admin_dashboard') if role == 'admin' else url_for('technician_dashboard') if role == 'technician' else url_for('dentist_dashboard') if role == 'dentist' else None %}
+    {% set sign_in_url = url_for('login', next=request.path) %}
 
     <header class="topbar">
         <div class="topbar-inner">
-            <a class="brand" href="{{ dashboard_url }}">
+            <a class="brand" href="{{ dashboard_url or sign_in_url }}">
                 <img src="{{ url_for('static', filename='images/logo_dental.jpg') }}" alt="">
                 DentaLink
             </a>
             {% if profile %}
             <div class="who">{{ profile.display_name or profile.first_name }}<br>{{ role | title }}</div>
+            {% else %}
+            <div class="who">Mrkzter Dental Laboratory<br>Delivery label</div>
             {% endif %}
         </div>
     </header>
@@ -145,27 +154,65 @@
 
         {% else %}
             {% set status = case.status %}
-            {% set can_see_patient = role == 'admin' or (role == 'dentist' and case.dentist_id == profile.id) %}
+            {% set delivered = status in ['delivered', 'completed'] %}
 
+            {# ---------- Status pill (all views) ---------- #}
+            {% set status_pill %}
+                {% if status == 'ready_for_dispatch' %}<span class="pill ready">Ready for pickup</span>
+                {% elif status == 'in_transit' %}<span class="pill transit">On its way</span>
+                {% elif delivered %}<span class="pill delivered">Delivered</span>
+                {% else %}<span class="pill other">{{ status | replace('_', ' ') | title }}</span>{% endif %}
+            {% endset %}
+
+            {% if public and expired %}
+            {# ---------- Public, more than 30 days after delivery: no details ---------- #}
+            <section class="card notice done">
+                <div class="case-head">
+                    <div class="case-number">#{{ case.case_number }}</div>
+                    {{ status_pill }}
+                </div>
+                <p class="muted">This case was delivered on <time datetime="{{ case.delivered_at }}">{{ case.delivered_at[:10] }}</time>. Its details are no longer shown on this label.</p>
+            </section>
+
+            {% elif public %}
+            {# ---------- Public view: only what the box needs to reach the right clinic ---------- #}
+            <section class="card">
+                <div class="case-head">
+                    <div>
+                        <div class="case-number">#{{ case.case_number }}</div>
+                        <div class="case-sub">Mrkzter Dental Laboratory</div>
+                    </div>
+                    {{ status_pill }}
+                </div>
+                <dl class="details">
+                    <div><dt>Deliver to</dt><dd>{{ case.dentist.clinic_name or 'Independent Practice' }}</dd></div>
+                    <div><dt>Dentist</dt><dd>{{ case.dentist.display_name or case.dentist.first_name or '—' }}</dd></div>
+                    <div><dt>Needed by</dt><dd>{% if case.due_date %}<time data-date datetime="{{ case.due_date }}">{{ case.due_date }}</time>{% else %}Not set{% endif %}</dd></div>
+                    <div><dt>Case</dt><dd>{{ (case.case_type or 'Restoration') | replace('_', ' ') | title }}</dd></div>
+                    <div><dt>Shade</dt><dd>{{ shades | join(', ') if shades else '—' }}</dd></div>
+                    <div><dt>Status</dt><dd>
+                        {% if status == 'ready_for_dispatch' %}Packed, waiting for courier pickup
+                        {% elif status == 'in_transit' %}With the courier{% if case.dispatched_at %} since <time datetime="{{ case.dispatched_at }}">{{ case.dispatched_at[:10] }}</time>{% endif %}
+                        {% elif delivered %}Delivered{% if case.delivered_at %} <time datetime="{{ case.delivered_at }}">{{ case.delivered_at[:10] }}</time>{% endif %}
+                        {% else %}{{ status | replace('_', ' ') | capitalize }}{% endif %}
+                    </dd></div>
+                </dl>
+            </section>
+            <p class="privacy">Patient and prescription details are only shown to signed-in lab and clinic staff.</p>
+
+            {% else %}
+            {# ---------- Signed-in lab staff or this case's dentist: full details ---------- #}
             <section class="card">
                 <div class="case-head">
                     <div>
                         <div class="case-number">#{{ case.case_number }}</div>
                         <div class="case-sub">{{ (case.case_type or 'Restoration') | replace('_', ' ') | title }} · Due {{ case.due_date or 'not set' }}</div>
                     </div>
-                    {% if status == 'ready_for_dispatch' %}
-                        <span class="pill ready">Ready for dispatch</span>
-                    {% elif status == 'in_transit' %}
-                        <span class="pill transit">In transit</span>
-                    {% elif status in ['delivered', 'completed'] %}
-                        <span class="pill delivered">Delivered</span>
-                    {% else %}
-                        <span class="pill other">{{ status | replace('_', ' ') | title }}</span>
-                    {% endif %}
+                    {{ status_pill }}
                 </div>
 
                 <dl class="details">
-                    <div><dt>Patient</dt><dd>{{ case.patient_name if can_see_patient else patient_initials }}</dd></div>
+                    <div><dt>Patient</dt><dd>{{ case.patient_name or patient_initials }}</dd></div>
                     <div><dt>Reference</dt><dd>{{ case.patient_reference or '—' }}</dd></div>
                     <div><dt>Clinic</dt><dd>{{ case.dentist.clinic_name or 'Independent Practice' }}</dd></div>
                     <div><dt>Dentist</dt><dd>{{ case.dentist.display_name or case.dentist.first_name or '—' }}</dd></div>
@@ -190,7 +237,7 @@
                 </div>
                 {% endif %}
 
-                {% if case.instructions and can_see_patient %}
+                {% if case.instructions %}
                 <div>
                     <div class="muted" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Rx instructions</div>
                     <p style="margin: 2px 0 0; color: var(--ink);">{{ case.instructions }}</p>
@@ -203,45 +250,55 @@
                 else url_for('admin_case_details', case_id=case.id) if role == 'admin'
                 else url_for('view_case_details', case_id=case.id) if case.technician_id == profile.id else none %}
             {% if full_url %}
-                <a class="btn" href="{{ full_url }}" style="display: flex; justify-content: center; border: 1px solid var(--border, #E2E8F0); background: #FFFFFF; color: var(--ink, #0F172A); text-decoration: none;">View full job order: scans, photos and tooth chart →</a>
+                <a class="btn btn-outline" href="{{ full_url }}">View full job order: scans, photos and tooth chart →</a>
             {% endif %}
 
             {# ---------- Actions ---------- #}
-            {% if role in ['admin', 'technician'] and status == 'ready_for_dispatch' %}
+            {% if role == 'admin' and status == 'ready_for_dispatch' %}
                 <section class="card">
-                    <h2>Hand to courier</h2>
-                    <p class="muted">Confirm the box matches #{{ case.case_number }}, then record who is taking it. The clinic is notified right away.</p>
+                    <h2>Check the package, then hand it to the courier</h2>
+                    <ul class="checklist">
+                        <li>The box is labelled <strong>#{{ case.case_number }}</strong> for <strong>{{ case.dentist.clinic_name or 'Independent Practice' }}</strong>.</li>
+                        <li>It holds {{ case.teeth | length }} unit{{ 's' if case.teeth | length != 1 }} matching the teeth, material and shade above.</li>
+                        <li>The restoration is protected and the box is sealed.</li>
+                    </ul>
                     <form method="POST" action="{{ url_for('dispatch_case', token=label.token) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <label class="check"><input type="checkbox" name="package_checked" value="yes" required> I checked the package against this label</label>
                         <label for="courier_name">Courier name</label>
                         <input type="text" id="courier_name" name="courier_name" maxlength="120" autocomplete="off" placeholder="e.g. Juan Dela Cruz (Lalamove)" required>
-                        <button type="submit" class="btn btn-cyan">Hand to courier</button>
+                        <button type="submit" class="btn btn-cyan">Package checked – hand to courier</button>
+                    </form>
+                    <p class="muted">The case moves to In transit and the clinic is notified right away.</p>
+                </section>
+
+            {% elif role == 'admin' and status == 'in_transit' %}
+                <section class="card notice">
+                    <h2>With the courier</h2>
+                    <p class="muted">The clinic confirms receipt in DentaLink. If the courier confirms drop-off and the clinic hasn't, you can record it here.</p>
+                    <form method="POST" action="{{ url_for('admin_mark_delivered', case_id=case.id) }}" onsubmit="return confirm('Mark #{{ case.case_number }} as delivered? The clinic will be notified.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <label for="received_by">Received by (optional)</label>
+                        <input type="text" id="received_by" name="received_by" maxlength="120" autocomplete="off" placeholder="e.g. Front desk, per courier">
+                        <button type="submit" class="btn btn-green">Mark delivered</button>
                     </form>
                 </section>
 
             {% elif role == 'dentist' and status in ['ready_for_dispatch', 'in_transit'] %}
-                <section class="card">
-                    <h2>Confirm receipt</h2>
-                    {% if status == 'ready_for_dispatch' %}
-                        <p class="muted">The lab hasn't scanned this package out yet. If it's in your hands, you can still confirm receipt and the lab will be told.</p>
-                    {% else %}
-                        <p class="muted">Check that the restoration matches the units above before confirming.</p>
-                    {% endif %}
-                    <form method="POST" action="{{ url_for('receive_case', token=label.token) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <label for="received_by">Received by</label>
-                        <input type="text" id="received_by" name="received_by" maxlength="120" autocomplete="name" placeholder="{{ profile.display_name or profile.first_name }}">
-                        <button type="submit" class="btn btn-green">Confirm receipt</button>
-                    </form>
+                <section class="card notice">
+                    <h2>{{ 'On its way to you' if status == 'in_transit' else 'Packed at the lab' }}</h2>
+                    <p class="muted">When the box arrives, check that the restoration matches the units above, then confirm receipt on the case page.</p>
+                    <a class="btn btn-green" href="{{ url_for('dentist_case_summary', case_id=case.id) }}#receiptTitle">Go to Confirm receipt</a>
                 </section>
 
             {% elif status == 'in_transit' %}
                 <section class="card notice">
                     <h2>With the courier</h2>
-                    <p class="muted">Waiting for the clinic to scan this label on arrival.</p>
+                    <p class="muted">Waiting for the clinic to confirm receipt.</p>
                 </section>
 
-            {% elif status in ['delivered', 'completed'] %}
+            {% elif delivered %}
                 <section class="card notice done">
                     <h2>Delivered</h2>
                     <p class="muted">
@@ -250,10 +307,10 @@
                     </p>
                 </section>
 
-            {% else %}
+            {% elif status != 'ready_for_dispatch' %}
                 <section class="card notice">
                     <h2>Not ready for dispatch</h2>
-                    <p class="muted">This case is currently {{ status | replace('_', ' ') }}. It can't be handed over or received from this label right now.</p>
+                    <p class="muted">This case is currently {{ status | replace('_', ' ') }}.</p>
                 </section>
             {% endif %}
 
@@ -268,8 +325,8 @@
                                 <strong>Label issued</strong>
                                 <span>{{ e.actor_name }} · QC approved</span>
                             {% elif e.event_type == 'dispatched' %}
-                                <strong>Handed to courier</strong>
-                                <span>{{ e.courier_name or 'Courier' }} · scanned by {{ e.actor_name }}</span>
+                                <strong>Checked and handed to courier</strong>
+                                <span>{{ e.courier_name or 'Courier' }} · by {{ e.actor_name }}</span>
                             {% elif e.event_type == 'delivered' %}
                                 <strong>Delivered</strong>
                                 <span>Received by {{ e.received_by or e.actor_name }}{% if e.notes %} · {{ e.notes }}{% endif %}</span>
@@ -281,18 +338,26 @@
                 </ol>
             </section>
             {% endif %}
+            {% endif %}
         {% endif %}
 
-        <a href="{{ dashboard_url }}" class="btn btn-outline">Go to dashboard</a>
+        {% if dashboard_url %}
+            <a href="{{ dashboard_url }}" class="btn btn-outline">Go to dashboard</a>
+        {% else %}
+            <a href="{{ sign_in_url }}" class="btn btn-outline">Lab or clinic staff? Sign in</a>
+        {% endif %}
     </main>
 
     <script>
-        // Show stored UTC timestamps in the viewer's local time
+        // Show stored timestamps in the viewer's local time; plain dates stay as dates.
         document.querySelectorAll("time[datetime]").forEach(el => {
-            const when = new Date(el.getAttribute("datetime"));
-            if (!isNaN(when)) {
-                el.textContent = when.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-            }
+            const raw = el.getAttribute("datetime");
+            const dateOnly = el.hasAttribute("data-date") || /^\d{4}-\d{2}-\d{2}$/.test(raw);
+            const when = new Date(dateOnly ? raw + "T00:00:00" : raw);
+            if (isNaN(when)) return;
+            el.textContent = dateOnly || el.textContent.length <= 10
+                ? when.toLocaleDateString([], { dateStyle: "medium" })
+                : when.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
         });
     </script>
 </body>

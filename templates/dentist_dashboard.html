@@ -592,8 +592,8 @@
                         {% endif %}
 
                         <div class="k-card-actions">
-                            {# Receipt is confirmed only by scanning the QR label on the box (proof it arrived). #}
-                            <span style="font-size: 11px; color: var(--text-muted); padding: 6px 0;">Scan the QR on the box to confirm receipt</span>
+                            {# Receipt is confirmed on the case page; the QR label on the box is information only. #}
+                            <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}#receiptTitle" class="btn-action-primary">Confirm receipt</a>
                             <a href="{{ url_for('dentist_case_summary', case_id=c.id) }}" class="btn-action-secondary">View job order</a>
                             {% if c.remake_of %}{{ prev_jo_button(c.remake_of, 'Original job order', 'btn-action-secondary pjo-card-btn') }}{% endif %}
                         </div>

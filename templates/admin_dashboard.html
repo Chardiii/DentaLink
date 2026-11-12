@@ -672,12 +672,18 @@
                                 {% else %}
                                     <div class="meta-row">
                                         <span class="meta-label">Next step:</span>
-                                        <span class="meta-val">Scan the label at courier handoff</span>
+                                        <span class="meta-val">Scan the label, check the package, hand to courier</span>
                                     </div>
                                 {% endif %}
                             </div>
-                            <div style="display: flex; gap: 8px;">
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                 <a href="{{ url_for('dispatch_slip', case_id=c.id) }}" class="btn btn-outline-cyan" style="flex: 1; justify-content: center;">Print label</a>
+                                {% if c.status == 'in_transit' %}
+                                <form method="POST" action="{{ url_for('admin_mark_delivered', case_id=c.id) }}" style="margin: 0;" onsubmit="return confirm('Mark #{{ c.case_number }} as delivered? The clinic will be notified.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="btn btn-outline" title="Use when the courier confirms drop-off and the clinic hasn't confirmed receipt">Mark delivered</button>
+                                </form>
+                                {% endif %}
                                 <form method="POST" action="{{ url_for('admin_reissue_dispatch_label', case_id=c.id) }}" style="margin: 0;" onsubmit="return confirm('Replace this label? The old label will stop working.');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <button type="submit" class="btn btn-outline" title="Use when a label is lost or damaged">Reissue</button>

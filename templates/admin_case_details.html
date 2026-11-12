@@ -249,8 +249,15 @@
                 {% elif status in ['ready_for_dispatch', 'in_transit'] %}
                     <section class="panel action" aria-labelledby="labelTitle">
                         <h2 id="labelTitle">QR delivery label</h2>
-                        <p class="hint">{% if status == 'ready_for_dispatch' %}Pack the case, attach this label, and scan it when the courier takes it. The clinic scans it on arrival to confirm receipt.{% else %}With the courier. The clinic confirms receipt by scanning the label.{% endif %}</p>
+                        <p class="hint">{% if status == 'ready_for_dispatch' %}Pack the case and attach this label. When the courier arrives, scan it, check the package against the details, and hand it over. Anyone who scans the label sees only the clinic, dentist, due date, case type and shade.{% else %}With the courier. The clinic confirms receipt in DentaLink; if the courier confirms drop-off and the clinic hasn't, mark it delivered here.{% endif %}</p>
                         {% if label %}<a class="btn btn-primary btn-block" href="{{ url_for('dispatch_slip', case_id=case.id) }}">Print the QR label</a>{% endif %}
+                        {% if status == 'in_transit' %}
+                        <form method="POST" action="{{ url_for('admin_mark_delivered', case_id=case.id) }}" onsubmit="return confirm('Mark #{{ case.case_number }} as delivered? The clinic will be notified.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" class="btn btn-ghost btn-sm btn-block">Mark delivered</button>
+                        </form>
+                        {% endif %}
                         <form method="POST" action="{{ url_for('admin_reissue_dispatch_label', case_id=case.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="btn btn-ghost btn-sm btn-block" title="Use if the label was lost or damaged; the old QR stops working">Replace the label (old QR stops working)</button>
