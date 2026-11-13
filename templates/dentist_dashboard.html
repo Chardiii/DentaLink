@@ -193,6 +193,7 @@
         .input-dark:focus, .select-dark:focus, .textarea-dark:focus { border-color: var(--accent-cyan); background-color: #FFFFFF; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12); }
         input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
         .select-dark { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 14px top 50%; background-size: 9px auto; }
+        .select-dark { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 34px; }   /* long shade names end in … instead of running into the arrow */
 
         /* Odontogram Card */
         .interactive-arch-panel { background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
@@ -796,10 +797,11 @@
                             </select>
                             <select id="global-shade" class="select-dark">
                                 <option value="" disabled selected>Batch Select VITA Shade...</option>
-                                <option value="A1">VITA A1</option><option value="A2">VITA A2</option><option value="A3">VITA A3</option><option value="A3.5">VITA A3.5</option>
-                                <option value="B1">VITA B1</option><option value="B2">VITA B2</option>
-                                <option value="C1">VITA C1</option><option value="C2">VITA C2</option>
-                                <option value="D2">VITA D2</option><option value="BL1">Bleach BL1</option><option value="BL2">Bleach BL2</option>
+                                <option value="A1">VITA A1 (Warm White)</option><option value="A2">VITA A2 (Natural Average Adult)</option><option value="A3">VITA A3 (Common Natural / Stained)</option><option value="A3.5">VITA A3.5</option><option value="A4">VITA A4</option>
+                                <option value="B1">VITA B1 (Natural White, Gold Standard)</option><option value="B2">VITA B2 (Natural Cream)</option><option value="B3">VITA B3</option><option value="B4">VITA B4</option>
+                                <option value="C1">VITA C1</option><option value="C2">VITA C2</option><option value="C3">VITA C3</option><option value="C4">VITA C4</option>
+                                <option value="D2">VITA D2</option><option value="D3">VITA D3</option><option value="D4">VITA D4</option>
+                                <option value="BL1">Bleach BL1 (Extreme Hollywood White)</option><option value="BL2">Bleach BL2 (Intense Bleach, Veneers)</option><option value="BL3">Bleach BL3 (Intermediate Bleach, Veneers)</option><option value="BL4">Bleach BL4 (Soft Bleach, Veneers)</option>
                             </select>
                         </div>
                     </div>
@@ -1488,12 +1490,26 @@
                     <div>
                         <select name="shade" class="select-dark" required>
                             <option value="" disabled ${!curSha ? 'selected' : ''}>VITA Shade...</option>
-                            <option value="A1" ${curSha === 'A1' ? 'selected' : ''}>A1</option>
-                            <option value="A2" ${curSha === 'A2' ? 'selected' : ''}>A2</option>
-                            <option value="A3" ${curSha === 'A3' ? 'selected' : ''}>A3</option>
-                            <option value="B1" ${curSha === 'B1' ? 'selected' : ''}>B1</option>
-                            <option value="C1" ${curSha === 'C1' ? 'selected' : ''}>C1</option>
-                            <option value="BL1" ${curSha === 'BL1' ? 'selected' : ''}>BL1</option>
+                            <option value="A1" ${curSha === 'A1' ? 'selected' : ''}>VITA A1 (Warm White)</option>
+                            <option value="A2" ${curSha === 'A2' ? 'selected' : ''}>VITA A2 (Natural Average Adult)</option>
+                            <option value="A3" ${curSha === 'A3' ? 'selected' : ''}>VITA A3 (Common Natural / Stained)</option>
+                            <option value="A3.5" ${curSha === 'A3.5' ? 'selected' : ''}>VITA A3.5</option>
+                            <option value="A4" ${curSha === 'A4' ? 'selected' : ''}>VITA A4</option>
+                            <option value="B1" ${curSha === 'B1' ? 'selected' : ''}>VITA B1 (Natural White, Gold Standard)</option>
+                            <option value="B2" ${curSha === 'B2' ? 'selected' : ''}>VITA B2 (Natural Cream)</option>
+                            <option value="B3" ${curSha === 'B3' ? 'selected' : ''}>VITA B3</option>
+                            <option value="B4" ${curSha === 'B4' ? 'selected' : ''}>VITA B4</option>
+                            <option value="C1" ${curSha === 'C1' ? 'selected' : ''}>VITA C1</option>
+                            <option value="C2" ${curSha === 'C2' ? 'selected' : ''}>VITA C2</option>
+                            <option value="C3" ${curSha === 'C3' ? 'selected' : ''}>VITA C3</option>
+                            <option value="C4" ${curSha === 'C4' ? 'selected' : ''}>VITA C4</option>
+                            <option value="D2" ${curSha === 'D2' ? 'selected' : ''}>VITA D2</option>
+                            <option value="D3" ${curSha === 'D3' ? 'selected' : ''}>VITA D3</option>
+                            <option value="D4" ${curSha === 'D4' ? 'selected' : ''}>VITA D4</option>
+                            <option value="BL1" ${curSha === 'BL1' ? 'selected' : ''}>Bleach BL1 (Extreme Hollywood White)</option>
+                            <option value="BL2" ${curSha === 'BL2' ? 'selected' : ''}>Bleach BL2 (Intense Bleach, Veneers)</option>
+                            <option value="BL3" ${curSha === 'BL3' ? 'selected' : ''}>Bleach BL3 (Intermediate Bleach, Veneers)</option>
+                            <option value="BL4" ${curSha === 'BL4' ? 'selected' : ''}>Bleach BL4 (Soft Bleach, Veneers)</option>
                         </select>
                     </div>
 
