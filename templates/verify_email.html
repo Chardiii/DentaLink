@@ -274,6 +274,16 @@
         }
 
         /* Action Buttons */
+        .resend-form { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: -6px 0 22px; font-size: 13px; color: #64748B; }
+        .resend-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid #0284C7; background: #FFFFFF; color: #0284C7; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .resend-btn:hover:not(:disabled) { background: #F0F9FF; }
+        .resend-btn:disabled { border-color: #CBD5E1; color: #64748B; cursor: not-allowed; }
+        .resend-btn:focus-visible { outline: 2px solid #0284C7; outline-offset: 2px; }
+        .resend-flash { margin: -8px 0 14px; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+        .resend-flash.verify-sent { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #047857; }
+        .resend-flash.verify-wait { background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.3); color: #B45309; }
+        .resend-flash.verify-error { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: #B91C1C; }
+
         .btn-group {
             display: flex;
             flex-direction: column;
@@ -372,9 +382,21 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
             </svg>
             <div>
-                <strong>Action Required:</strong> Click <strong>Verify Email</strong> inside the message to authenticate your identity. Be sure to check your <em>Spam</em> or <em>Junk</em> folder if it does not appear within a minute.
+                <strong>Action Required:</strong> Click <strong>Verify Email</strong> inside the message to authenticate your identity. The email can take <strong>5–10 minutes</strong> to arrive; check your <em>Spam</em>, <em>Promotions</em> or <em>Junk</em> folder too.
             </div>
         </div>
+
+        <!-- Resend the confirmation email -->
+        {% with notes = get_flashed_messages(with_categories=true, category_filter=['verify-sent', 'verify-wait', 'verify-error']) %}
+            {% for category, message in notes %}
+                <div class="resend-flash {{ category }}" role="status">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('resend_verification_email') }}" class="resend-form">
+            <input type="hidden" name="csrf_token" value="{{ resend_token }}">
+            <span class="resend-text">Still nothing after 10 minutes?</span>
+            <button type="submit" class="resend-btn" id="resendBtn" data-wait="{{ wait_seconds or 0 }}">Resend confirmation email</button>
+        </form>
 
         <!-- Verification Steps Stepper -->
         <div class="step-section-title">Account Activation Timeline</div>
@@ -421,6 +443,29 @@
     <div class="page-footer">
         © 2026 Mrkzter Dental Laboratory • All Rights Reserved
     </div>
+
+    <script>
+        // Count down the one-minute wait between confirmation emails.
+        (function () {
+            const btn = document.getElementById('resendBtn');
+            if (!btn) return;
+            const label = btn.textContent;
+            let left = parseInt(btn.dataset.wait || '0', 10);
+            const tick = () => {
+                if (left > 0) {
+                    btn.disabled = true;
+                    btn.textContent = `Resend available in ${left}s`;
+                    left -= 1;
+                    setTimeout(tick, 1000);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = label;
+                }
+            };
+            tick();
+            btn.form.addEventListener('submit', () => { btn.disabled = true; btn.textContent = 'Sending…'; });
+        })();
+    </script>
 
 </body>
 </html>

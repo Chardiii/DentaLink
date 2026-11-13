@@ -2203,10 +2203,11 @@ def register():
             # =========================
             # SHOW EMAIL VERIFICATION
             # =========================
-            return render_template(
-                "verify_email.html",
-                email=email
-            )
+            # Remember the address in this browser's session: the "Resend" button can only
+            # resend to the account this browser just registered, never to a typed-in address.
+            session["verify_email"] = email
+            session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
+            return redirect(url_for("verify_email"))
 
         except Exception as e:
             err_str = str(e)
@@ -2219,6 +2220,62 @@ def register():
             return render_template("register.html")
 
     return render_template("register.html")
+
+
+# =========================
+# CONFIRMATION EMAIL: "check your inbox" page and resend
+# =========================
+VERIFY_RESEND_WAIT_SECONDS = 60   # Supabase also allows one resend per minute per address
+
+
+def _verify_wait_seconds():
+    """Seconds until this browser may ask for another confirmation email."""
+    sent = _parse_timestamp(session.get("verify_sent_at"))
+    if not sent:
+        return 0
+    left = VERIFY_RESEND_WAIT_SECONDS - (datetime.now(timezone.utc) - sent).total_seconds()
+    return max(0, int(left + 0.999))
+
+
+@app.route("/verify-email")
+def verify_email():
+    email = session.get("verify_email")
+    if not email:
+        return redirect(url_for("login"))
+    return render_template("verify_email.html", email=email, wait_seconds=_verify_wait_seconds(),
+                           resend_token=_csrf_token())
+
+
+@app.route("/verify-email/resend", methods=["POST"])
+def resend_verification_email():
+    """Send the sign-up confirmation email again, to the address this browser just registered."""
+    email = session.get("verify_email")
+    if not email:
+        return redirect(url_for("login"))
+    if not _valid_csrf_token():
+        flash("This page expired. Try the button again.", "verify-error")
+        return redirect(url_for("verify_email"))
+    wait = _verify_wait_seconds()
+    if wait:
+        flash(f"Please wait {wait} seconds before asking for another email.", "verify-wait")
+        return redirect(url_for("verify_email"))
+    try:
+        supabase.auth.resend({"type": "signup", "email": email})
+        session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
+        flash("A new confirmation email is on its way. It can take 5–10 minutes to arrive.", "verify-sent")
+    except Exception as error:
+        text = str(error).lower()
+        if "already" in text and "confirm" in text:
+            session.pop("verify_email", None)
+            flash("This email address is already confirmed. You can sign in once the lab approves your account.", "verify-sent")
+            return redirect(url_for("login"))
+        if "seconds" in text or "rate" in text or "429" in text:
+            session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
+            flash("The email service asks us to wait a minute between emails. Try again shortly.", "verify-wait")
+        else:
+            app.logger.exception("Unable to resend the confirmation email")
+            flash("We couldn't send the email right now. Try again in a minute.", "verify-error")
+    return redirect(url_for("verify_email"))
 
 # =========================
 # LOGIN
