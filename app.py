@@ -2286,9 +2286,30 @@ def register():
                                                       "Sign in instead, or use a different email."})
         if "password" in err_str:
             return _render_register(values, {"password": f"The password was not accepted: {e}"})
-        if "rate limit" in err_str or "429" in err_str:
-            return _render_register(values, {"_form": "Too many sign-up attempts in a short time. "
-                                                      "Please wait a minute and submit again."})
+        if "rate limit" in err_str or "429" in err_str or "for security purposes" in err_str:
+            # Supabase limits confirmation emails per address: this one was emailed less than a
+            # minute ago (usually the same form sent twice). Show the "check your inbox" page
+            # instead of an error, so nobody registers yet again.
+            session["verify_email"] = email
+            session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
+            flash("A confirmation email was already sent to this address a moment ago. Check your inbox "
+                  "and Spam folder; there's no need to register again.", "verify-sent")
+            return redirect(url_for("verify_email"))
+        app.logger.exception("Sign-up failed for %s", email)
+        if "sending" in err_str and "email" in err_str:
+            # Supabase couldn't send the confirmation email (its SMTP settings), so it didn't
+            # create the account. Nothing is wrong with the person's details: say so, and tell
+            # the admins, who are the only ones who can fix it.
+            try:
+                _notify_admins("A registration failed because Supabase couldn't send the confirmation email. "
+                               "Check Authentication > Emails > SMTP Settings in Supabase (Brevo SMTP login and key).",
+                               link="/admin")
+            except Exception:
+                app.logger.exception("Unable to notify admins about the failed confirmation email")
+            return _render_register(values, {"_form": "Your details are fine, but we couldn't send the confirmation "
+                                                      "email, so your account wasn't created yet. This is a problem on "
+                                                      "the laboratory's side and the administrator has been told. "
+                                                      "Please try again later."})
         return _render_register(values, {"_form": "We couldn't create your account right now. "
                                                   "Your details are kept below; please try again in a moment."})
 

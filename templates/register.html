@@ -1265,7 +1265,27 @@
             if (problems.length) {
                 e.preventDefault();
                 showProblemsModal(problems);
+                return;
             }
+            // One submission only: a second click would ask for a second confirmation email.
+            if (this.dataset.sent) {
+                e.preventDefault();
+                return;
+            }
+            this.dataset.sent = '1';
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.firstChild.textContent = 'Creating your account… ';
+        });
+
+        // Back button after submitting: the browser may restore the locked button, so unlock it.
+        window.addEventListener('pageshow', function(e) {
+            if (!e.persisted) return;
+            const form = document.getElementById('registerForm');
+            delete form.dataset.sent;
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.firstChild.textContent = 'Submit Registration ';
         });
 
         // Coming back from the server: show the clinic field for dentists and refresh the hints.
