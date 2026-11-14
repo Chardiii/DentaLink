@@ -888,7 +888,7 @@ def _env_value(name, default=""):
 def _send_plain_email(recipient, name, subject, html):
     """Send one email through Brevo (the same account as the approval emails)."""
     api_key = _env_value("BREVO_SMTP_PASS")
-    sender = _env_value("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+    sender = _env_value("BREVO_SENDER_EMAIL", "mrkzter.dentalink@gmail.com")
     if not api_key or not recipient:
         app.logger.warning("Email not sent (%s): Brevo key or recipient missing", subject)
         return
@@ -907,7 +907,14 @@ def _send_plain_email(recipient, name, subject, html):
             detail = json.loads(error.read().decode("utf-8", "replace")).get("message") or ""
         except Exception:
             detail = ""
-        raise RuntimeError(f"Brevo said: {detail or error.reason} (HTTP {error.code})") from None
+        message = f"Brevo said: {detail or error.reason} (HTTP {error.code})"
+        if error.code == 401:
+            # Name the key this server is actually using, the way Brevo lists keys (its last
+            # characters), so the admin can tell an old, SMTP or mistyped key from the new one.
+            kind = ("an SMTP key; the app needs an API key (xkeysib-…)" if api_key.startswith("xsmtpsib-")
+                    else "an API key" if api_key.startswith("xkeysib-") else "not a Brevo API key")
+            message += f"; the server is using the key ending in …{api_key[-6:]} ({len(api_key)} characters, {kind})"
+        raise RuntimeError(message) from None
 
 
 def _email_account_decision(user_id, user, decision, reason=""):
@@ -949,8 +956,9 @@ def _brevo_fix_hint(error_text):
     if "sender" in text:
         return ". In Brevo, add BREVO_SENDER_EMAIL under Senders, domains, IPs and verify it"
     if "http 401" in text or "key not found" in text or "unauthorized" in text:
-        return (". The Brevo API key was refused: create a new API key in Brevo (SMTP & API > API keys) "
-                "and paste it into BREVO_SMTP_PASS on the server, with no spaces")
+        return (". Compare those last characters with the key list in Brevo (SMTP & API > API keys & MCP). "
+                "If they don't match, Railway is still running with the old value: open the service in Railway "
+                "and click Deploy so the new BREVO_SMTP_PASS takes effect")
     return ""
 
 
