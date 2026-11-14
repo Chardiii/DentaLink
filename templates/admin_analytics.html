@@ -108,7 +108,7 @@
             <div>
                 <span class="eyebrow"><span class="eyebrow-dot"></span>Analytics</span>
                 <h1>Clinics &amp; job orders</h1>
-                <p class="lead">Who is ordering, how much, and how the lab is delivering. Counts DentaLink job orders only; imported paper job orders aren't included yet.</p>
+                <p class="lead">Who is ordering, how much, and how the lab is delivering. Job order and clinic figures include the lab's imported paper job orders; delivery figures use DentaLink cases only, because paper slips don't record delivery to the clinic.</p>
             </div>
             <a class="btn btn-ghost" href="{{ url_for('reports') }}">Printable reports →</a>
         </div>
@@ -148,12 +148,12 @@
         <section class="card" aria-labelledby="ordersTitle">
             <div class="card-head">
                 <h2 id="ordersTitle">Job orders per month</h2>
-                <p class="card-sub">Job orders sent to the lab each month.</p>
+                <p class="card-sub">Job orders received by the lab each month, from DentaLink and from imported paper job orders.</p>
             </div>
             <div class="chart-box"><svg id="ordersChart" role="img" aria-labelledby="ordersTitle"></svg><div class="tooltip" hidden></div></div>
             <details class="table-view"><summary>Show as a table</summary>
-                <div class="table-wrap"><table><thead><tr><th>Month</th><th class="num">Job orders</th><th class="num">Units</th><th class="num">Active clinics</th></tr></thead>
-                <tbody>{% for t in a.trend %}<tr><td>{{ t.label }}</td><td class="num">{{ t.orders }}</td><td class="num">{{ t.units }}</td><td class="num">{{ t.active_clinics }}</td></tr>{% endfor %}</tbody></table></div>
+                <div class="table-wrap"><table><thead><tr><th>Month</th><th class="num">Job orders</th><th class="num">of which paper</th><th class="num">Units</th><th class="num">Active clinics</th></tr></thead>
+                <tbody>{% for t in a.trend %}<tr><td>{{ t.label }}</td><td class="num">{{ t.orders }}</td><td class="num">{{ t.paper }}</td><td class="num">{{ t.units }}</td><td class="num">{{ t.active_clinics }}</td></tr>{% endfor %}</tbody></table></div>
             </details>
         </section>
 
@@ -198,7 +198,7 @@
                         {% for r in a.ranking %}
                             <tr>
                                 <td class="rank">{{ loop.index }}</td>
-                                <td><strong>{{ r.label }}</strong>{% if r.dentists > 1 %}<div class="card-sub" style="margin: 0;">{{ r.dentists }} dentists</div>{% endif %}</td>
+                                <td><strong>{{ r.label }}</strong>{% if not r.has_account %}<div class="card-sub" style="margin: 0;">No DentaLink account yet{% if r.paper %} · paper job orders{% endif %}</div>{% elif r.dentists > 1 %}<div class="card-sub" style="margin: 0;">{{ r.dentists }} dentists{% if r.paper %} · {{ r.paper }} on paper{% endif %}</div>{% elif r.paper %}<div class="card-sub" style="margin: 0;">{{ r.paper }} on paper</div>{% endif %}</td>
                                 <td class="num"><strong>{{ r.orders }}</strong></td>
                                 <td class="num">{{ r.units }}</td>
                                 <td class="num">{{ r.share }}%</td>
@@ -257,7 +257,7 @@
             <section class="card" aria-labelledby="ontimeTitle">
                 <div class="card-head">
                     <h2 id="ontimeTitle">On-time delivery</h2>
-                    <p class="card-sub">Share of cases delivered by their due date, by month delivered.</p>
+                    <p class="card-sub">Share of DentaLink cases delivered by their due date, by month delivered.</p>
                 </div>
                 <div class="chart-box"><svg id="ontimeChart" class="short" role="img" aria-labelledby="ontimeTitle"></svg><div class="tooltip" hidden></div></div>
                 <details class="table-view"><summary>Show as a table</summary>
@@ -268,7 +268,7 @@
             <section class="card" aria-labelledby="remakeTitle">
                 <div class="card-head">
                     <h2 id="remakeTitle">Remake rate</h2>
-                    <p class="card-sub">Remakes accepted per case delivered, by month.</p>
+                    <p class="card-sub">Remakes accepted per DentaLink case delivered, by month.</p>
                 </div>
                 <div class="chart-box"><svg id="remakeChart" class="short" role="img" aria-labelledby="remakeTitle"></svg><div class="tooltip" hidden></div></div>
                 <details class="table-view"><summary>Show as a table</summary>

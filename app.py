@@ -5566,6 +5566,18 @@ JOB_ORDER_DATE_FIELDS = ("date_sent", "lab_in", "lab_out", "due_date")
 JOB_ORDER_MAX_ROWS = 2000
 
 
+def _paper_received_day(order):
+    """The day the lab received a paper job order: its lab-in date, else the date the clinic
+    sent it, else (slips with only an OUT date) the day it left the lab. None when undated."""
+    return _lab_day(order.get("lab_in") or order.get("date_sent") or order.get("lab_out"))
+
+
+def _job_type_label(text):
+    """'crown + bridge' -> 'Crown + Bridge', keeping abbreviations such as '(FPD)' as written."""
+    words = (text or "").replace("_", " ").split()
+    return " ".join(w if w.isupper() else w[:1].upper() + w[1:] for w in words) or "—"
+
+
 def _job_orders():
     """All imported job orders, newest received first; [] before the migration has run."""
     try:
@@ -5814,13 +5826,13 @@ def _real_case_units():
     dates = {c["id"]: str(c["created_at"])[:10] for c in cases if c.get("created_at")}
     if dates:
         teeth = _fetch_all(lambda: supabase_admin.table("case_teeth").select("case_id, material, shade").order("case_id"))
-        rows += [{"date": dates[t["case_id"]], "material": t.get("material"), "shade": t.get("shade"), "units": 1}
-                 for t in teeth if t.get("case_id") in dates]
+        rows += [{"date": dates[t["case_id"]], "material": t.get("material"), "shade": t.get("shade"), "units": 1,
+                  "source": "dentalink"} for t in teeth if t.get("case_id") in dates]
     for jo in _job_orders():
-        day = jo.get("lab_in") or jo.get("date_sent")
+        day = _paper_received_day(jo)
         if day:
-            rows.append({"date": str(day)[:10], "material": jo.get("material"), "shade": jo.get("shade"),
-                         "units": int(jo.get("units") or 0)})
+            rows.append({"date": day.isoformat(), "material": jo.get("material"), "shade": jo.get("shade"),
+                         "units": int(jo.get("units") or 0), "source": "paper"})
     return rows
 
 
@@ -5915,6 +5927,8 @@ def admin_forecast_analytics():
             disc_rows=[r for r in plan if r["kind"] == "disc"],
             assumptions=done["result"]["assumptions"] if done else profile_summary(),
             real_units=sum(int(r["units"] or 0) for r in real_rows),
+            paper_units=sum(int(r["units"] or 0) for r in real_rows if r.get("source") == "paper"),
+            paper_orders=sum(1 for r in real_rows if r.get("source") == "paper"),
             real_weeks=real_weeks,
             min_real_weeks=MIN_REAL_WEEKS,
         )
@@ -6012,7 +6026,7 @@ def admin_forecast_export_excel():
             f"Method used: {result['best_model']} (about ±{round(best.get('wape_4_weeks', 0) * 100)}% typical 4-week miss). "
             f"Each method forecast each of the last {result.get('test_weeks')} weeks without seeing them.",
             ("Learned from " + (f"{result.get('history_weeks')} weeks of job orders simulated from the lab's own figures."
-                                if result.get("source") == "simulated" else f"{result.get('history_weeks')} weeks of DentaLink cases.")
+                                if result.get("source") == "simulated" else f"{result.get('history_weeks')} weeks of real job orders (DentaLink cases and imported paper job orders).")
              + " Units are converted to discs at 18–25 units per disc; \"To be safe\" uses 18. Supplier delivery takes 2–4 working days."),
         ],
     }
@@ -6292,13 +6306,13 @@ def _report_job_orders(period, **_):
         "out": c["delivered"], "remake": bool(c.get("remake_of")), "cancelled": c.get("status") == "cancelled",
     } for c in cases]
     for o in _job_orders():
-        day = _lab_day(o.get("lab_in") or o.get("date_sent"))
+        day = _paper_received_day(o)
         if not _in_period(day, period):
             continue
         units = int(o.get("units") or 0)
         entries.append({
             "ref": o["jo_ref"], "day": day, "source": "Paper", "clinic": o.get("clinic") or "—",
-            "type": (o.get("case_type") or "—").replace("_", " ").title(), "units": units,
+            "type": _job_type_label(o.get("case_type")), "units": units,
             "materials": {_material_family(o.get("material")): units}, "material_text": o.get("material") or "—",
             "technician": o.get("technician") or "—", "status": "Completed" if o.get("lab_out") else "Recorded",
             "out": _lab_day(o.get("lab_out")), "remake": str(o.get("is_remake") or "").strip().lower() in ("yes", "y", "true", "1"),
@@ -6339,7 +6353,8 @@ def _report_job_orders(period, **_):
              "empty": "No job orders in this period.", "wide": True},
         ],
         "notes": ["DentaLink job orders count from the day they were sent to the lab; paper job orders from their lab-in date "
-                  "(or date sent). Cancelled job orders are listed but not counted in the totals."],
+                  "(or the date sent, or the lab-out date when that is the only date on the slip). "
+                  "Cancelled job orders are listed but not counted in the totals."],
     }
 
 
@@ -6878,9 +6893,30 @@ def print_job_order(case_id):
 
 
 # =========================
-# ADMIN: ANALYTICS (on-screen charts; DentaLink cases only, paper job orders not counted)
+# ADMIN: ANALYTICS (on-screen charts; DentaLink cases plus imported paper job orders)
 # =========================
 QUIET_CLINIC_DAYS = 60
+
+
+def _paper_analytics_rows():
+    """Imported paper job orders shaped like _report_cases() rows, for order and clinic figures.
+    The slips don't record delivery to the clinic, so they have no delivered day or lateness and
+    stay out of the on-time and remake-rate figures. Their clinics usually have no DentaLink
+    account; a clinic that registers later under the same name is counted as one clinic."""
+    rows = []
+    for o in _job_orders():
+        day = _paper_received_day(o)
+        if not day:
+            continue
+        name = " ".join((o.get("clinic") or "").split()) or "Unknown clinic (paper)"
+        rows.append({
+            "id": f"paper:{o['jo_ref']}", "source": "paper", "status": "completed",
+            "received": day, "delivered": None, "late_days": None,
+            "units": int(o.get("units") or 0),
+            "clinic_key": _clinic_key(name) or name, "clinic": name,
+            "type_label": _job_type_label(o.get("case_type")),
+        })
+    return rows
 
 
 def _analytics(month):
@@ -6897,6 +6933,7 @@ def _analytics(month):
     ref_day = min(today, month_end - timedelta(days=1))   # "now" for this month
 
     cases = [c for c in _report_cases() if c.get("status") != "cancelled" and c["received"]]
+    cases += _paper_analytics_rows()
     by_id = {c["id"]: c for c in cases}
     reports = _report_issue_reports()
     remakes = [r for r in reports if r.get("status") == "remake_accepted" and r.get("case_id") in by_id]
@@ -6930,6 +6967,7 @@ def _analytics(month):
         trend.append({
             "month": f"{m:%Y-%m}", "label": f"{MONTH_NAMES[m.month - 1][:3]} {m.year}",
             "orders": len(received), "units": sum(c["units"] for c in received),
+            "paper": sum(1 for c in received if c.get("source") == "paper"),
             "active_clinics": len({c["clinic_key"] for c in received}),
             "new_clinics": sum(1 for cl in clinics.values() if in_month(cl["joined"], m)),
             "delivered": len(delivered), "on_time": on_time(delivered),
@@ -6952,6 +6990,8 @@ def _analytics(month):
             "share": round(100 * len(mine) / len(month_cases)) if month_cases else 0,
             "change": len(mine) - prev_counts.get(key, 0), "last_order": last,
             "dentists": len(clinics[key]["dentists"]) or 1, "on_time": on_time(delivered),
+            "has_account": bool(clinics[key]["dentists"]),
+            "paper": sum(1 for c in mine if c.get("source") == "paper"),
             "remakes": sum(1 for r in remakes if in_month(_lab_day(r.get("created_at")), month)
                            and by_id[r["case_id"]]["clinic_key"] == key),
         })

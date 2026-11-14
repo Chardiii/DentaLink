@@ -207,7 +207,7 @@
                 {% if run %}
                     <div class="run-meta">
                         <span>Last run <strong><time datetime="{{ run.finished_at or run.created_at }}">{{ (run.finished_at or run.created_at)[:16] }}</time></strong></span>
-                        <span>Data <strong>{{ 'Lab profile (simulated history)' if result.source == 'simulated' else 'DentaLink cases' }}</strong></span>
+                        <span>Data <strong>{{ 'Lab profile (simulated history)' if result.source == 'simulated' else 'Real job orders' }}</strong></span>
                         <span>Model used <strong>{{ result.best_model }}</strong></span>
                         <span>Forecast from <strong><time datetime="{{ result.forecast_start }}" data-date>{{ result.forecast_start }}</time></strong></span>
                     </div>
@@ -220,7 +220,7 @@
                 {% set real_ready = real_weeks >= min_real_weeks %}
                 <div class="source-choice" role="radiogroup" aria-label="Data to forecast from">
                     <label title="3 years of job orders simulated from the lab's own figures"><input type="radio" name="source" value="simulated" {{ 'checked' if not real_ready or (result and result.source == 'simulated') }}> Lab profile</label>
-                    <label class="{{ '' if real_ready else 'disabled' }}" title="{{ 'Use DentaLink cases only' if real_ready else 'Available once DentaLink has ' ~ min_real_weeks ~ ' weeks of cases (now ' ~ real_weeks ~ ')' }}"><input type="radio" name="source" value="real" {{ '' if real_ready else 'disabled' }} {{ 'checked' if real_ready and result and result.source == 'real' }}> DentaLink cases</label>
+                    <label class="{{ '' if real_ready else 'disabled' }}" title="{{ 'Use real job orders only (DentaLink cases and imported paper job orders)' if real_ready else 'Available once there are ' ~ min_real_weeks ~ ' weeks of real job orders (now ' ~ real_weeks ~ ')' }}"><input type="radio" name="source" value="real" {{ '' if real_ready else 'disabled' }} {{ 'checked' if real_ready and result and result.source == 'real' }}> Real job orders</label>
                 </div>
                 <button type="submit" class="btn btn-primary" {{ 'disabled' if running }}>
                     <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.6m14.8 2A8 8 0 004.6 9m0 0H9m11 11v-5h-.6m0 0a8 8 0 01-14.8-2m14.8 2H15"/></svg>
@@ -389,9 +389,9 @@
                     </div>
                 {% endfor %}
             </dl>
-            <h3 style="margin: 18px 0 2px; font-size: 14px; color: var(--text-strong);">Real DentaLink cases collected</h3>
-            <p class="card-sub">{{ real_units }} units over {{ real_weeks }} week{{ '' if real_weeks == 1 else 's' }}. The forecast can learn from DentaLink cases alone after {{ min_real_weeks }} weeks (about a year), enough to test it on half a year it hasn't seen.</p>
-            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="{{ min_real_weeks }}" aria-valuenow="{{ [real_weeks, min_real_weeks] | min }}" aria-label="Weeks of real cases"><span style="width: {{ ([real_weeks, min_real_weeks] | min) / min_real_weeks * 100 }}%;"></span></div>
+            <h3 style="margin: 18px 0 2px; font-size: 14px; color: var(--text-strong);">Real job orders collected</h3>
+            <p class="card-sub">{{ real_units }} units over {{ real_weeks }} week{{ '' if real_weeks == 1 else 's' }}: {{ paper_units }} unit{{ '' if paper_units == 1 else 's' }} from {{ paper_orders }} imported paper job order{{ '' if paper_orders == 1 else 's' }} and {{ real_units - paper_units }} from DentaLink cases. The forecast can learn from real job orders alone after {{ min_real_weeks }} weeks (about a year), enough to test it on half a year it hasn't seen.</p>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="{{ min_real_weeks }}" aria-valuenow="{{ [real_weeks, min_real_weeks] | min }}" aria-label="Weeks of real job orders"><span style="width: {{ ([real_weeks, min_real_weeks] | min) / min_real_weeks * 100 }}%;"></span></div>
         </section>
     </main>
 
