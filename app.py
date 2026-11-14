@@ -166,6 +166,7 @@ ISSUE_TYPES = {
 }
 ISSUE_DECISIONS = {"remake_accepted": "Remake accepted", "no_action": "No remake needed"}
 
+import urllib.error
 import urllib.request
 import threading
 
@@ -878,10 +879,16 @@ def _admin_emails():
     return out
 
 
+def _env_value(name, default=""):
+    """An environment value without the stray spaces, line breaks or quotes that
+    often come along when a key is pasted into a hosting dashboard."""
+    return (os.getenv(name) or default).strip().strip('"').strip("'").strip()
+
+
 def _send_plain_email(recipient, name, subject, html):
     """Send one email through Brevo (the same account as the approval emails)."""
-    api_key = os.getenv("BREVO_SMTP_PASS")
-    sender = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
+    api_key = _env_value("BREVO_SMTP_PASS")
+    sender = _env_value("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
     if not api_key or not recipient:
         app.logger.warning("Email not sent (%s): Brevo key or recipient missing", subject)
         return
@@ -890,8 +897,17 @@ def _send_plain_email(recipient, name, subject, html):
     req = urllib.request.Request(
         "https://api.brevo.com/v3/smtp/email", data=json.dumps(payload).encode("utf-8"),
         headers={"accept": "application/json", "api-key": api_key, "content-type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read()
+    except urllib.error.HTTPError as error:
+        # Brevo explains a refusal in the reply body (e.g. "Key not found", "unrecognised IP
+        # address", "sender not valid"); pass that on instead of a bare "HTTP Error 401".
+        try:
+            detail = json.loads(error.read().decode("utf-8", "replace")).get("message") or ""
+        except Exception:
+            detail = ""
+        raise RuntimeError(f"Brevo said: {detail or error.reason} (HTTP {error.code})") from None
 
 
 def _email_account_decision(user_id, user, decision, reason=""):
@@ -908,7 +924,7 @@ def _email_account_decision(user_id, user, decision, reason=""):
         return None, "their email address couldn't be looked up"
     if not recipient:
         return None, "the account has no email address"
-    if not os.getenv("BREVO_SMTP_PASS"):
+    if not _env_value("BREVO_SMTP_PASS"):
         return recipient, "email sending isn't set up on this server (BREVO_SMTP_PASS is missing)"
     approved = decision == "approved"
     subject = ("Your DentaLink account is approved" if approved
@@ -920,8 +936,22 @@ def _email_account_decision(user_id, user, decision, reason=""):
         _send_plain_email(recipient, name, subject, html)
     except Exception as error:
         app.logger.exception("Unable to send the %s email to %s", decision, recipient)
-        return recipient, f"the email service returned an error ({error})"
+        return recipient, f"the email service returned an error ({error}){_brevo_fix_hint(str(error))}"
     return recipient, None
+
+
+def _brevo_fix_hint(error_text):
+    """One line telling the admin what to change for the usual Brevo refusals."""
+    text = error_text.lower()
+    if "ip address" in text:
+        return (". In Brevo, open Security > Authorized IPs and allow this server's address, "
+                "or turn off blocking of unauthorized IPs for API keys")
+    if "sender" in text:
+        return ". In Brevo, add BREVO_SENDER_EMAIL under Senders, domains, IPs and verify it"
+    if "http 401" in text or "key not found" in text or "unauthorized" in text:
+        return (". The Brevo API key was refused: create a new API key in Brevo (SMTP & API > API keys) "
+                "and paste it into BREVO_SMTP_PASS on the server, with no spaces")
+    return ""
 
 
 def _alert_backup_failed(kind, due_at, error):
