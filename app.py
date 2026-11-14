@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import secrets
 import uuid
@@ -168,50 +169,6 @@ ISSUE_DECISIONS = {"remake_accepted": "Remake accepted", "no_action": "No remake
 import urllib.request
 import threading
 
-def send_email_in_background(recipient_email, user_name, action_type):
-    try:
-        api_key = os.getenv("BREVO_SMTP_PASS") 
-        sender_email = os.getenv("BREVO_SENDER_EMAIL", "jiclao24@gmail.com")
-        app_url = _normalize_app_url(os.getenv("APP_URL")) or "http://localhost:5000"
-
-        if not api_key or not recipient_email:
-            print("⚠️ Brevo API key or recipient email missing.")
-            return
-
-        is_approved = (action_type == "approved")
-        subject = "✅ Welcome to DentaLink LIS - Account Approved" if is_approved else "Notice Regarding Your DentaLink LIS Account Application"
-        template_file = "email_approved.html" if is_approved else "email_rejected.html"
-
-        with app.app_context():
-            html_content = render_template(template_file, full_name=user_name, app_url=app_url)
-
-        payload = {
-            "sender": {"name": "DentaLink LIS", "email": sender_email},
-            "to": [{"email": recipient_email, "name": user_name}],
-            "subject": subject,
-            "htmlContent": html_content
-        }
-
-        req = urllib.request.Request(
-            "https://api.brevo.com/v3/smtp/email",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "accept": "application/json",
-                "api-key": api_key,
-                "content-type": "application/json"
-            },
-            method="POST"
-        )
-
-        print(f"📧 [Background] Sending email via Brevo HTTP API to {recipient_email}...")
-        with urllib.request.urlopen(req) as response:
-            res_body = json.loads(response.read().decode("utf-8"))
-            print(f"✅ [Background] Email successfully sent! Message ID: {res_body.get('messageId')}")
-
-    except Exception as err:
-        print(f"❌ [Background] Brevo HTTP API error: {str(err)}")
-
-
 @app.before_request
 def update_user_activity():
     user_id = session.get("user_id")
@@ -232,7 +189,10 @@ def update_user_activity():
 
 @app.route("/")
 def home():
-
+    # A confirmation link lands on the site root when Supabase doesn't know the
+    # /email-confirmed address yet; pass its result on so the person still sees it.
+    if request.args.get("code") or request.args.get("error_code") or request.args.get("error"):
+        return redirect(url_for("email_confirmed", **request.args.to_dict()))
     return redirect(url_for("login"))
 
 # =========================
@@ -932,6 +892,36 @@ def _send_plain_email(recipient, name, subject, html):
         headers={"accept": "application/json", "api-key": api_key, "content-type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=15) as resp:
         resp.read()
+
+
+def _email_account_decision(user_id, user, decision, reason=""):
+    """Email a registrant that their account was approved or rejected.
+
+    Sent right away (Brevo answers in about a second) so the admin is told whether the
+    person was actually notified. Returns (address or None, problem text or None)."""
+    name = _display_name(user, "Colleague")
+    try:
+        auth_user = getattr(supabase_admin.auth.admin.get_user_by_id(user_id), "user", None)
+        recipient = getattr(auth_user, "email", None)
+    except Exception:
+        app.logger.exception("Unable to look up the email address of %s", user_id)
+        return None, "their email address couldn't be looked up"
+    if not recipient:
+        return None, "the account has no email address"
+    if not os.getenv("BREVO_SMTP_PASS"):
+        return recipient, "email sending isn't set up on this server (BREVO_SMTP_PASS is missing)"
+    approved = decision == "approved"
+    subject = ("Your DentaLink account is approved" if approved
+               else "Update on your DentaLink account application")
+    html = render_template("email_approved.html" if approved else "email_rejected.html",
+                           full_name=name, app_url=APP_URL or "http://localhost:5000",
+                           reason=reason, role=user.get("role"))
+    try:
+        _send_plain_email(recipient, name, subject, html)
+    except Exception as error:
+        app.logger.exception("Unable to send the %s email to %s", decision, recipient)
+        return recipient, f"the email service returned an error ({error})"
+    return recipient, None
 
 
 def _alert_backup_failed(kind, due_at, error):
@@ -1650,21 +1640,14 @@ def approve_user(user_id):
         # Update status in database
         supabase_admin.table("profiles").update(changes).eq("id", user_id).execute()
 
-        # Fire email asynchronously in background thread so Gunicorn doesn't timeout
-        try:
-            auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
-            if auth_user_res and getattr(auth_user_res, "user", None):
-                recipient_email = auth_user_res.user.email
-                user_name = user.get("display_name") or user.get("first_name") or "Colleague"
-
-                email_thread = threading.Thread(
-                    target=send_email_in_background,
-                    args=(recipient_email, user_name, "approved")
-                )
-                email_thread.start()
-        except Exception as mail_err:
-            print(f"Failed to start approval email thread: {str(mail_err)}")
-
+        name = _display_name(user, "The user")
+        recipient, problem = _email_account_decision(user_id, user, "approved")
+        if problem:
+            flash(f"{name}'s account is approved, but the email couldn't be sent: {problem}. "
+                  "Please tell them another way that they can now sign in.", "account-approved-nomail")
+        else:
+            flash(f"{name}'s account is approved. We emailed {recipient} to let them know they can sign in.",
+                  "account-approved")
         return redirect(url_for("admin_dashboard"))
 
     except Exception as e:
@@ -1695,21 +1678,16 @@ def reject_user(user_id):
         # Update status in database
         supabase_admin.table("profiles").update({"status": "rejected"}).eq("id", user_id).execute()
 
-        # Fire email asynchronously in background thread
-        try:
-            auth_user_res = supabase_admin.auth.admin.get_user_by_id(user_id)
-            if auth_user_res and getattr(auth_user_res, "user", None):
-                recipient_email = auth_user_res.user.email
-                user_name = user.get("display_name") or user.get("first_name") or "Colleague"
-
-                email_thread = threading.Thread(
-                    target=send_email_in_background,
-                    args=(recipient_email, user_name, "rejected")
-                )
-                email_thread.start()
-        except Exception as mail_err:
-            print(f"Failed to start rejection email thread: {str(mail_err)}")
-
+        # Optional note from the admin, included in the email so the person knows what to fix.
+        reason = " ".join((request.form.get("reason") or "").split())[:500]
+        name = _display_name(user, "The user")
+        recipient, problem = _email_account_decision(user_id, user, "rejected", reason)
+        if problem:
+            flash(f"{name}'s application is rejected, but the email couldn't be sent: {problem}. "
+                  "Please let them know another way.", "account-rejected-nomail")
+        else:
+            flash(f"{name}'s application is rejected. We emailed {recipient} with the update"
+                  f"{' and your reason' if reason else ''}.", "account-rejected")
         return redirect(url_for("admin_dashboard"))
 
     except Exception as e:
@@ -2111,115 +2089,170 @@ def create_dental_case():
 # REGISTER
 # =========================
 
+NAME_RE = re.compile(r"[A-Za-zÑñ]+(?: [A-Za-zÑñ]+)*")   # letters, single spaces between words
+PHONE_RE = re.compile(r"09\d{9}")
+EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+REGISTER_FIELDS = ("first_name", "last_name", "display_name", "phone", "role", "clinic_name", "email")
+
+
+def _register_problems(form):
+    """Check the registration form. Returns (cleaned values, {field: message}).
+
+    Each message names the field and says exactly what to fix, so the page can show it
+    beside that field and keep everything the person typed correctly."""
+    values = {f: " ".join((form.get(f) or "").split()) for f in REGISTER_FIELDS}
+    values["email"] = values["email"].lower()
+    values["accept_terms"] = form.get("accept_terms") == "yes"
+    password = form.get("password") or ""
+    errors = {}
+
+    for field, label, shortest in (("first_name", "First name", 2), ("last_name", "Last name", 2),
+                                   ("display_name", "Display name", 3)):
+        value = values[field]
+        if not value:
+            errors[field] = f"{label} is required."
+        elif not NAME_RE.fullmatch(value):
+            errors[field] = f"{label} can only contain letters and spaces (no numbers, periods or symbols)."
+        elif len(value) < shortest:
+            errors[field] = f"{label} must be at least {shortest} letters."
+
+    if not values["phone"]:
+        errors["phone"] = "Phone number is required."
+    elif not PHONE_RE.fullmatch(values["phone"]):
+        errors["phone"] = "Phone number must be 11 digits and start with 09 (e.g. 09123456789)."
+
+    if values["role"] not in ("dentist", "technician"):
+        errors["role"] = "Please choose Dentist or Dental Technician."
+        values["role"] = ""
+
+    if values["role"] == "dentist":
+        clinic = values["clinic_name"]
+        if not clinic:
+            errors["clinic_name"] = "Dental clinic name is required for dentists."
+        elif not NAME_RE.fullmatch(clinic):
+            errors["clinic_name"] = "Dental clinic name can only contain letters and spaces (no numbers or symbols)."
+        elif len(clinic) > 120:
+            errors["clinic_name"] = "Dental clinic name must be 120 characters or fewer."
+    else:
+        values["clinic_name"] = ""
+
+    if not values["email"]:
+        errors["email"] = "Email address is required."
+    elif not EMAIL_RE.fullmatch(values["email"]):
+        errors["email"] = "Enter a valid email address (e.g. name@clinic.com)."
+
+    missing = []
+    if len(password) < 8:
+        missing.append("at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        missing.append("an uppercase letter")
+    if not re.search(r"[a-z]", password):
+        missing.append("a lowercase letter")
+    if not re.search(r"[0-9]", password):
+        missing.append("a number")
+    if missing:
+        errors["password"] = "Password needs " + ", ".join(missing) + "."
+    elif password != (form.get("confirm_password") or ""):
+        errors["confirm_password"] = "Passwords do not match. Type the same password in both boxes."
+
+    if not values["accept_terms"]:
+        errors["accept_terms"] = "Please read and accept the Terms and Conditions and Data Privacy Notice."
+
+    # One phone number per account: the lab calls this number about cases and deliveries.
+    if "phone" not in errors:
+        try:
+            taken = (supabase_admin.table("profiles").select("id")
+                     .eq("phone", values["phone"]).limit(1).execute().data)
+        except Exception:
+            taken = None
+        if taken:
+            errors["phone"] = "This phone number is already used by another account. Please use a different number."
+
+    return values, errors
+
+
+def _render_register(values=None, errors=None):
+    """Show the form again: correct entries stay filled in, wrong ones are cleared and marked."""
+    values = dict(values or {})
+    errors = errors or {}
+    for field in errors:
+        if field in values and field not in ("role", "accept_terms"):
+            values[field] = ""
+    return render_template("register.html", form=values, errors=errors)
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if request.method == "POST":
+    if request.method != "POST":
+        return _render_register()
+
+    values, errors = _register_problems(request.form)
+    if errors:
+        return _render_register(values, errors)
+
+    email = values["email"]
+    role = values["role"]
+    clinic_name = values["clinic_name"] or None
+    display_name = values["display_name"]
+
+    try:
+        # =========================
+        # CREATE SUPABASE AUTH USER
+        # =========================
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": request.form.get("password"),
+            "options": {"email_redirect_to": _email_confirmed_url()},
+        })
+
+        # Supabase answers a sign-up for an address it already has with a stand-in user that
+        # has no identities (so outsiders can't probe for accounts); no email is sent then.
+        if not response.user or not (getattr(response.user, "identities", None) or []):
+            return _render_register(values, {"email": "An account with this email address already exists. "
+                                                      "Sign in instead, or use a different email."})
 
         # =========================
-        # GET FORM DATA
+        # CREATE PROFILE
         # =========================
-        first_name = request.form.get("first_name", "").strip()
-        last_name = request.form.get("last_name", "").strip()
-        display_name = request.form.get("display_name", "").strip()
-        phone = request.form.get("phone", "").strip()
-
-        role = request.form.get("role", "").strip()
-        professional_id = request.form.get("professional_id", "N/A")
-        
-        # Grab clinic name if user selected dentist, otherwise set to None/Empty
-        clinic_name = request.form.get("clinic_name", "").strip() if role == "dentist" else None
-
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password")
-        confirm_password = request.form.get("confirm_password")
-
-        # =========================
-        # VALIDATE PASSWORD
-        # =========================
-        if password != confirm_password:
-            flash("Passwords do not match.", "error")
-            return render_template("register.html")
+        supabase_admin.table("profiles").insert({
+            "id": response.user.id,
+            "first_name": values["first_name"],
+            "last_name": values["last_name"],
+            "display_name": display_name,
+            "phone": values["phone"],
+            "professional_id": request.form.get("professional_id", "N/A"),
+            "clinic_name": clinic_name,
+            "role": role,
+            "status": "pending",
+            "terms_version": TERMS_VERSION,
+            "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        _notify_admins(
+            f"New account waiting for approval: {display_name} ({role}{', ' + clinic_name if clinic_name else ''}).",
+            link="/admin",
+        )
 
         # =========================
-        # PREVENT ADMIN REGISTRATION
+        # SHOW EMAIL VERIFICATION
         # =========================
-        if role not in ["dentist", "technician"]:
-            flash("Invalid role selected.", "error")
-            return render_template("register.html")
+        # Remember the address in this browser's session: the "Resend" button can only
+        # resend to the account this browser just registered, never to a typed-in address.
+        session["verify_email"] = email
+        session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
+        return redirect(url_for("verify_email"))
 
-        # Clinic reports group dentists by clinic, so a dentist must name theirs.
-        if role == "dentist":
-            clinic_name = " ".join((clinic_name or "").split())[:120]
-            if not clinic_name:
-                flash("Please enter your dental clinic's name.", "error")
-                return render_template("register.html")
-
-        # =========================
-        # REQUIRE TERMS ACCEPTANCE
-        # =========================
-        if request.form.get("accept_terms") != "yes":
-            flash("You must read and accept the Terms and Conditions and Data Privacy Notice to create an account.", "error")
-            return render_template("register.html")
-
-        try:
-            # =========================
-            # CREATE SUPABASE AUTH USER
-            # =========================
-            response = supabase.auth.sign_up({
-                "email": email,
-                "password": password
-            })
-
-            if not response.user:
-                flash("Registration failed. Please check your information.", "error")
-                return render_template("register.html")
-
-            # =========================
-            # GET USER UUID
-            # =========================
-            user_id = response.user.id
-
-            # =========================
-            # CREATE PROFILE
-            # =========================
-            supabase_admin.table("profiles").insert({
-                "id": user_id,
-                "first_name": first_name,
-                "last_name": last_name,
-                "display_name": display_name,
-                "phone": phone,
-                "professional_id": professional_id,
-                "clinic_name": clinic_name,  # <--- SAVED TO DATABASE HERE
-                "role": role,
-                "status": "pending",
-                "terms_version": TERMS_VERSION,
-                "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
-            }).execute()
-            _notify_admins(
-                f"New account waiting for approval: {display_name} ({role}{', ' + clinic_name if clinic_name else ''}).",
-                link="/admin",
-            )
-
-            # =========================
-            # SHOW EMAIL VERIFICATION
-            # =========================
-            # Remember the address in this browser's session: the "Resend" button can only
-            # resend to the account this browser just registered, never to a typed-in address.
-            session["verify_email"] = email
-            session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
-            return redirect(url_for("verify_email"))
-
-        except Exception as e:
-            err_str = str(e)
-            # Catch Postgres unique constraint 23505 or Supabase duplicate user notifications
-            if "23505" in err_str or "already registered" in err_str or "already exists" in err_str:
-                flash("An account with this email address already exists. Please sign in or use a different email.", "error")
-            else:
-                flash("Unable to complete registration. Please verify your details and try again.", "error")
-
-            return render_template("register.html")
-
-    return render_template("register.html")
+    except Exception as e:
+        err_str = str(e).lower()
+        if "23505" in err_str or "already registered" in err_str or "already exists" in err_str:
+            return _render_register(values, {"email": "An account with this email address already exists. "
+                                                      "Sign in instead, or use a different email."})
+        if "password" in err_str:
+            return _render_register(values, {"password": f"The password was not accepted: {e}"})
+        if "rate limit" in err_str or "429" in err_str:
+            return _render_register(values, {"_form": "Too many sign-up attempts in a short time. "
+                                                      "Please wait a minute and submit again."})
+        return _render_register(values, {"_form": "We couldn't create your account right now. "
+                                                  "Your details are kept below; please try again in a moment."})
 
 
 # =========================
@@ -2260,7 +2293,8 @@ def resend_verification_email():
         flash(f"Please wait {wait} seconds before asking for another email.", "verify-wait")
         return redirect(url_for("verify_email"))
     try:
-        supabase.auth.resend({"type": "signup", "email": email})
+        supabase.auth.resend({"type": "signup", "email": email,
+                              "options": {"email_redirect_to": _email_confirmed_url()}})
         session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
         flash("A new confirmation email is on its way. It can take 5–10 minutes to arrive.", "verify-sent")
     except Exception as error:
@@ -2276,6 +2310,66 @@ def resend_verification_email():
             app.logger.exception("Unable to resend the confirmation email")
             flash("We couldn't send the email right now. Try again in a minute.", "verify-error")
     return redirect(url_for("verify_email"))
+
+
+def _email_confirmed_url():
+    """Where the confirmation link sends people after Supabase confirms the address.
+    Add this address to Supabase > Authentication > URL Configuration > Redirect URLs."""
+    return f"{APP_URL}/email-confirmed"
+
+
+@app.route("/email-confirmed")
+def email_confirmed():
+    """The page a person sees after clicking the link in their confirmation email.
+
+    Supabase confirms the address before it redirects here: a successful click arrives
+    with ?code=..., an expired or reused link with ?error_code=... The page only reports
+    the result; it doesn't sign anyone in or change anything."""
+    if request.args.get("error_code") or request.args.get("error"):
+        state = "expired"
+    elif request.args.get("code"):
+        state = "confirmed"
+    else:
+        state = "unknown"
+    response = make_response(render_template(
+        "email_confirmed.html", state=state, resend_token=_csrf_token(),
+        wait_seconds=_verify_wait_seconds(), remembered_email=session.get("verify_email", "")))
+    # The one-time code is in the address: keep it out of caches and referrer headers.
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.route("/email-confirmed/resend", methods=["POST"])
+def resend_confirmation_from_link():
+    """A fresh confirmation link for someone whose link expired, from any browser.
+    The answer is the same whether or not the address has an account, so it can't be
+    used to find out who is registered."""
+    back = redirect(url_for("email_confirmed", error="resend"))
+    if not _valid_csrf_token():
+        flash("This page expired. Please try again.", "verify-error")
+        return back
+    email = " ".join((request.form.get("email") or "").split()).lower()
+    if not EMAIL_RE.fullmatch(email):
+        flash("Enter the email address you registered with (e.g. name@clinic.com).", "verify-error")
+        return back
+    wait = _verify_wait_seconds()
+    if wait:
+        flash(f"Please wait {wait} seconds before asking for another email.", "verify-wait")
+        return back
+    session["verify_sent_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        supabase.auth.resend({"type": "signup", "email": email,
+                              "options": {"email_redirect_to": _email_confirmed_url()}})
+    except Exception as error:
+        text = str(error).lower()
+        if "seconds" in text or "rate" in text or "429" in text:
+            flash("The email service asks us to wait a minute between emails. Try again shortly.", "verify-wait")
+            return back
+        # Already confirmed or no such account: answer the same way as a real send.
+    flash("If that address has an account that still needs confirming, a new link is on its way. "
+          "It can take 5–10 minutes to arrive; check Spam too.", "verify-sent")
+    return back
 
 # =========================
 # LOGIN

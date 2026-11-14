@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>{% if state == 'confirmed' %}Email Confirmed{% elif state == 'expired' %}Link Expired{% else %}Email Confirmation{% endif %} - DentaLink LIS</title>
+    <style>
+        :root {
+            --bg-main: #F0F5FA;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --accent-cyan: #0284C7;
+            --accent-cyan-hover: #0369A1;
+            --accent-green: #10B981;
+            --accent-amber: #D97706;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+            color-scheme: light;
+            background-image:
+                radial-gradient(circle at 15% 15%, rgba(2, 132, 199, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .brand-header { text-align: center; margin-bottom: 30px; }
+        .logo-container {
+            background: #FFFFFF; padding: 10px 20px; border-radius: 12px; display: inline-block;
+            margin-bottom: 15px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.1);
+            border: 1px solid rgba(2, 132, 199, 0.15);
+        }
+        .mrkzter-logo { height: 38px; width: auto; display: block; }
+        .brand-titles h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; color: #0F172A; }
+        .brand-titles p {
+            margin: 4px 0 0 0; font-size: 11px; font-weight: 700; color: var(--accent-cyan);
+            letter-spacing: 1.5px; text-transform: uppercase;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 540px;
+            padding: 40px 36px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, transparent, var(--tone), transparent);
+        }
+        .card.confirmed { --tone: var(--accent-green); --tone-soft: rgba(16, 185, 129, 0.12); --tone-line: rgba(16, 185, 129, 0.35); }
+        .card.expired   { --tone: var(--accent-amber); --tone-soft: rgba(217, 119, 6, 0.1);  --tone-line: rgba(217, 119, 6, 0.3); }
+        .card.unknown   { --tone: var(--accent-cyan);  --tone-soft: rgba(2, 132, 199, 0.1);  --tone-line: rgba(2, 132, 199, 0.25); }
+
+        .state[hidden] { display: none; }
+
+        .icon-circle {
+            width: 76px; height: 76px; margin: 0 auto 20px; border-radius: 50%;
+            background: var(--tone-soft); border: 1px solid var(--tone-line); color: var(--tone);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .confirmed .icon-circle { animation: pop 0.45s cubic-bezier(.2, 1.4, .4, 1) both; }
+        @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .check-path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw 0.45s 0.3s ease-out forwards; }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        @media (prefers-reduced-motion: reduce) {
+            .confirmed .icon-circle, .check-path { animation: none; stroke-dashoffset: 0; }
+        }
+
+        .card-heading { font-size: 24px; font-weight: 700; margin: 0 0 8px; color: #0F172A; }
+        .card-description { font-size: 15px; color: #475569; margin: 0 0 24px; }
+
+        .next-box {
+            background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px 18px; margin-bottom: 26px; text-align: left;
+        }
+        .next-title {
+            font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 1px; margin: 0 0 12px;
+        }
+        .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+        .steps li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: var(--text-main); }
+        .steps .sub { display: block; font-size: 13px; color: var(--text-muted); }
+        .dot {
+            width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex;
+            align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+            border: 1px solid var(--border-color); background: #FFFFFF; color: var(--text-muted);
+        }
+        .dot.done { background: var(--accent-green); border-color: var(--accent-green); color: #FFFFFF; }
+        .dot.now { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(2, 132, 199, 0.08); }
+
+        .btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+            padding: 14px 20px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer;
+            border: none; text-decoration: none; transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        .btn-primary { background: var(--accent-cyan); color: #FFFFFF; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25); }
+        .btn-primary:hover { background: var(--accent-cyan-hover); }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-outline { background: #FFFFFF; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); margin-top: 10px; }
+        .btn-outline:hover { background: #F0F9FF; }
+        .btn:focus-visible, input:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+
+        .resend-box { text-align: left; border-top: 1px solid var(--border-color); margin-top: 26px; padding-top: 22px; }
+        .resend-box h3 { font-size: 15px; margin: 0 0 4px; color: #0F172A; }
+        .resend-box p { font-size: 13px; color: var(--text-muted); margin: 0 0 12px; }
+        .resend-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .resend-row input {
+            flex: 1 1 220px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 8px;
+            background: var(--bg-input); font-size: 14px; color: var(--text-main);
+        }
+        .resend-row .btn { width: auto; flex: 0 0 auto; margin: 0; padding: 12px 18px; font-size: 14px; }
+        .resend-row .btn:disabled { background: #E2E8F0; color: #64748B; border-color: #CBD5E1; cursor: not-allowed; }
+
+        .flash { margin: 0 0 16px; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: left; }
+        .flash.verify-sent { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #047857; }
+        .flash.verify-wait { background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.3); color: #B45309; }
+        .flash.verify-error { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: #B91C1C; }
+
+        .page-footer { margin-top: 30px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+        @media (max-width: 600px) {
+            .card { padding: 32px 22px; }
+            .card-heading { font-size: 22px; }
+        }
+        /* Phones: 16px form fields so iOS doesn't zoom in on focus. */
+        @media (max-width: 768px) { input { font-size: 16px !important; } }
+    </style>
+</head>
+<body>
+
+    <div class="brand-header">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='images/mrkzter_logo.jpg') }}" alt="Mrkzter Dental Laboratory Logo" class="mrkzter-logo">
+        </div>
+        <div class="brand-titles">
+            <h1>DentaLink LIS</h1>
+            <p>Mrkzter Dental Laboratory</p>
+        </div>
+    </div>
+
+    <div class="card {{ state }}" id="card">
+
+        <!-- Confirmed -->
+        <section class="state" data-state="confirmed" {% if state != 'confirmed' %}hidden{% endif %}>
+            <div class="icon-circle">
+                <svg width="38" height="38" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path class="check-path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M5 13l4 4L19 7"/>
+                </svg>
+            </div>
+            <h2 class="card-heading">Email Confirmed!</h2>
+            <p class="card-description">Thank you. Your email address has been verified successfully.</p>
+
+            <div class="next-box">
+                <p class="next-title">What happens next</p>
+                <ol class="steps">
+                    <li><span class="dot done">✓</span><span>Email address confirmed</span></li>
+                    <li><span class="dot now">2</span><span>The laboratory administrator reviews your account<span class="sub">They check your details and approve your access.</span></span></li>
+                    <li><span class="dot">3</span><span>Sign in to your DentaLink workspace<span class="sub">If you sign in before approval, you'll see a "not yet approved" notice.</span></span></li>
+                </ol>
+            </div>
+
+            <a href="{{ url_for('login') }}" class="btn btn-primary">
+                Go to Sign In
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            </a>
+        </section>
+
+        <!-- Expired or already-used link -->
+        <section class="state" data-state="expired" {% if state != 'expired' %}hidden{% endif %}>
+            <div class="icon-circle">
+                <svg width="34" height="34" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h2 class="card-heading">This Link Has Expired</h2>
+            <p class="card-description">The confirmation link is no longer valid. It may be too old, or it was already used.
+                If you clicked it before, your email is already confirmed and you can sign in.</p>
+
+            <a href="{{ url_for('login') }}" class="btn btn-primary">
+                Go to Sign In
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            </a>
+
+            <div class="resend-box">
+                <h3>Need a new confirmation link?</h3>
+                <p>Enter the email address you registered with and we'll send a fresh link.</p>
+                {% with notes = get_flashed_messages(with_categories=true, category_filter=['verify-sent', 'verify-wait', 'verify-error']) %}
+                    {% for category, message in notes %}
+                        <div class="flash {{ category }}" role="status">{{ message }}</div>
+                    {% endfor %}
+                {% endwith %}
+                <form method="POST" action="{{ url_for('resend_confirmation_from_link') }}" class="resend-row">
+                    <input type="hidden" name="csrf_token" value="{{ resend_token }}">
+                    <input type="email" name="email" placeholder="name@clinic.com" required autocomplete="email"
+                           aria-label="Registered email address" value="{{ remembered_email }}">
+                    <button type="submit" class="btn btn-outline" id="resendBtn" data-wait="{{ wait_seconds or 0 }}">Send new link</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Opened without a result (e.g. typed in) -->
+        <section class="state" data-state="unknown" {% if state != 'unknown' %}hidden{% endif %}>
+            <div class="icon-circle">
+                <svg width="34" height="34" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <h2 class="card-heading">Email Confirmation</h2>
+            <p class="card-description">To confirm your email, open the message from DentaLink and click the confirmation link.
+                If you already did, you can sign in once the laboratory approves your account.</p>
+            <a href="{{ url_for('login') }}" class="btn btn-primary">Go to Sign In</a>
+        </section>
+    </div>
+
+    <div class="page-footer">
+        © 2026 Mrkzter Dental Laboratory • All Rights Reserved
+    </div>
+
+    <script>
+        (function () {
+            // Some Supabase setups report a bad link after "#" instead of "?": show the expired state then.
+            const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+            if (hash.get('error_code') || hash.get('error')) {
+                const card = document.getElementById('card');
+                card.className = 'card expired';
+                document.querySelectorAll('.state').forEach(s => { s.hidden = s.dataset.state !== 'expired'; });
+                document.title = 'Link Expired - DentaLink LIS';
+            } else if (hash.get('type') === 'signup' && hash.get('access_token')) {
+                const card = document.getElementById('card');
+                card.className = 'card confirmed';
+                document.querySelectorAll('.state').forEach(s => { s.hidden = s.dataset.state !== 'confirmed'; });
+                document.title = 'Email Confirmed - DentaLink LIS';
+            }
+            // Remove the one-time code from the address bar so it isn't bookmarked or shared.
+            if (location.search || location.hash) {
+                history.replaceState(null, '', location.pathname);
+            }
+
+            // One-minute wait between emails, same as the "Check your inbox" page.
+            const btn = document.getElementById('resendBtn');
+            if (!btn) return;
+            const label = btn.textContent;
+            let left = parseInt(btn.dataset.wait || '0', 10);
+            const tick = () => {
+                if (left > 0) {
+                    btn.disabled = true;
+                    btn.textContent = `Wait ${left}s`;
+                    left -= 1;
+                    setTimeout(tick, 1000);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = label;
+                }
+            };
+            tick();
+            btn.form.addEventListener('submit', () => { btn.disabled = true; btn.textContent = 'Sending…'; });
+        })();
+    </script>
+</body>
+</html>

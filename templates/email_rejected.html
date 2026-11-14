@@ -29,9 +29,15 @@
                             <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-top: 0; margin-bottom: 16px;">
                                 Thank you for your interest in connecting with the <strong>DentaLink Laboratory Information System</strong>.
                             </p>
-                            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-top: 0; margin-bottom: 28px;">
-                                After carefully reviewing the professional credentials submitted with your registration, the laboratory administration has declined or deferred authorization of your account at this time. If you believe this decision was made in error or if you need to resubmit updated license documentation, please reach out directly to our support desk.
+                            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-top: 0; margin-bottom: {{ '16px' if reason else '28px' }};">
+                                After carefully reviewing the details submitted with your registration, the laboratory administration has declined or deferred authorization of your account at this time. If you believe this decision was made in error or you need to correct your details, please contact the laboratory directly.
                             </p>
+                            {% if reason %}
+                            <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #EF4444; border-radius: 8px; padding: 14px 16px; margin-bottom: 28px;">
+                                <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B;">Note from the laboratory</p>
+                                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #1E293B;">{{ reason }}</p>
+                            </div>
+                            {% endif %}
                         </td>
                     </tr>
                     <!-- Footer Info -->
