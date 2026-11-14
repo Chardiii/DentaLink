@@ -28,6 +28,14 @@
         .filters .spacer { flex: 1; }
         .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
 
+        /* Admins: the reports sit beside the admin sidebar, like every other admin page. */
+        body.with-sidebar { padding: 0; --sidebar-width: 260px; --border-color: var(--border); --text-muted: var(--muted); }
+        .report-main { margin-left: var(--sidebar-width); padding: 32px 32px 48px; }
+        .page-title h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; color: var(--strong); }
+        .page-title p { margin: 2px 0 0; font-size: 13.5px; color: var(--muted); }
+        @media (max-width: 1024px) { .report-main { margin-left: 0; padding: 24px 20px 40px; } }
+        @media (max-width: 600px) { .report-main { padding: 18px 12px 32px; } }
+
         /* The printed sheet */
         /* One A4 sheet per page; the page split is decided on the server (rows per page). */
         .sheet { max-width: 1100px; margin: 0 auto 24px; padding: 32px 36px 24px; background: #FFFFFF; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px rgba(15, 23, 42, .08); display: flex; flex-direction: column; }
@@ -67,7 +75,8 @@
         @page { size: A4; margin: 0; }
         @media print {
             body { background: #FFFFFF; padding: 0; font-size: 11px; }
-            .toolbar { display: none; }
+            .toolbar, .app-sidebar, .live-toast { display: none !important; }
+            .report-main { margin: 0; padding: 0; }
             /* One sheet per A4 page (297mm tall). min-height, not height: if long text ever makes
                a sheet taller than a page, it continues on an extra page instead of being cut off. */
             .sheet { border: 0; box-shadow: none; border-radius: 0; padding: 12mm 12mm 10mm; margin: 0; max-width: none; min-height: 295mm; break-after: page; page-break-after: always; }
@@ -84,10 +93,22 @@
         @media (max-width: 768px) { input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; } }
     </style>
 </head>
-<body>
+<body{% if role == 'admin' %} class="with-sidebar"{% endif %}>
+    {% if role == 'admin' %}
+        {% set active_admin_page = 'reports' %}
+        {% include "partials/admin_sidebar.html" %}
+        <main class="report-main">
+    {% endif %}
     <div class="toolbar">
         <div class="toolbar-row">
-            <a class="btn" href="{{ back }}">← Back to dashboard</a>
+            {% if role == 'admin' %}
+                <div class="page-title">
+                    <h1>Reports</h1>
+                    <p>Print or download laboratory reports for any period.</p>
+                </div>
+            {% else %}
+                <a class="btn" href="{{ back }}">← Back to dashboard</a>
+            {% endif %}
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <a class="btn" href="{{ url_for('reports', **dict(request.args.to_dict(), report=key, format='xlsx')) }}">
                     <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -219,6 +240,14 @@
         <footer class="sheet-foot">Page {{ page_no }} of {{ page_count }}</footer>
     </article>
     {% endfor %}
+    {% if role == 'admin' %}
+        </main>
+        <script>
+            window.LIVE_REGIONS = ['.sidebar-nav', '.notif-wrapper'];
+            window.liveHooks = {};
+        </script>
+        {% include 'partials/live_updates.html' %}
+    {% endif %}
 
     <script>
         // Show only the picker for the chosen period type; disabled pickers aren't submitted.
